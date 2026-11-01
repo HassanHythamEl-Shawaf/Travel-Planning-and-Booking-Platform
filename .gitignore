@@ -1,0 +1,20 @@
+# Dependencies
+node_modules/
+**/node_modules/
+
+# Build output
+dist/
+**/dist/
+*.tsbuildinfo
+
+# Environment variables and secrets
+.env
+**/.env
+
+# Keep example environment files
+!.env.example
+!**/.env.example
+
+# Logs
+*.log
+npm-debug.log*
