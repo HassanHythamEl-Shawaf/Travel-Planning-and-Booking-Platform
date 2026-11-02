@@ -2,11 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 
-import {
-  User,
-  UserDocument,
-  AccountStatus,
-} from './schemas/user.schema';
+import { User, UserDocument, AccountStatus } from './schemas/user.schema';
 
 @Injectable()
 export class UsersService {
@@ -22,15 +18,11 @@ export class UsersService {
 
   // Find a user by email (normal queries)
   async findByEmail(email: string): Promise<UserDocument | null> {
-    return this.userModel
-      .findOne({ email: email.toLowerCase().trim() })
-      .exec();
+    return this.userModel.findOne({ email: email.toLowerCase().trim() }).exec();
   }
 
   // Find a user by email, including sensitive authentication fields
-  async findByEmailForAuth(
-    email: string,
-  ): Promise<UserDocument | null> {
+  async findByEmailForAuth(email: string): Promise<UserDocument | null> {
     return this.userModel
       .findOne({ email: email.toLowerCase().trim() })
       .select('+passwordHash +refreshTokenHash')
@@ -40,6 +32,53 @@ export class UsersService {
   // Find a user by MongoDB ID
   async findById(id: string): Promise<UserDocument | null> {
     return this.userModel.findById(id).exec();
+  }
+
+  async findByIdForAuth(id: string): Promise<UserDocument | null> {
+    return this.userModel
+      .findById(id)
+      .select('+passwordHash +refreshTokenHash')
+      .exec();
+  }
+
+  async updateLastActivity(id: string): Promise<void> {
+    await this.userModel.updateOne(
+      { _id: id },
+      { $set: { lastActivityAt: new Date() } },
+    );
+  }
+
+  async changePasswordHash(id: string, passwordHash: string): Promise<void> {
+    await this.userModel.updateOne(
+      { _id: id },
+      {
+        $set: {
+          passwordHash,
+          mustChangePassword: false,
+          refreshTokenHash: null,
+          failedLoginAttempts: 0,
+          lockUntil: null,
+        },
+      },
+    );
+  }
+
+  async deactivateAccount(id: string): Promise<UserDocument | null> {
+    return this.userModel
+      .findByIdAndUpdate(
+        id,
+        {
+          $set: {
+            status: AccountStatus.DEACTIVATED,
+            refreshTokenHash: null,
+          },
+        },
+        {
+          new: true,
+          runValidators: true,
+        },
+      )
+      .exec();
   }
 
   // Update editable profile information
