@@ -1,0 +1,26 @@
+@'
+AI PROMPT LOG
+Add one entry per prompt that materially contributed to the project.
+
+================================================
+Date: 2026-11-01
+Student: Hassan
+Tool: ChatGPT and Claude
+Related Requirement: Project planning
+Prompt:
+Asked for a split of the Milestone 1 backend work between 8 people, with work order and shared contracts, checked against the project description and requirements sheet.
+How the output was used:
+Used it as the team work split and work order documents.
+================================================
+
+================================================
+Date: 2026-11-01
+Student: Hassan
+Tool: Claude
+Related Requirement: Project setup
+Prompt:
+Asked for step-by-step guidance to set up the GitHub repo, branches and the NestJS backend as Person 1.
+How the output was used:
+Followed the commands to create the repo structure and the main and develop branches.
+================================================
+'@ | Set-Content -Path AI_PROMPTS.txt -Encoding ascii
