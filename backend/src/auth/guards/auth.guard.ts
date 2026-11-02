@@ -6,10 +6,12 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
+import { Reflector } from '@nestjs/core';
 import type { Request } from 'express';
 
 import { AccountStatus } from '../../users/schemas/user.schema';
 import { UsersService } from '../../users/users.service';
+import { ALLOW_PASSWORD_CHANGE_KEY } from '../decorators/allow-password-change.decorator';
 import { AuthenticatedUser } from '../decorators/current-user.decorator';
 
 interface AuthenticatedRequest extends Request {
@@ -22,6 +24,7 @@ export class AuthGuard implements CanActivate {
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
     private readonly usersService: UsersService,
+    private readonly reflector: Reflector,
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
@@ -46,10 +49,25 @@ export class AuthGuard implements CanActivate {
       throw new UnauthorizedException('Invalid session');
     }
 
-    const user = await this.usersService.findById(payload.sub);
+    const user = await this.usersService.findByIdForAuth(payload.sub);
 
-    if (!user || user.status !== AccountStatus.ACTIVE) {
+    if (
+      !user ||
+      user.status !== AccountStatus.ACTIVE ||
+      !user.refreshTokenHash
+    ) {
       throw new UnauthorizedException('Invalid session');
+    }
+
+    const allowPasswordChange = this.reflector.getAllAndOverride<boolean>(
+      ALLOW_PASSWORD_CHANGE_KEY,
+      [context.getHandler(), context.getClass()],
+    );
+
+    if (user.mustChangePassword && !allowPasswordChange) {
+      throw new UnauthorizedException(
+        'You must change your password before continuing',
+      );
     }
 
     const now = new Date();

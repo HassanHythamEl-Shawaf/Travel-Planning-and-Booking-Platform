@@ -12,6 +12,7 @@ import type { Response } from 'express';
 import type { Request } from 'express';
 
 import { AuthService } from './auth.service';
+import { AllowPasswordChange } from './decorators/allow-password-change.decorator';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
 import { ChangePasswordDto } from './dto/change-password.dto';
@@ -29,7 +30,7 @@ export class AuthController {
     return {
       httpOnly: true,
       secure: production,
-      sameSite: production ? ('none' as const) : ('lax' as const),
+      sameSite: 'lax' as const,
       path: '/',
     };
   }
@@ -92,6 +93,7 @@ export class AuthController {
 
   @Post('logout')
   @UseGuards(AuthGuard)
+  @AllowPasswordChange()
   @ApiOperation({ summary: 'Log out and revoke the refresh token' })
   async logout(
     @CurrentUser() user: { sub: string },
@@ -114,6 +116,7 @@ export class AuthController {
 
   @Post('change-password')
   @UseGuards(AuthGuard)
+  @AllowPasswordChange()
   @ApiOperation({ summary: 'Change current user password' })
   async changePassword(
     @CurrentUser() user: { sub: string },
