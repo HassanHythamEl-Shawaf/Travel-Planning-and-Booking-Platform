@@ -142,19 +142,17 @@ export class AuthService {
     );
 
     if (!passwordMatches) {
-      user.failedLoginAttempts += 1;
+      const loginState = await this.usersService.recordFailedLogin(
+        user.email,
+        now,
+      );
 
-      if (user.failedLoginAttempts >= 5) {
-        user.lockUntil = new Date(Date.now() + 15 * 60 * 1000);
-        await user.save();
-
+      if (!loginState || loginState.failedLoginAttempts >= 5) {
         throw new HttpException(
           'Too many failed login attempts. Your account is locked for 15 minutes.',
           HttpStatus.TOO_MANY_REQUESTS,
         );
       }
-
-      await user.save();
 
       throw new UnauthorizedException('Invalid email or password');
     }

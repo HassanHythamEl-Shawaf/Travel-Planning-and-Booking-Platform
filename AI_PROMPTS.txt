@@ -23,4 +23,15 @@ Asked for step-by-step guidance to set up the GitHub repo, branches and the Nest
 How the output was used:
 Followed the commands to create the repo structure and the main and develop branches.
 ================================================
+
+================================================
+Date: 2026-11-02
+Student: Hassan
+Tool: Copilot
+Related Requirement: GEN-13, ACC-05, ACC-06, ACC-08, ACC-09, ACC-11, ACC-12, ACC-19
+Prompt:
+Asked to audit Person 1's assigned milestone work against the project work split, finish safely implementable gaps, and verify backend behavior.
+How the output was used:
+Hardened revocation and temporary-password enforcement, configured cookie CSRF protection, added shared pagination and exception handling, and defined fail-closed integration contracts for moderator provider ownership and booking-restricted account deactivation.
+================================================
 '@ | Set-Content -Path AI_PROMPTS.txt -Encoding ascii

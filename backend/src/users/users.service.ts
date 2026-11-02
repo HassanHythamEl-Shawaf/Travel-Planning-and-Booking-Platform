@@ -48,6 +48,69 @@ export class UsersService {
     );
   }
 
+  async recordFailedLogin(
+    email: string,
+    now: Date,
+  ): Promise<Pick<User, 'failedLoginAttempts' | 'lockUntil'> | null> {
+    return this.userModel
+      .findOneAndUpdate(
+        {
+          email: email.toLowerCase().trim(),
+          status: AccountStatus.ACTIVE,
+          $or: [{ lockUntil: null }, { lockUntil: { $lte: now } }],
+        },
+        [
+          {
+            $set: {
+              failedLoginAttempts: {
+                $add: [
+                  {
+                    $cond: [
+                      {
+                        $and: [
+                          { $ne: ['$lockUntil', null] },
+                          { $lte: ['$lockUntil', now] },
+                        ],
+                      },
+                      0,
+                      { $ifNull: ['$failedLoginAttempts', 0] },
+                    ],
+                  },
+                  1,
+                ],
+              },
+            },
+          },
+          {
+            $set: {
+              lockUntil: {
+                $cond: [
+                  { $gte: ['$failedLoginAttempts', 5] },
+                  {
+                    $dateAdd: {
+                      startDate: '$$NOW',
+                      unit: 'minute',
+                      amount: 15,
+                    },
+                  },
+                  null,
+                ],
+              },
+            },
+          },
+        ],
+        {
+          new: true,
+          projection: {
+            failedLoginAttempts: 1,
+            lockUntil: 1,
+          },
+        },
+      )
+      .lean()
+      .exec();
+  }
+
   async changePasswordHash(id: string, passwordHash: string): Promise<void> {
     await this.userModel.updateOne(
       { _id: id },
