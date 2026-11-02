@@ -57,6 +57,14 @@ $ npm run test:e2e
 $ npm run test:cov
 ```
 
+## Cookie authentication
+
+Browser requests that change data must send an `Origin` or `Referer` matching
+`FRONTEND_URL` (or the API's own origin). The backend rejects requests from
+other origins. Authentication cookies are `httpOnly`, use `SameSite=Lax`, and
+are marked `Secure` in production. Keep the frontend and API on the same site
+in production, and set `FRONTEND_URL` to the frontend's origin.
+
 ## Deployment
 
 When you're ready to deploy your NestJS application to production, there are some key steps you can take to ensure it runs as efficiently as possible. Check out the [deployment documentation](https://docs.nestjs.com/deployment) for more information.

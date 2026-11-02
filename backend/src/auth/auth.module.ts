@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { APP_GUARD } from '@nestjs/core';
 import { JwtModule } from '@nestjs/jwt';
 
 import { UsersModule } from '../users/users.module';
@@ -6,12 +7,19 @@ import { UsersController } from '../users/users.controller';
 import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
 import { AuthGuard } from './guards/auth.guard';
+import { CsrfGuard } from './guards/csrf.guard';
 import { RolesGuard } from './guards/roles.guard';
 
 @Module({
   imports: [UsersModule, JwtModule.register({})],
   controllers: [AuthController, UsersController],
-  providers: [AuthService, AuthGuard, RolesGuard],
-  exports: [AuthService, AuthGuard, RolesGuard],
+  providers: [
+    AuthService,
+    AuthGuard,
+    CsrfGuard,
+    RolesGuard,
+    { provide: APP_GUARD, useExisting: CsrfGuard },
+  ],
+  exports: [AuthService, AuthGuard, CsrfGuard, RolesGuard],
 })
 export class AuthModule {}
