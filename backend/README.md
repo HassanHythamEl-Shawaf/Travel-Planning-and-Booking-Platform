@@ -65,6 +65,38 @@ other origins. Authentication cookies are `httpOnly`, use `SameSite=Lax`, and
 are marked `Secure` in production. Keep the frontend and API on the same site
 in production, and set `FRONTEND_URL` to the frontend's origin.
 
+## Shared backend utilities
+
+List endpoints should use `getPagination(page)` from `src/common/pagination.ts`.
+It validates a positive integer page and returns the fixed page size of 10,
+plus the MongoDB `skip` value.
+
+The global HTTP exception filter preserves Nest HTTP errors and logs unexpected
+server errors without returning internal details to clients.
+
+### Provider ownership integration
+
+Provider-specific moderator routes should use `@ProviderOwnership('airline')`
+or `@ProviderOwnership('hotel')` with `ProviderOwnershipGuard` after
+`AuthGuard`. The guard allows admins and checks moderators through the
+`ProviderAssignmentReader` contract in `src/auth/provider-assignment.reader.ts`.
+The assignment module must register a provider using
+`PROVIDER_ASSIGNMENT_READER` and be imported by `AuthModule`; requests are
+denied with a service-unavailable response until that integration is
+registered. A route using this guard without `@ProviderOwnership()` also fails
+closed.
+
+### Account deactivation integration
+
+`DELETE /api/users/me` requires `{ "confirm": true }` and checks
+`BookingEligibilityReader.hasUpcomingConfirmedBookings(userId)` before
+deactivating the account and clearing cookies. The flight and hotel booking
+owners must provide a combined reader using the token
+`BOOKING_ELIGIBILITY_READER` in a module imported by `AuthModule`. The endpoint
+fails closed with service unavailable until that integration is registered.
+User content owners must also resolve deactivated-user public references as
+`Deleted user`.
+
 ## Deployment
 
 When you're ready to deploy your NestJS application to production, there are some key steps you can take to ensure it runs as efficiently as possible. Check out the [deployment documentation](https://docs.nestjs.com/deployment) for more information.

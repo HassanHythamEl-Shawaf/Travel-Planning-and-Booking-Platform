@@ -9,6 +9,7 @@ import { AuthService } from './auth.service';
 import { AuthGuard } from './guards/auth.guard';
 import { CsrfGuard } from './guards/csrf.guard';
 import { RolesGuard } from './guards/roles.guard';
+import { ProviderOwnershipGuard } from './guards/provider-ownership.guard';
 
 @Module({
   imports: [UsersModule, JwtModule.register({})],
@@ -18,8 +19,15 @@ import { RolesGuard } from './guards/roles.guard';
     AuthGuard,
     CsrfGuard,
     RolesGuard,
+    ProviderOwnershipGuard,
     { provide: APP_GUARD, useExisting: CsrfGuard },
   ],
-  exports: [AuthService, AuthGuard, CsrfGuard, RolesGuard],
+  exports: [
+    AuthService,
+    AuthGuard,
+    CsrfGuard,
+    RolesGuard,
+    ProviderOwnershipGuard,
+  ],
 })
 export class AuthModule {}
