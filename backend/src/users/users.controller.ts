@@ -12,7 +12,16 @@ import {
   ServiceUnavailableException,
   UseGuards,
 } from '@nestjs/common';
-import { ApiOperation, ApiTags } from '@nestjs/swagger';
+import {
+  ApiBadRequestResponse,
+  ApiBody,
+  ApiConflictResponse,
+  ApiOkResponse,
+  ApiOperation,
+  ApiServiceUnavailableResponse,
+  ApiTags,
+  ApiUnauthorizedResponse,
+} from '@nestjs/swagger';
 import type { Response } from 'express';
 
 import { AuthGuard } from '../auth/guards/auth.guard';
@@ -35,7 +44,9 @@ export class UsersController {
   ) {}
 
   @Get('me')
-  @ApiOperation({ summary: 'Get current user profile' })
+  @ApiOperation({ summary: 'Get current user profile (ACC-11)' })
+  @ApiOkResponse({ description: 'Current user profile' })
+  @ApiUnauthorizedResponse({ description: 'Authentication is required' })
   async getMyProfile(@CurrentUser() user: { sub: string }) {
     const result = await this.usersService.findById(user.sub);
 
@@ -56,7 +67,13 @@ export class UsersController {
   }
 
   @Patch('me')
-  @ApiOperation({ summary: 'Update current user profile' })
+  @ApiOperation({ summary: 'Update current user profile (ACC-09)' })
+  @ApiBody({ type: UpdateProfileDto })
+  @ApiOkResponse({ description: 'Profile updated successfully' })
+  @ApiBadRequestResponse({
+    description: 'Invalid input or attempt to update a restricted field',
+  })
+  @ApiUnauthorizedResponse({ description: 'Authentication is required' })
   async updateMyProfile(
     @CurrentUser() user: { sub: string },
     @Body() dto: UpdateProfileDto,
@@ -80,7 +97,21 @@ export class UsersController {
   }
 
   @Delete('me')
-  @ApiOperation({ summary: 'Deactivate current user account' })
+  @ApiOperation({ summary: 'Deactivate current user account (ACC-12)' })
+  @ApiBody({ type: DeactivateAccountDto })
+  @ApiOkResponse({
+    description: 'Account deactivated and authentication cookies cleared',
+  })
+  @ApiBadRequestResponse({
+    description: 'Deactivation confirmation is required',
+  })
+  @ApiConflictResponse({
+    description: 'Upcoming confirmed booking prevents deactivation',
+  })
+  @ApiServiceUnavailableResponse({
+    description: 'Booking eligibility integration is not configured',
+  })
+  @ApiUnauthorizedResponse({ description: 'Authentication is required' })
   async deactivateMyAccount(
     @CurrentUser() user: { sub: string },
     @Body() dto: DeactivateAccountDto,
