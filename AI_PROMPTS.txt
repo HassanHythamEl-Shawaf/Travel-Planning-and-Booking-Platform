@@ -271,3 +271,29 @@ ran the unit tests, the blog e2e suite three times (the race tests stayed
 green), the reports and admin e2e suites (in-memory MongoDB, not Atlas),
 lint and build.
 ================================================
+
+================================================
+Date: 2026-11-05
+Student: Wael (Person 2)
+Tool: Claude Code
+Related Requirement: BLG-10, BLG-12, GEN-08, GEN-09, GEN-10
+
+Prompt:
+Finish the blog: post images through the shared upload module behind a
+BLOG_IMAGE_STORE token (501 until it is bound, max 5 per post, first image is
+the cover), the public author page (name, join date, published posts, up to
+10 public non-hidden itineraries read through teammate-contracts.ts; 404 for
+deactivated, admin and moderator accounts), and real post/comment moderation
+handlers that replace the GEN-09 defaults: hiding a comment updates the
+post's commentCount and deleting a post cascades to comments and likes. Add
+an afterDelete hook to ModerationHandler that ModerationService calls after
+the commit, so the post handler can delete image files. Extend the blog e2e
+to the full scenario and write the README section.
+
+How the output was used:
+Claude Code wrote the image service, author page, itinerary reader,
+moderation handlers, the afterDelete hook with its GEN-09 unit tests, the
+README section and the rest of the blog e2e. I reviewed the code and ran the
+unit tests, the blog, reports and admin e2e suites (in-memory MongoDB, not
+Atlas), lint and build.
+================================================

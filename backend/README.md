@@ -224,6 +224,44 @@ other reporters.
 
 Tests: `npm run test:e2e -- reports` (in-memory replica set, never Atlas).
 
+## Blog (BLG-01 – BLG-12)
+
+Swagger tag **Blog**. Full rules: `docs/requirements/BLG-blog-spec.md`.
+
+- **Posts** — `POST /api/posts` (`title` 3–150, `content` 1–20,000, `tags`, `status`
+  `draft` | `published`, default draft), `PATCH` / `DELETE /api/posts/:id` (author only),
+  `GET /api/posts/mine` (drafts included, `status` filter). Publishing sets `publishedAt` the
+  first time only; a post can go back to draft. Deleting a post also deletes its comments and
+  likes, and closes open reports on them as `content_deleted`.
+- **Reading** — `GET /api/posts/:id`, `GET /api/posts?q=&tag=&authorId=`,
+  `GET /api/tags/:tag/posts` and `GET /api/authors/:id` are public. `q` matches the title, tags
+  or author name. Results are ordered by likes + comments, newest first on ties.
+  A draft is visible only to its author; a hidden post to its author and admins; a post by a
+  deactivated author to admins only. Everyone else gets 404.
+- **Tags** — up to 5 per post, each 1–30 characters of `a-z`, `0-9` and `-`. Tags are trimmed,
+  lowercased and deduplicated (`"Cairo "` and `"cairo"` become one tag).
+- **Comments** — `GET|POST /api/posts/:id/comments`, `PATCH|DELETE /api/comments/:id`
+  (comment author only). Comments are 1–500 characters, listed oldest first, and allowed only on
+  published, visible posts. Comments by deactivated accounts show as "Deleted user".
+- **Likes** — `POST|DELETE /api/posts/:id/like`, both idempotent, both return
+  `{ liked, likeCount }`. `likeCount` and `commentCount` are stored on the post and change in the
+  same transaction as the like or comment (hidden comments are not counted).
+- **Images** — `POST /api/posts/:id/images` (multipart `file`) and
+  `DELETE /api/posts/:id/images/:imageId`. They go through the shared upload module (JPG/PNG,
+  5 MB, max 5 per post; the first image is the cover). Until that module is bound to
+  `BLOG_IMAGE_STORE` in `BlogModule`, both answer **501**.
+- **Author page** — `GET /api/authors/:id` returns name, join date, published posts (paginated)
+  and up to 10 public itineraries (read from `itineraries` via
+  `ITINERARY_FIELDS` in `teammate-contracts.ts`).
+
+Public GETs use `OptionalAuthGuard` (`src/blog/optional-auth.guard.ts`). It applies the same
+checks as `AuthGuard`, but a missing or invalid session makes the request a guest request,
+never a 401. Only `user` accounts write posts, comments and likes. Admins moderate through
+the GEN-10 endpoints: Blog registers real `post` and `comment` moderation handlers, so hiding a
+comment updates `commentCount`, and deleting a post removes its comments, likes and image files.
+
+Tests: `npm run test:e2e -- blog` (in-memory replica set, includes 20 parallel likes).
+
 ## Deployment
 
 When you're ready to deploy your NestJS application to production, there are some key steps you can take to ensure it runs as efficiently as possible. Check out the [deployment documentation](https://docs.nestjs.com/deployment) for more information.
