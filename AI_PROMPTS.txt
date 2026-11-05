@@ -46,3 +46,22 @@ How the output was used:
 Changed the password-change API to PATCH as specified in the updated endpoint list, added requirement-linked Swagger request/response documentation, and verified the update introduced no ACC-03 registration tag.
 ================================================
 '@ | Set-Content -Path AI_PROMPTS.txt -Encoding ascii
+
+================================================
+Date: 2026-11-04
+Student: Wael (Person 2)
+Tool: Claude (claude.ai) and Claude Code
+Related Requirement: GEN-12, ACC-18
+
+Prompt:
+Plan and implement the reference-data seed (countries, cities, airports,
+attractions, derived currencies) and the seeded admin account, following
+the agreed spec (string CSV ids as _id, camelCase fields, upsert-only,
+validate everything before writing, separate `npm run seed` command,
+public read-only reference endpoints, Jest tests).
+
+How the output was used:
+Claude produced the spec after a Q&A on design decisions; Claude Code
+implemented it. I reviewed the code, ran the tests and the seed twice
+against the shared Atlas database, and checked the endpoints in Swagger.
+================================================

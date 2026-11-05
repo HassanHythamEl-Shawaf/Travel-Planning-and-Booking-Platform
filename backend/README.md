@@ -97,6 +97,24 @@ fails closed with service unavailable until that integration is registered.
 User content owners must also resolve deactivated-user public references as
 `Deleted user`.
 
+## Seeding the database (GEN-12, ACC-18)
+
+The seed loads the official reference data (countries, cities, airports, attractions)
+from `src/seed/data/*.csv`, derives supported currencies from Countries, and creates
+the seeded admin account.
+
+1. In `backend/.env` set `MONGODB_URI`, `SEED_ADMIN_NAME`, `SEED_ADMIN_EMAIL`, `SEED_ADMIN_PASSWORD`
+   (password: 8+ characters, at least one letter and one digit).
+2. From the `backend/` folder run: `npm run seed`
+
+Safe to run repeatedly: it inserts missing records and updates changed ones, never deletes,
+and never changes an existing admin's password. If any CSV row is invalid it prints every
+error and writes nothing.
+
+Reference IDs are the official dataset IDs (e.g. airport `CAI`, city `cairo`, country `EG`,
+attraction `att-1`, currency `EUR`) and are stored as the documents' `_id`. Store them as
+strings when referencing them from other schemas.
+
 ## Deployment
 
 When you're ready to deploy your NestJS application to production, there are some key steps you can take to ensure it runs as efficiently as possible. Check out the [deployment documentation](https://docs.nestjs.com/deployment) for more information.
