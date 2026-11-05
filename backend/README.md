@@ -153,6 +153,50 @@ suspended or have their password reset. Suspending ends the account's sessions i
 Tests: `npm test` (unit) and `npm run test:e2e -- admin` (in-memory MongoDB replica set via
 `mongodb-memory-server`; the first run downloads a `mongod` binary, and Atlas is never touched).
 
+## Reports & moderation (GEN-09, GEN-10)
+
+Any logged-in account can report a blog post, comment, hotel review or itinerary:
+
+- `POST /api/reports` with `targetType` (`post` | `comment` | `review` | `itinerary`), `targetId`,
+  `reason` (`spam` | `harassment` | `inappropriate` | `misinformation` | `other`) and optional
+  `details` (required when the reason is `other`, max 500 characters).
+  Only content the caller can currently see is reportable (otherwise 404); reporting your own
+  content is 403; one open report per account per item (409 until it is resolved).
+- `GET /api/reports/mine` lists the caller's reports and their status.
+
+Admins (Swagger tag **Admin – Moderation**):
+
+- `GET /api/admin/reports`: open reports by default (`status=all` for every status), with
+  reporter, a snapshot of the content taken at report time, and the number of open reports
+  on the same content.
+- `PATCH /api/admin/reports/:id` with `action: 'dismiss' | 'hide'` and an optional internal `note`.
+  Resolving one report resolves **every** open report on the same content with the same outcome.
+- `PATCH /api/admin/content/:type/:id/hide|unhide` moderates without a report. Unhiding never
+  reopens reports.
+- `DELETE /api/admin/content/:type/:id?note=…` deletes the content (a post also loses its
+  comments and likes) and resolves its open reports as `content_deleted`.
+
+Every admin action runs in one transaction with its audit entry (`REPORT_DISMISSED`,
+`CONTENT_HIDDEN`, `CONTENT_UNHIDDEN`, `CONTENT_DELETED`). After the commit, the author gets
+`CONTENT_HIDDEN` / `CONTENT_UNHIDDEN` / `CONTENT_DELETED`, and each reporter gets one
+`REPORT_RESOLVED` (`action_taken` or `no_violation`). Notifications never name the admin or
+other reporters.
+
+**For content owners (Blog, reviews, itineraries)**
+
+- Add `isHidden: boolean` (default `false`) to your schema. Hidden content must be visible only
+  to its author and admins (404 for everyone else) and excluded from search, lists, counts and
+  (for reviews) the hotel average rating. The moderation code only sets the flag.
+- Until you register a handler, moderation reads and writes your raw collection with the names in
+  `src/integrations/teammate-contracts.ts` (`CONTENT_COLLECTIONS`). Admin delete of reviews and
+  itineraries answers **501** until you register a handler with `delete`.
+- Register in your module (which imports `ModerationModule`):
+  `onModuleInit() { this.moderationRegistry.register('review', { find, setHidden, delete }) }`.
+  The interface and a full example are in `src/moderation/moderation.registry.ts`. Use the
+  session you are given for every write, and recompute derived data (ratings, images) there.
+
+Tests: `npm run test:e2e -- reports` (in-memory replica set, never Atlas).
+
 ## Deployment
 
 When you're ready to deploy your NestJS application to production, there are some key steps you can take to ensure it runs as efficiently as possible. Check out the [deployment documentation](https://docs.nestjs.com/deployment) for more information.
