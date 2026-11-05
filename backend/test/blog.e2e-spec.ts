@@ -405,11 +405,60 @@ describe('Blog (e2e)', () => {
     });
   });
 
-  describe('moderation and deletion (GEN-10, D6)', () => {
+  describe('moderation, images and author pages (GEN-10, BLG-10, BLG-12)', () => {
+    const commentsFor = async (agent: TestAgent | ReturnType<typeof guest>) =>
+      (await agent.get(`/api/posts/${postId}/comments`).expect(200)).body;
+    const reportStatus = async (id: string) =>
+      (
+        await connection
+          .collection('reports')
+          .findOne({ _id: new Types.ObjectId(id) })
+      )?.status;
+
+    it('hides a comment via GEN-10 and keeps commentCount in step', async () => {
+      const reported = await carol
+        .post('/api/reports')
+        .send({ targetType: 'comment', targetId: commentId, reason: 'spam' })
+        .expect(201);
+      await admin
+        .patch(`/api/admin/reports/${reported.body.id}`)
+        .send({ action: 'hide' })
+        .expect(200);
+      expect((await storedPost())?.commentCount).toBe(0);
+
+      const own = await commentsFor(bob);
+      expect(own.total).toBe(1);
+      expect(own.items[0]).toMatchObject({
+        id: commentId,
+        isHidden: true,
+        isOwner: true,
+      });
+      expect((await commentsFor(carol)).total).toBe(0);
+      expect((await commentsFor(guest())).total).toBe(0);
+      expect((await commentsFor(admin)).items[0].isHidden).toBe(true);
+
+      // Its author can still edit it while hidden (D11); others now get 404.
+      await bob
+        .patch(`/api/comments/${commentId}`)
+        .send({ content: 'Edited while hidden' })
+        .expect(200);
+      await carol
+        .patch(`/api/comments/${commentId}`)
+        .send({ content: 'no' })
+        .expect(404);
+
+      await admin
+        .patch(`/api/admin/content/comment/${commentId}/unhide`)
+        .expect(200);
+      expect((await storedPost())?.commentCount).toBe(1);
+      expect((await commentsFor(carol)).total).toBe(1);
+    });
+
     it('hides a post from everyone but its author and admins', async () => {
       await admin.patch(`/api/admin/content/post/${postId}/hide`).expect(200);
       await guest().get(`/api/posts/${postId}`).expect(404);
       await bob.get(`/api/posts/${postId}`).expect(404);
+      await guest().get(`/api/posts/${postId}/comments`).expect(404);
       const own = await alice.get(`/api/posts/${postId}`).expect(200);
       expect(own.body.isHidden).toBe(true);
       await admin.get(`/api/posts/${postId}`).expect(200);
@@ -417,14 +466,101 @@ describe('Blog (e2e)', () => {
       expect(search.body.items.map((p: { id: string }) => p.id)).toEqual([
         otherPostId,
       ]);
-      await bob.patch(`/api/posts/${postId}`).send({ title: 'Not mine' }).expect(404);
+      await bob
+        .patch(`/api/posts/${postId}`)
+        .send({ title: 'Not mine' })
+        .expect(404);
+      await bob.post(`/api/posts/${postId}/like`).expect(404);
       await admin.patch(`/api/admin/content/post/${postId}/unhide`).expect(200);
     });
 
-    it('deletes a post and closes its open reports as content_deleted', async () => {
-      const reported = await carol
+    it('answers 501 for images until the upload module is bound (D15)', async () => {
+      await alice
+        .post(`/api/posts/${postId}/images`)
+        .attach('file', Buffer.from([0xff, 0xd8, 0xff]), 'nile.jpg')
+        .expect(501);
+      await alice.delete(`/api/posts/${postId}/images/abc`).expect(501);
+      await guest().post(`/api/posts/${postId}/images`).expect(401);
+    });
+
+    it('shows an author page with published posts and public itineraries (BLG-12)', async () => {
+      const base = Date.UTC(2026, 9, 1);
+      const day = 86_400_000;
+      await connection.collection('itineraries').insertMany([
+        ...Array.from({ length: 11 }, (_, i) => ({
+          ownerId: aliceId,
+          title: `Public trip ${i}`,
+          countries: ['EG'],
+          isPublic: true,
+          isHidden: false,
+          createdAt: new Date(base + i * day),
+        })),
+        {
+          ownerId: aliceId,
+          title: 'Private trip',
+          isPublic: false,
+          createdAt: new Date(base + 99 * day),
+        },
+        {
+          ownerId: aliceId,
+          title: 'Hidden trip',
+          isPublic: true,
+          isHidden: true,
+          createdAt: new Date(base + 98 * day),
+        },
+        {
+          ownerId: bobId,
+          title: 'Bob trip',
+          isPublic: true,
+          createdAt: new Date(base),
+        },
+      ]);
+
+      const page = await guest().get(`/api/authors/${aliceId}`).expect(200);
+      expect(page.body).toMatchObject({
+        id: aliceId.toString(),
+        name: 'Alice Author',
+        joinedAt: expect.any(String),
+        publishedPostCount: 1,
+        posts: {
+          total: 1,
+          items: [{ id: postId, likeCount: 5, commentCount: 1 }],
+        },
+      });
+      const titles: string[] = page.body.publicItineraries.map(
+        (i: { title: string }) => i.title,
+      );
+      expect(titles).toHaveLength(10);
+      expect(titles[0]).toBe('Public trip 10');
+      for (const excluded of ['Private trip', 'Hidden trip', 'Bob trip']) {
+        expect(titles).not.toContain(excluded);
+      }
+
+      // Drafts are not on the author page.
+      const draft = await alice
+        .post('/api/posts')
+        .send({ title: 'Secret draft', content: 'x' })
+        .expect(201);
+      const again = await guest().get(`/api/authors/${aliceId}`).expect(200);
+      expect(again.body.publishedPostCount).toBe(1);
+      await alice.delete(`/api/posts/${draft.body.id}`).expect(200);
+
+      const adminUser = await connection
+        .collection('users')
+        .findOne({ email: ADMIN.email });
+      await guest().get(`/api/authors/${adminUser!._id}`).expect(404);
+      await guest().get(`/api/authors/${new Types.ObjectId()}`).expect(404);
+      await guest().get('/api/authors/not-an-id').expect(400);
+    });
+
+    it('deletes a post with its comments, likes and open reports (D6)', async () => {
+      const postReport = await carol
         .post('/api/reports')
         .send({ targetType: 'post', targetId: postId, reason: 'spam' })
+        .expect(201);
+      const commentReport = await dave
+        .post('/api/reports')
+        .send({ targetType: 'comment', targetId: commentId, reason: 'spam' })
         .expect(201);
 
       await alice
@@ -432,33 +568,118 @@ describe('Blog (e2e)', () => {
         .expect(200)
         .expect({ id: postId, deleted: true });
 
+      const _id = new Types.ObjectId(postId);
       expect(await storedPost()).toBeNull();
-      const report = await connection
-        .collection('reports')
-        .findOne({ _id: new Types.ObjectId(reported.body.id) });
-      expect(report).toMatchObject({
-        status: 'content_deleted',
-        resolvedBy: null,
-        resolutionNote: 'Deleted by author',
-      });
+      expect(
+        await connection.collection('comments').countDocuments({ postId: _id }),
+      ).toBe(0);
+      expect(
+        await connection.collection('likes').countDocuments({ postId: _id }),
+      ).toBe(0);
+      for (const id of [postReport.body.id, commentReport.body.id]) {
+        const report = await connection
+          .collection('reports')
+          .findOne({ _id: new Types.ObjectId(id) });
+        expect(report).toMatchObject({
+          status: 'content_deleted',
+          resolvedBy: null,
+          resolutionNote: 'Deleted by author',
+        });
+      }
       await alice.delete(`/api/posts/${postId}`).expect(404);
+      await bob
+        .patch(`/api/comments/${commentId}`)
+        .send({ content: 'gone?' })
+        .expect(404);
+      const authorPage = await guest().get(`/api/authors/${aliceId}`).expect(200);
+      expect(authorPage.body.publishedPostCount).toBe(0);
     });
 
-    it('hides posts of deactivated authors from everyone but admins', async () => {
-      await connection
-        .collection('users')
-        .updateOne({ email: 'bob@blog.test' }, { $set: { status: 'deactivated' } });
+    it('hides posts and author pages of deactivated authors (D4, D16)', async () => {
+      const users = connection.collection('users');
+      await users.updateOne(
+        { email: 'bob@blog.test' },
+        { $set: { status: 'deactivated' } },
+      );
       await guest().get(`/api/posts/${otherPostId}`).expect(404);
       await admin.get(`/api/posts/${otherPostId}`).expect(200);
       expect((await guest().get('/api/posts').expect(200)).body.total).toBe(0);
-      await connection
-        .collection('users')
-        .updateOne({ email: 'bob@blog.test' }, { $set: { status: 'suspended' } });
+      await guest().get(`/api/authors/${bobId}`).expect(404);
+
+      await users.updateOne(
+        { email: 'bob@blog.test' },
+        { $set: { status: 'suspended' } },
+      );
       // Suspended authors stay visible (ACC-16).
       await guest().get(`/api/posts/${otherPostId}`).expect(200);
-      await connection
-        .collection('users')
-        .updateOne({ email: 'bob@blog.test' }, { $set: { status: 'active' } });
+      await guest().get(`/api/authors/${bobId}`).expect(200);
+      await users.updateOne(
+        { email: 'bob@blog.test' },
+        { $set: { status: 'active' } },
+      );
+    });
+
+    it('shows "Deleted user" for comments of deactivated accounts (D12)', async () => {
+      const users = connection.collection('users');
+      const c = await dave
+        .post(`/api/posts/${otherPostId}/comments`)
+        .send({ content: 'Nice' })
+        .expect(201);
+      await users.updateOne(
+        { email: 'dave@blog.test' },
+        { $set: { status: 'deactivated' } },
+      );
+      const list = await guest()
+        .get(`/api/posts/${otherPostId}/comments`)
+        .expect(200);
+      expect(list.body.items[0]).toMatchObject({
+        id: c.body.id,
+        author: { id: null, name: 'Deleted user' },
+      });
+      await users.updateOne(
+        { email: 'dave@blog.test' },
+        { $set: { status: 'active' } },
+      );
+    });
+
+    it('lets an admin delete a post with the same cascade (GEN-10)', async () => {
+      const c = await carol
+        .post(`/api/posts/${otherPostId}/comments`)
+        .send({ content: 'Buy followers here' })
+        .expect(201);
+      await erin.post(`/api/posts/${otherPostId}/like`).expect(200);
+      const commentReport = await erin
+        .post('/api/reports')
+        .send({ targetType: 'comment', targetId: c.body.id, reason: 'spam' })
+        .expect(201);
+      const postReport = await erin
+        .post('/api/reports')
+        .send({ targetType: 'post', targetId: otherPostId, reason: 'spam' })
+        .expect(201);
+
+      const deleted = await admin
+        .delete(`/api/admin/content/post/${otherPostId}`)
+        .expect(200);
+      expect(deleted.body).toMatchObject({ deleted: true, resolvedReports: 1 });
+
+      const _id = new Types.ObjectId(otherPostId);
+      expect(await connection.collection('posts').countDocuments({ _id })).toBe(
+        0,
+      );
+      expect(
+        await connection.collection('comments').countDocuments({ postId: _id }),
+      ).toBe(0);
+      expect(
+        await connection.collection('likes').countDocuments({ postId: _id }),
+      ).toBe(0);
+      expect(await reportStatus(postReport.body.id)).toBe('content_deleted');
+      const closed = await connection
+        .collection('reports')
+        .findOne({ _id: new Types.ObjectId(commentReport.body.id) });
+      expect(closed).toMatchObject({
+        status: 'content_deleted',
+        resolutionNote: 'Post deleted by an administrator',
+      });
     });
   });
 });
