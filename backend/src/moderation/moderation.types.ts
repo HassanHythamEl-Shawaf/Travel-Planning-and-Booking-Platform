@@ -32,6 +32,11 @@ export interface ModeratableContent {
    */
   publiclyVisible: boolean;
   snapshot: ContentSnapshot;
+  /**
+   * Optional. Stored files belonging to the content (for example image ids),
+   * for the handler's afterDelete to remove once the deletion is committed.
+   */
+  assets?: string[];
 }
 
 export interface ModerationHandler {
@@ -50,6 +55,12 @@ export interface ModerationHandler {
   ): Promise<boolean>;
   /** Optional. Returns false if not found. */
   delete?(id: string, session: ClientSession): Promise<boolean>;
+  /**
+   * Optional. Called after a successful delete has been committed, with the
+   * content as found inside the transaction (e.g. to remove its files).
+   * Errors are logged and never fail the request.
+   */
+  afterDelete?(content: ModeratableContent): Promise<void>;
 }
 
 /** First `EXCERPT_LENGTH` characters, never splitting a surrogate pair. */
