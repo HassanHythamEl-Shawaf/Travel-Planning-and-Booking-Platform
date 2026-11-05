@@ -32,6 +32,7 @@ describe('PostsService (BLG-01 – BLG-04, BLG-08, BLG-09)', () => {
   let authorDoc: Record<string, unknown> | null;
   let postModel: Record<string, jest.Mock>;
   let userModel: Record<string, jest.Mock>;
+  let likeModel: { exists: jest.Mock };
   let connection: { transaction: jest.Mock };
   let cascade: { deletePostChildren: jest.Mock; closeOpenReports: jest.Mock };
   let service: PostsService;
@@ -82,6 +83,7 @@ describe('PostsService (BLG-01 – BLG-04, BLG-08, BLG-09)', () => {
     userModel = {
       findById: jest.fn().mockImplementation(() => query(authorDoc)),
     };
+    likeModel = { exists: jest.fn().mockReturnValue(query(null)) };
     connection = {
       transaction: jest.fn(async (fn: (s: unknown) => unknown) => fn(session)),
     };
@@ -93,6 +95,7 @@ describe('PostsService (BLG-01 – BLG-04, BLG-08, BLG-09)', () => {
       connection as never,
       postModel as never,
       userModel as never,
+      likeModel as never,
       cascade as never,
     );
   });
@@ -153,6 +156,22 @@ describe('PostsService (BLG-01 – BLG-04, BLG-08, BLG-09)', () => {
       expect(detail.isHidden).toBeUndefined();
       expect(detail.isOwner).toBe(false);
       expect(detail.excerpt).toHaveLength(200);
+    });
+
+    it('reports likedByMe for a viewer who liked the post', async () => {
+      likeModel.exists.mockReturnValue(query({ _id: new Types.ObjectId() }));
+      const detail = await service.findOne(postId.toString(), other);
+      expect(detail.likedByMe).toBe(true);
+      expect(likeModel.exists).toHaveBeenCalledWith({
+        postId,
+        userId: new Types.ObjectId(other.sub),
+      });
+    });
+
+    it('never queries likes for a guest', async () => {
+      const detail = await service.findOne(postId.toString(), undefined);
+      expect(detail.likedByMe).toBe(false);
+      expect(likeModel.exists).not.toHaveBeenCalled();
     });
 
     it('shows status and isHidden to admins', async () => {
