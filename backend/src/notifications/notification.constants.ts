@@ -14,7 +14,9 @@ export enum NotificationType {
   PROVIDER_DEACTIVATED = 'PROVIDER_DEACTIVATED',
   PROVIDER_REACTIVATED = 'PROVIDER_REACTIVATED',
   CONTENT_HIDDEN = 'CONTENT_HIDDEN',
+  CONTENT_UNHIDDEN = 'CONTENT_UNHIDDEN',
   CONTENT_DELETED = 'CONTENT_DELETED',
+  REPORT_RESOLVED = 'REPORT_RESOLVED',
 }
 
 type Payload = Record<string, unknown>;
@@ -34,6 +36,23 @@ function withReason(message: string, payload: Payload): string {
 }
 
 const ref = (p: Payload) => field(p, 'bookingReference', 'your booking');
+
+const TITLE_FALLBACK_LENGTH = 50;
+
+/**
+ * `post "My week in Aswan"`: the content type plus the snapshot title,
+ * falling back to the excerpt's first 50 characters (GEN-10).
+ */
+function contentLabel(p: Payload): string {
+  const type = field(p, 'contentType', 'content');
+  let title = field(p, 'title', '');
+  if (!title) {
+    const excerpt = Array.from(field(p, 'excerpt', '').trim());
+    title = excerpt.slice(0, TITLE_FALLBACK_LENGTH).join('');
+    if (excerpt.length > TITLE_FALLBACK_LENGTH) title += '…';
+  }
+  return title ? `${type} "${title}"` : type;
+}
 
 /**
  * Message templates. Every field is optional: a missing one falls back to a
@@ -78,14 +97,21 @@ export const NOTIFICATION_TEMPLATES: Record<
     `${field(p, 'providerName', 'A provider')} has been reactivated.`,
   [NotificationType.CONTENT_HIDDEN]: (p) =>
     withReason(
-      `Your ${field(p, 'contentType', 'content')} has been hidden by a moderator.`,
+      `Your ${contentLabel(p)} has been hidden by a moderator. Only you and administrators can see it.`,
       p,
     ),
+  [NotificationType.CONTENT_UNHIDDEN]: (p) =>
+    `Your ${contentLabel(p)} is visible again.`,
   [NotificationType.CONTENT_DELETED]: (p) =>
     withReason(
-      `Your ${field(p, 'contentType', 'content')} has been removed by a moderator.`,
+      `Your ${contentLabel(p)} has been removed by a moderator.`,
       p,
     ),
+  // Never names the admin or other reporters (D18).
+  [NotificationType.REPORT_RESOLVED]: (p) =>
+    field(p, 'outcome', '') === 'action_taken'
+      ? `We reviewed the ${field(p, 'contentType', 'content')} you reported and took action. Thank you for helping keep the community safe.`
+      : `We reviewed the ${field(p, 'contentType', 'content')} you reported and found no violation of our guidelines. Thank you for your report.`,
 };
 
 export function renderNotification(
