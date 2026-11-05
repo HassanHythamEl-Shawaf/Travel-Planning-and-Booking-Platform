@@ -198,3 +198,24 @@ Claude Code wrote the admin moderation endpoints, notification templates,
 tests and README section. I reviewed the code, ran the unit tests, the
 reports and admin e2e suites (in-memory MongoDB, not Atlas), lint and build.
 ================================================
+
+================================================
+Date: 2026-11-05
+Student: Wael (Person 2)
+Tool: Claude Code
+Related Requirement: GEN-01
+
+Prompt:
+Grill me on the notifications module before teammates start using it, then
+apply the recommended answers: one sender per event (contract table), no
+separate payment-success type, refunds notified only on success or failure,
+booking messages that name the booking type and provider before a reference
+exists, an allow-list for payload keys so secrets never reach the client,
+and a README demo for Swagger. Write the spec first, then the code and tests.
+
+How the output was used:
+Claude Code wrote docs/requirements/GEN-01-notifications-spec.md, the payload
+allow-list, the new template wording, unit tests and the README section. I
+reviewed the decisions and the code, ran lint, build, the unit tests and the
+admin and reports e2e suites (in-memory MongoDB, not Atlas).
+================================================
