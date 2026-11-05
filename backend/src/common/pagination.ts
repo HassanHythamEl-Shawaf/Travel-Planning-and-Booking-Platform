@@ -8,6 +8,14 @@ export interface Pagination {
   skip: number;
 }
 
+export interface Paginated<T> {
+  items: T[];
+  page: number;
+  limit: number;
+  total: number;
+  totalPages: number;
+}
+
 export function getPagination(pageValue: string | number = 1): Pagination {
   if (typeof pageValue === 'string' && !/^\d+$/.test(pageValue)) {
     throw new BadRequestException('Page must be a positive integer');
