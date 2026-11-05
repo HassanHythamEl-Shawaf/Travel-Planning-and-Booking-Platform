@@ -245,3 +245,29 @@ controllers, unit tests and a blog e2e test on an in-memory MongoDB replica
 set. I reviewed the code and ran the unit tests, the blog, reports and admin
 e2e suites (not Atlas), lint and build.
 ================================================
+
+================================================
+Date: 2026-11-05
+Student: Wael (Person 2)
+Tool: Claude Code
+Related Requirement: BLG-05, BLG-06, BLG-07
+
+Prompt:
+Add comments and likes to the blog: Comment and Like schemas (unique
+{postId, userId}), flat comments of 1–500 characters on published visible
+posts only, listed oldest first with hidden comments only for their author
+and admins and "Deleted user" for deactivated authors, edit/delete by the
+comment author only (post authors cannot delete others' comments), and
+idempotent like/unlike returning { liked, likeCount }. Keep likeCount and
+commentCount on the post, changed in the same transaction as the write,
+never below 0, and treat a duplicate-key race as "already liked". Prove it
+with an e2e test of 20 parallel likes from one user and parallel likes from
+5 users.
+
+How the output was used:
+Claude Code wrote the schemas, services, controllers, unit tests and the
+comment/like part of the blog e2e test. I reviewed the transaction logic,
+ran the unit tests, the blog e2e suite three times (the race tests stayed
+green), the reports and admin e2e suites (in-memory MongoDB, not Atlas),
+lint and build.
+================================================
