@@ -101,6 +101,7 @@ export class UsersService {
         ],
         {
           new: true,
+          updatePipeline: true,
           projection: {
             failedLoginAttempts: 1,
             lockUntil: 1,

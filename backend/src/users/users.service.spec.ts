@@ -44,6 +44,8 @@ describe('UsersService', () => {
       status: 'active',
     });
     expect(update).toHaveLength(2);
+    // Mongoose 9 rejects array (pipeline) updates without this option.
+    expect(options).toMatchObject({ updatePipeline: true });
     expect(update[1]).toHaveProperty(
       '$set.lockUntil.$cond.1.$dateAdd.amount',
       15,
