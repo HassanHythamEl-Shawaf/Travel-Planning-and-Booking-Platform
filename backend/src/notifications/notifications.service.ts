@@ -3,7 +3,11 @@ import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 
 import { Paginated, Pagination } from '../common/pagination';
-import { NotificationType, renderNotification } from './notification.constants';
+import {
+  NotificationType,
+  renderNotification,
+  sanitizeNotificationPayload,
+} from './notification.constants';
 import { Notification } from './schemas/notification.schema';
 
 export interface NotificationView {
@@ -28,14 +32,17 @@ export interface NotificationView {
  *
  * await this.notifications.send(booking.userId.toString(),
  *   NotificationType.BOOKING_CONFIRMED,
- *   { bookingId: booking.id, bookingReference: booking.bookingReference });
+ *   { bookingId: booking.id, bookingType: 'flight',
+ *     bookingReference: booking.bookingReference, providerName: airline.name });
  *
  * await this.notifications.sendMany(passengerUserIds,
- *   NotificationType.FLIGHT_SCHEDULE_CHANGED, { flightId, flightNumber });
+ *   NotificationType.FLIGHT_SCHEDULE_CHANGED,
+ *   { flightId, flightNumber, newDepartureTime: '2026-12-01 14:30 (Africa/Cairo)' });
  *
- * The message text is rendered from the type's template using the payload
- * (bookingReference, amount, currency, flightNumber, providerName,
- * contentType, reason). Missing fields fall back to generic wording.
+ * Only the keys in NOTIFICATION_PAYLOAD_KEYS with primitive values are kept
+ * (others are dropped and logged). The message text is rendered from the
+ * type's template; missing fields fall back to generic wording. Who sends
+ * which type: docs/requirements/GEN-01-notifications-spec.md §2.
  */
 @Injectable()
 export class NotificationsService {
@@ -65,13 +72,20 @@ export class NotificationsService {
       );
       if (recipients.length === 0) return;
 
-      const message = renderNotification(type, payload);
+      const { payload: clean, dropped } = sanitizeNotificationPayload(payload);
+      if (dropped.length > 0) {
+        this.logger.warn(
+          `Dropped payload keys not allowed for ${type} notifications: ${dropped.join(', ')}`,
+        );
+      }
+
+      const message = renderNotification(type, clean);
       await this.notificationModel.insertMany(
         recipients.map((id) => ({
           userId: new Types.ObjectId(id),
           type,
           message,
-          payload,
+          payload: clean,
         })),
         { ordered: false },
       );

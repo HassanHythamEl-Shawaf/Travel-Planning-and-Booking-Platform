@@ -146,12 +146,39 @@ suspended or have their password reset. Suspending ends the account's sessions i
   `src/integrations/teammate-contracts.ts`. If yours differ, change that file only.
 - **Notifications:** import `NotificationsModule` and call
   `notificationsService.send(userId, NotificationType.X, payload)` *after* your transaction
-  commits. It never throws.
+  commits. It never throws. See "Notifications (GEN-01)" below for who sends which type.
 - **Audit:** import `AuditLogsModule` and call `auditLogsService.record({...}, session?)`. It throws,
   so an action without its audit entry fails.
 
 Tests: `npm test` (unit) and `npm run test:e2e -- admin` (in-memory MongoDB replica set via
 `mongodb-memory-server`; the first run downloads a `mongod` binary, and Atlas is never touched).
+
+## Notifications (GEN-01)
+
+Endpoints (any logged-in account, own notifications only): `GET /api/notifications?page&unreadOnly`,
+`GET /api/notifications/unread-count`, `PATCH /api/notifications/:id/read` (404 for someone else's)
+and `PATCH /api/notifications/read-all`.
+
+**Demo in Swagger:** as the admin, suspend and then reactivate a test user. Log in as that user:
+unread count is 2, the list shows both (newest first), mark one read, then read-all → `{ "updated": 1 }`.
+
+**For teammates** (full contract: `docs/requirements/GEN-01-notifications-spec.md`):
+
+| Event | Type | Sender |
+|---|---|---|
+| Booking confirmed after payment | `BOOKING_CONFIRMED` | Arafa / Yassin, in `confirmBooking()` |
+| Hold expired | `BOOKING_EXPIRED` | Arafa / Yassin, in the release method the ExpiryService calls |
+| User cancels | `BOOKING_CANCELLED` | Arafa / Yassin |
+| Payment failed | `PAYMENT_FAILED` | Abozaid |
+| Refund succeeded / failed | `REFUND_ISSUED` / `REFUND_FAILED` | Abozaid |
+| Schedule change | `FLIGHT_SCHEDULE_CHANGED` | Yahia |
+| Airline cancels a flight | `FLIGHT_CANCELLED` | Yahia only (Arafa's cancel-all returns the user ids and sends nothing) |
+
+- Send **after** your transaction commits; `send` / `sendMany` never throw.
+- Pass `bookingType` (`'flight'` / `'hotel'`) and `providerName` with booking events, so the message
+  reads "your hotel booking at Hilton Cairo" before a reference exists.
+- Only the keys in `NOTIFICATION_PAYLOAD_KEYS` (`notification.constants.ts`) with primitive values
+  are stored; anything else is dropped with a warning in the server log. Ask Wael to add a key.
 
 ## Reports & moderation (GEN-09, GEN-10)
 

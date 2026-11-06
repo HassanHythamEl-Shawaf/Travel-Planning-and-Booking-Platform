@@ -35,7 +35,112 @@ function withReason(message: string, payload: Payload): string {
   return reason ? `${message} Reason: ${reason}` : message;
 }
 
-const ref = (p: Payload) => field(p, 'bookingReference', 'your booking');
+/**
+ * Payload keys a notification may carry (GEN-01 spec §3). Anything else is
+ * dropped by `sanitizeNotificationPayload`, so secrets or whole documents
+ * never reach the client.
+ */
+export const NOTIFICATION_PAYLOAD_KEYS = [
+  'bookingId',
+  'bookingType',
+  'bookingReference',
+  'providerType',
+  'providerId',
+  'providerName',
+  'flightId',
+  'flightNumber',
+  'newDepartureTime',
+  'hotelId',
+  'paymentId',
+  'refundId',
+  'amount',
+  'currency',
+  'reason',
+  'contentType',
+  'contentId',
+  'title',
+  'excerpt',
+  'outcome',
+] as const;
+
+const ALLOWED_KEYS: ReadonlySet<string> = new Set(NOTIFICATION_PAYLOAD_KEYS);
+
+export const MAX_PAYLOAD_STRING_LENGTH = 500;
+
+/**
+ * Keeps only allowed keys with primitive values. Dates become ISO strings,
+ * ObjectIds become hex strings, long strings are cut. Returns the cleaned
+ * payload and the names of the keys that were dropped.
+ */
+export function sanitizeNotificationPayload(payload: unknown): {
+  payload: Payload;
+  dropped: string[];
+} {
+  const clean: Payload = {};
+  const dropped: string[] = [];
+  if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
+    return { payload: clean, dropped };
+  }
+  for (const [key, value] of Object.entries(payload as Payload)) {
+    const normalized = normalizeValue(value);
+    if (!ALLOWED_KEYS.has(key) || normalized === undefined) {
+      dropped.push(key);
+      continue;
+    }
+    clean[key] = normalized;
+  }
+  return { payload: clean, dropped };
+}
+
+function normalizeValue(value: unknown): unknown {
+  if (value === null) return null;
+  if (value instanceof Date) {
+    return Number.isNaN(value.getTime()) ? undefined : value.toISOString();
+  }
+  if (isObjectIdLike(value)) return value.toHexString();
+  switch (typeof value) {
+    case 'string':
+      return value.length > MAX_PAYLOAD_STRING_LENGTH
+        ? value.slice(0, MAX_PAYLOAD_STRING_LENGTH)
+        : value;
+    case 'number':
+      return Number.isFinite(value) ? value : undefined;
+    case 'boolean':
+      return value;
+    default:
+      return undefined;
+  }
+}
+
+function isObjectIdLike(value: unknown): value is { toHexString(): string } {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    (value as { _bsontype?: unknown })._bsontype === 'ObjectId' &&
+    typeof (value as { toHexString?: unknown }).toHexString === 'function'
+  );
+}
+
+const PROVIDER_PREPOSITION: Record<string, (name: string) => string> = {
+  flight: (name) => ` with ${name}`,
+  hotel: (name) => ` at ${name}`,
+};
+
+/**
+ * `flight booking ABC123 with Nile Air`, `hotel booking at Hilton Cairo`,
+ * or plain `booking` (GEN-01 spec §4). The reference only exists after
+ * confirmation, so type and provider make earlier messages specific.
+ */
+function bookingLabel(p: Payload): string {
+  const type = field(p, 'bookingType', '').toLowerCase();
+  const kind = type === 'flight' || type === 'hotel' ? `${type} ` : '';
+  const reference = field(p, 'bookingReference', '');
+  const providerName = field(p, 'providerName', '');
+  const provider = providerName
+    ? (PROVIDER_PREPOSITION[type]?.(providerName) ?? ` (${providerName})`)
+    : '';
+  return `${kind}booking${reference ? ` ${reference}` : ''}${provider}`;
+}
 
 const TITLE_FALLBACK_LENGTH = 50;
 
@@ -63,23 +168,27 @@ export const NOTIFICATION_TEMPLATES: Record<
   (payload: Payload) => string
 > = {
   [NotificationType.BOOKING_CONFIRMED]: (p) =>
-    `Your booking ${ref(p)} is confirmed.`,
+    `Your ${bookingLabel(p)} is confirmed.`,
   [NotificationType.BOOKING_CANCELLED]: (p) =>
-    withReason(`Your booking ${ref(p)} has been cancelled.`, p),
+    withReason(`Your ${bookingLabel(p)} has been cancelled.`, p),
   [NotificationType.BOOKING_EXPIRED]: (p) =>
-    `The hold on ${ref(p)} expired before payment was completed.`,
+    `The hold on your ${bookingLabel(p)} expired before payment was completed.`,
   [NotificationType.PAYMENT_FAILED]: (p) =>
-    `Payment for ${ref(p)} failed. The booking is not confirmed.`,
+    `Payment for your ${bookingLabel(p)} failed. The booking is not confirmed; you can retry until the hold expires.`,
   [NotificationType.REFUND_ISSUED]: (p) => {
     const amount = field(p, 'amount', '');
     const currency = field(p, 'currency', '');
     const money = amount ? ` of ${`${amount} ${currency}`.trim()}` : '';
-    return `A refund${money} for ${ref(p)} has been issued.`;
+    return `A refund${money} for your ${bookingLabel(p)} has been issued.`;
   },
   [NotificationType.REFUND_FAILED]: (p) =>
-    `The refund for ${ref(p)} could not be processed. Our team will follow up.`,
-  [NotificationType.FLIGHT_SCHEDULE_CHANGED]: (p) =>
-    `The schedule of flight ${field(p, 'flightNumber', 'on your booking')} has changed. Please review your booking.`,
+    `The refund for your ${bookingLabel(p)} could not be processed. Our team will follow up.`,
+  [NotificationType.FLIGHT_SCHEDULE_CHANGED]: (p) => {
+    const flight = field(p, 'flightNumber', 'on your booking');
+    const time = field(p, 'newDepartureTime', '');
+    const when = time ? ` New departure: ${time}.` : '';
+    return `The schedule of flight ${flight} has changed.${when} Please review your booking.`;
+  },
   [NotificationType.FLIGHT_CANCELLED]: (p) =>
     withReason(
       `Flight ${field(p, 'flightNumber', 'on your booking')} has been cancelled by the airline.`,
@@ -103,10 +212,7 @@ export const NOTIFICATION_TEMPLATES: Record<
   [NotificationType.CONTENT_UNHIDDEN]: (p) =>
     `Your ${contentLabel(p)} is visible again.`,
   [NotificationType.CONTENT_DELETED]: (p) =>
-    withReason(
-      `Your ${contentLabel(p)} has been removed by a moderator.`,
-      p,
-    ),
+    withReason(`Your ${contentLabel(p)} has been removed by a moderator.`, p),
   // Never names the admin or other reporters (D18).
   [NotificationType.REPORT_RESOLVED]: (p) =>
     field(p, 'outcome', '') === 'action_taken'
