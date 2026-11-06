@@ -9,6 +9,8 @@ import { ReferenceDataModule } from './reference-data/reference-data.module';
 import { AuditLogsModule } from './audit-logs/audit-logs.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { AdminModule } from './admin/admin.module';
+import { ModerationModule } from './moderation/moderation.module';
+import { ReportsModule } from './reports/reports.module';
 
 @Module({
   imports: [
@@ -25,6 +27,8 @@ import { AdminModule } from './admin/admin.module';
     AuditLogsModule,
     NotificationsModule,
     AdminModule,
+    ModerationModule,
+    ReportsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

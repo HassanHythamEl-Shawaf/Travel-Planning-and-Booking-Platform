@@ -48,3 +48,27 @@ export type BookingType = keyof typeof BOOKING_COLLECTIONS;
 
 /** Users collection (Mongoose default for model `User`), used for lookups. */
 export const USERS_COLLECTION = 'users';
+
+/**
+ * Content collections read and written by the moderation default handlers
+ * (GEN-09 / GEN-10). Posts, comments and likes belong to the Blog module
+ * (Wael), reviews to Yassin (Person 6), itineraries to Hammad (Person 8).
+ * Owners replace the defaults by registering their own ModerationHandler.
+ *
+ * Fields read / written by the default handlers (missing isHidden = false):
+ * posts:       _id, authorId (ObjectId), title (string), content (string),
+ *              status ('draft' | 'published'), isHidden (boolean)
+ * comments:    _id, postId (ObjectId), authorId (ObjectId), content (string), isHidden
+ * likes:       postId (ObjectId), userId (ObjectId)
+ * reviews:     _id, userId (ObjectId), hotelId (ObjectId), comment (string), isHidden
+ * itineraries: _id, ownerId (ObjectId), title (string), isPublic (boolean), isHidden
+ */
+export const CONTENT_COLLECTIONS = {
+  post: 'posts', // Blog (Wael). Mongoose model Post
+  comment: 'comments', // Blog (Wael). Mongoose model Comment
+  like: 'likes', // Blog (Wael). Mongoose model Like; used only by the post delete cascade
+  review: 'reviews', // Yassin (Person 6). Mongoose model Review
+  itinerary: 'itineraries', // Hammad (Person 8). Mongoose model Itinerary
+} as const;
+
+export const POST_STATUS = { DRAFT: 'draft', PUBLISHED: 'published' } as const;
