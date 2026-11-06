@@ -219,3 +219,29 @@ allow-list, the new template wording, unit tests and the README section. I
 reviewed the decisions and the code, ran lint, build, the unit tests and the
 admin and reports e2e suites (in-memory MongoDB, not Atlas).
 ================================================
+
+================================================
+Date: 2026-11-05
+Student: Wael (Person 2)
+Tool: Claude Code
+Related Requirement: BLG-01, BLG-02, BLG-03, BLG-04, BLG-08, BLG-09
+
+Prompt:
+Implement blog posts from the blog spec: a Post schema with the field names
+fixed in teammate-contracts.ts, draft/published in both directions with
+publishedAt set on the first publish only, one visibility helper (drafts for
+the author only, hidden for author and admins, deactivated authors for admins
+only, suspended authors visible), an OptionalAuthGuard for public GETs that
+mirrors AuthGuard's checks without throwing, posts CRUD, GET /posts/mine,
+normalised tags (max 5), search by escaped keyword ordered by likes +
+comments then newest, and tag listing. A hard delete of a post closes open
+reports on it as content_deleted in the same transaction. Read the
+requirements sheet first and follow it where it differs.
+
+How the output was used:
+Claude Code read the BLG rows from the sheet (search covers title, tags and
+author name; comments max 500), wrote the spec, schema, guard, services,
+controllers, unit tests and a blog e2e test on an in-memory MongoDB replica
+set. I reviewed the code and ran the unit tests, the blog, reports and admin
+e2e suites (not Atlas), lint and build.
+================================================

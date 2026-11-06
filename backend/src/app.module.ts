@@ -11,6 +11,7 @@ import { NotificationsModule } from './notifications/notifications.module';
 import { AdminModule } from './admin/admin.module';
 import { ModerationModule } from './moderation/moderation.module';
 import { ReportsModule } from './reports/reports.module';
+import { BlogModule } from './blog/blog.module';
 
 @Module({
   imports: [
@@ -29,6 +30,7 @@ import { ReportsModule } from './reports/reports.module';
     AdminModule,
     ModerationModule,
     ReportsModule,
+    BlogModule,
   ],
   controllers: [AppController],
   providers: [AppService],
