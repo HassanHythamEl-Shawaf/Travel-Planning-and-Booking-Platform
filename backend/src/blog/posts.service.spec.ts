@@ -35,6 +35,7 @@ describe('PostsService (BLG-01 – BLG-04, BLG-08, BLG-09)', () => {
   let likeModel: { exists: jest.Mock };
   let connection: { transaction: jest.Mock };
   let cascade: { deletePostChildren: jest.Mock; closeOpenReports: jest.Mock };
+  let cleaner: { deleteFiles: jest.Mock };
   let service: PostsService;
 
   const storedPost = (extra: Record<string, unknown> = {}) => ({
@@ -91,12 +92,14 @@ describe('PostsService (BLG-01 – BLG-04, BLG-08, BLG-09)', () => {
       deletePostChildren: jest.fn().mockResolvedValue([]),
       closeOpenReports: jest.fn().mockResolvedValue(0),
     };
+    cleaner = { deleteFiles: jest.fn().mockResolvedValue(undefined) };
     service = new PostsService(
       connection as never,
       postModel as never,
       userModel as never,
       likeModel as never,
       cascade as never,
+      cleaner as never,
     );
   });
 
@@ -300,12 +303,36 @@ describe('PostsService (BLG-01 – BLG-04, BLG-08, BLG-09)', () => {
       );
     });
 
+    it('deletes image files only after the commit', async () => {
+      stored = storedPost({
+        images: [
+          { imageId: 'i1', url: '/u/i1' },
+          { imageId: 'i2', url: '/u/i2' },
+        ],
+      });
+      let committed = false;
+      connection.transaction.mockImplementation(
+        async (fn: (s: unknown) => unknown) => {
+          const result = await fn(session);
+          committed = true;
+          return result;
+        },
+      );
+      cleaner.deleteFiles.mockImplementation(() => {
+        expect(committed).toBe(true);
+        return Promise.resolve();
+      });
+      await service.remove(postId.toString(), author);
+      expect(cleaner.deleteFiles).toHaveBeenCalledWith(['i1', 'i2']);
+    });
+
     it('answers 404 if the post vanished before the delete', async () => {
       postModel.deleteOne.mockReturnValue(query({ deletedCount: 0 }));
       await expect(service.remove(postId.toString(), author)).rejects.toThrow(
         NotFoundException,
       );
       expect(cascade.closeOpenReports).not.toHaveBeenCalled();
+      expect(cleaner.deleteFiles).not.toHaveBeenCalled();
     });
 
     it('answers 403 to a non-owner and never deletes', async () => {

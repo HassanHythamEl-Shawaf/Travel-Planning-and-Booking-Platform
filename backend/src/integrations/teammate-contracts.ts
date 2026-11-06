@@ -72,3 +72,18 @@ export const CONTENT_COLLECTIONS = {
 } as const;
 
 export const POST_STATUS = { DRAFT: 'draft', PUBLISHED: 'published' } as const;
+
+/**
+ * Itinerary fields read by the Blog author page (BLG-12) through
+ * blog/public-itinerary.reader.ts, on top of the moderation fields above.
+ * `countries` (string[]) and `createdAt` (Date) are optional: a missing
+ * value is returned as [] / null. Sorted newest first by createdAt, then _id.
+ */
+export const ITINERARY_FIELDS = {
+  ownerId: 'ownerId',
+  title: 'title',
+  isPublic: 'isPublic',
+  isHidden: 'isHidden',
+  countries: 'countries',
+  createdAt: 'createdAt',
+} as const;

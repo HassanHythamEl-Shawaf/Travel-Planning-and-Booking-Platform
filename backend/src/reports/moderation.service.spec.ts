@@ -32,6 +32,7 @@ describe('ModerationService (GEN-10)', () => {
     find: jest.Mock;
     setHidden: jest.Mock;
     delete?: jest.Mock;
+    afterDelete?: jest.Mock;
   };
   let registry: { get: jest.Mock };
   let auditLogs: { record: jest.Mock };
@@ -463,6 +464,42 @@ describe('ModerationService (GEN-10)', () => {
         ),
       );
       expect(connection.transaction).not.toHaveBeenCalled();
+    });
+
+    it('runs afterDelete after the commit with the content found in the transaction', async () => {
+      const found = content({ assets: ['img-1', 'img-2'] });
+      handler.find.mockResolvedValue(found);
+      handler.afterDelete = jest.fn().mockImplementation(() => {
+        events.push(`afterDelete:${committed}`);
+        return Promise.resolve();
+      });
+
+      await service.deleteContent(adminId, 'post', targetId);
+
+      expect(handler.afterDelete).toHaveBeenCalledWith(found);
+      expect(events.indexOf('afterDelete:true')).toBeGreaterThan(
+        events.indexOf('commit'),
+      );
+      expect(events).not.toContain('afterDelete:false');
+    });
+
+    it('still succeeds and notifies when afterDelete fails', async () => {
+      handler.afterDelete = jest.fn().mockRejectedValue(new Error('disk'));
+
+      await expect(
+        service.deleteContent(adminId, 'post', targetId),
+      ).resolves.toMatchObject({ deleted: true });
+      expect(notifications.send).toHaveBeenCalled();
+    });
+
+    it('never runs afterDelete when the delete is rolled back', async () => {
+      handler.afterDelete = jest.fn().mockResolvedValue(undefined);
+      auditLogs.record.mockRejectedValue(new Error('audit down'));
+
+      await expect(
+        service.deleteContent(adminId, 'post', targetId),
+      ).rejects.toThrow('audit down');
+      expect(handler.afterDelete).not.toHaveBeenCalled();
     });
 
     it('answers 404 when the content is gone', async () => {

@@ -17,6 +17,7 @@ import {
 import { toExcerpt } from '../moderation/moderation.types';
 import { AccountStatus, User } from '../users/schemas/user.schema';
 import { BlogCascadeService } from './blog-cascade.service';
+import { BlogImageCleaner } from './blog-image-cleaner';
 import { DELETED_BY_AUTHOR_NOTE, type PostStatus } from './blog.constants';
 import {
   canViewPost,
@@ -148,6 +149,7 @@ export class PostsService {
     @InjectModel(User.name) private readonly userModel: Model<User>,
     @InjectModel(Like.name) private readonly likeModel: Model<Like>,
     private readonly cascade: BlogCascadeService,
+    private readonly imageCleaner: BlogImageCleaner,
   ) {}
 
   // -------------------------------------------------------------- writes
@@ -214,7 +216,8 @@ export class PostsService {
 
   /**
    * Hard delete (D6): the post, its comments and likes, and open reports on
-   * any of them closed as content_deleted, in one transaction.
+   * any of them closed as content_deleted, in one transaction. Image files
+   * are removed after the commit (best effort).
    */
   async remove(id: string, viewer: AuthenticatedUser): Promise<DeletedDto> {
     const { post } = await this.loadOwned(id, viewer);
@@ -240,6 +243,9 @@ export class PostsService {
       );
     });
 
+    await this.imageCleaner.deleteFiles(
+      (post.images ?? []).map((i) => i.imageId),
+    );
     return { id, deleted: true };
   }
 

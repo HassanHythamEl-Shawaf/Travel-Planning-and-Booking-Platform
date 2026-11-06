@@ -1,6 +1,7 @@
 import {
   ConflictException,
   Injectable,
+  Logger,
   NotFoundException,
   NotImplementedException,
 } from '@nestjs/common';
@@ -72,6 +73,8 @@ function snapshotOf(content: ModeratableContent): AuditSnapshot {
  */
 @Injectable()
 export class ModerationService {
+  private readonly logger = new Logger(ModerationService.name);
+
   constructor(
     @InjectConnection() private readonly connection: Connection,
     @InjectModel(Report.name) private readonly reportModel: Model<Report>,
@@ -314,9 +317,10 @@ export class ModerationService {
         },
         session,
       );
-      return { resolved, snapshot };
+      return { resolved, snapshot, content };
     });
 
+    await this.runAfterDelete(type, outcome.content);
     await this.notifyAuthor(
       NotificationType.CONTENT_DELETED,
       type,
@@ -340,6 +344,24 @@ export class ModerationService {
   }
 
   // --------------------------------------------------------------- helpers
+
+  /** Post-commit cleanup (e.g. image files); never fails the request. */
+  private async runAfterDelete(
+    type: ContentType,
+    content: ModeratableContent,
+  ): Promise<void> {
+    const handler = this.registry.get(type);
+    if (!handler.afterDelete) return;
+    try {
+      await handler.afterDelete(content);
+    } catch (error) {
+      this.logger.warn(
+        `afterDelete for ${type} ${content.id} failed: ${
+          error instanceof Error ? error.message : 'unknown error'
+        }`,
+      );
+    }
+  }
 
   private resolution(
     adminId: string,
