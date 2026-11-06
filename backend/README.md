@@ -115,6 +115,44 @@ Reference IDs are the official dataset IDs (e.g. airport `CAI`, city `cairo`, co
 attraction `att-1`, currency `EUR`) and are stored as the documents' `_id`. Store them as
 strings when referencing them from other schemas.
 
+## Admin & moderator setup (ACC-13 – ACC-17, ACC-07a, GEN-07, GEN-01)
+
+Log in as the seeded admin (see above), then in Swagger (`/api/docs`):
+
+1. Create the airline or hotel first (`POST /api/airlines`, `POST /api/hotels`, owned by Persons 3–6).
+2. `POST /api/admin/moderators` with `name`, `email`, `temporaryPassword`, `providerType`
+   (`airline` | `hotel`) and `providerId`. The account, its assignment and the audit entry
+   are written in one transaction. A moderator manages exactly one provider; a provider
+   may have several moderators. Assignments are permanent: to move someone, suspend the
+   account and create a new moderator.
+3. The moderator logs in with the temporary password, calls `PATCH /api/auth/change-password`,
+   then logs in again. `GET /api/moderator/assignment` tells the dashboard which provider it manages.
+
+Other admin endpoints: `GET /api/admin/accounts`, `PATCH /api/admin/accounts/:id/suspend|reactivate`,
+`POST /api/admin/users/:id/reset-password`, `PATCH /api/admin/providers/:type/:id/deactivate|reactivate`,
+`GET /api/admin/bookings` (read-only) and `GET /api/admin/audit-logs`. Admin accounts cannot be
+suspended or have their password reset. Suspending ends the account's sessions immediately.
+
+**For teammates**
+
+- **Provider routes:** decorate with `@UseGuards(AuthGuard, RolesGuard, ProviderOwnershipGuard)` and
+  `@ProviderOwnership('airline' | 'hotel', '<id param>')`. Nest builds guards inside *your*
+  module, so that module must import `UsersModule`, `JwtModule.register({})` and
+  `ModeratorAssignmentsModule`. Without the last one the guard answers 503.
+- **Deactivated providers:** the admin sets `isActive: false` on your `airlines` / `hotels`
+  document. Exclude those from search and reject new holds/bookings. Their moderators
+  automatically get 403 on provider routes.
+- **Collection and field names** this code reads are listed in
+  `src/integrations/teammate-contracts.ts`. If yours differ, change that file only.
+- **Notifications:** import `NotificationsModule` and call
+  `notificationsService.send(userId, NotificationType.X, payload)` *after* your transaction
+  commits. It never throws.
+- **Audit:** import `AuditLogsModule` and call `auditLogsService.record({...}, session?)`. It throws,
+  so an action without its audit entry fails.
+
+Tests: `npm test` (unit) and `npm run test:e2e -- admin` (in-memory MongoDB replica set via
+`mongodb-memory-server`; the first run downloads a `mongod` binary, and Atlas is never touched).
+
 ## Deployment
 
 When you're ready to deploy your NestJS application to production, there are some key steps you can take to ensure it runs as efficiently as possible. Check out the [deployment documentation](https://docs.nestjs.com/deployment) for more information.

@@ -142,7 +142,7 @@ export class NotificationsService {
       .findOneAndUpdate(
         { ...owned, readAt: null },
         { $set: { readAt: new Date() } },
-        { new: true, projection: { readAt: 1 } },
+        { returnDocument: 'after', projection: { readAt: 1 } },
       )
       .lean()
       .exec();
