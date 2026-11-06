@@ -44,6 +44,42 @@ describe('notification templates', () => {
       }),
     ).toBe('A refund of 50 EUR for X1 has been issued.');
   });
+
+  it('names moderated content by title, falling back to a short excerpt (GEN-10)', () => {
+    expect(
+      renderNotification(NotificationType.CONTENT_HIDDEN, {
+        contentType: 'post',
+        title: 'Five days in Aswan',
+      }),
+    ).toContain('Your post "Five days in Aswan" has been hidden');
+    expect(
+      renderNotification(NotificationType.CONTENT_DELETED, {
+        contentType: 'comment',
+        title: null,
+        excerpt: 'x'.repeat(80),
+      }),
+    ).toBe(`Your comment "${'x'.repeat(50)}…" has been removed by a moderator.`);
+    expect(
+      renderNotification(NotificationType.CONTENT_UNHIDDEN, {
+        contentType: 'review',
+        excerpt: 'Clean rooms',
+      }),
+    ).toBe('Your review "Clean rooms" is visible again.');
+  });
+
+  it('words REPORT_RESOLVED by outcome without naming anyone (D18)', () => {
+    const taken = renderNotification(NotificationType.REPORT_RESOLVED, {
+      outcome: 'action_taken',
+      contentType: 'post',
+    });
+    const none = renderNotification(NotificationType.REPORT_RESOLVED, {
+      outcome: 'no_violation',
+      contentType: 'post',
+    });
+    expect(taken).toContain('took action');
+    expect(none).toContain('found no violation');
+    expect(`${taken} ${none}`).not.toMatch(/admin|reporter/i);
+  });
 });
 
 describe('NotificationsService', () => {
