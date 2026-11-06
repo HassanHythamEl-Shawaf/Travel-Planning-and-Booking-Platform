@@ -86,3 +86,24 @@ Claude Code wrote the module, adapters and tests. I reviewed the code,
 checked that the only change to Hassan's files is the module import in
 auth.module.ts, and ran the tests, lint and build.
 ================================================
+
+================================================
+Date: 2026-11-05
+Student: Wael (Person 2)
+Tool: Claude Code
+Related Requirement: GEN-07, GEN-01
+
+Prompt:
+Implement the audit log and in-app notifications from the admin spec:
+an append-only AuditLog (record() throws so an admin action cannot lose its
+entry; GET /api/admin/audit-logs with action/actor/target/date filters) and
+a shared NotificationsService (send/sendMany never throw, per-type message
+templates) with owner-only list, unread-count, mark-read and read-all
+endpoints. Add unit tests.
+
+How the output was used:
+Claude Code wrote the modules, endpoints and tests. A boot check against an
+in-memory MongoDB showed that modules using AuthGuard must import UsersModule
+and JwtModule themselves; this was fixed. I reviewed the code and ran the
+tests, lint and build.
+================================================
