@@ -43,6 +43,22 @@ export class BlogCascadeService {
   }
 
   /**
+   * `commentCount` counts non-hidden comments (D7). A decrement only applies
+   * while the counter is positive, so it never goes below 0.
+   */
+  async adjustCommentCount(
+    postId: Types.ObjectId,
+    delta: 1 | -1,
+    session: ClientSession,
+  ): Promise<void> {
+    const filter =
+      delta < 0 ? { _id: postId, commentCount: { $gt: 0 } } : { _id: postId };
+    await this.connection
+      .collection(CONTENT_COLLECTIONS.post)
+      .updateOne(filter, { $inc: { commentCount: delta } }, { session });
+  }
+
+  /**
    * Closes open reports on content that no longer exists as
    * `content_deleted`, with no resolving admin (D6). Reporters are not
    * notified. Returns the number of reports closed.

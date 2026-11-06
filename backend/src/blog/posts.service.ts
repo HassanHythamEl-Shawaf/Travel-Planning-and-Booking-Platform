@@ -34,6 +34,7 @@ import {
   PostListItemDto,
   UpdatePostDto,
 } from './dto/post.dto';
+import { Like } from './schemas/like.schema';
 import { Post } from './schemas/post.schema';
 import { normalizeTag, normalizeTags } from './tags';
 
@@ -145,6 +146,7 @@ export class PostsService {
     @InjectConnection() private readonly connection: Connection,
     @InjectModel(Post.name) private readonly postModel: Model<Post>,
     @InjectModel(User.name) private readonly userModel: Model<User>,
+    @InjectModel(Like.name) private readonly likeModel: Model<Like>,
     private readonly cascade: BlogCascadeService,
   ) {}
 
@@ -357,12 +359,16 @@ export class PostsService {
       .exec();
   }
 
-  /** Whether the viewer liked the post; filled in with likes (BLG-06). */
-  protected likedBy(
-    _postId: Types.ObjectId,
-    _viewer: Viewer,
+  /** Whether the viewer liked the post (BLG-06); false for guests. */
+  private async likedBy(
+    postId: Types.ObjectId,
+    viewer: Viewer,
   ): Promise<boolean> {
-    return Promise.resolve(false);
+    if (!viewer) return false;
+    const like = await this.likeModel
+      .exists({ postId, userId: new Types.ObjectId(viewer.sub) })
+      .exec();
+    return like !== null;
   }
 
   toListItem(row: ListRow): PostListItemDto {
