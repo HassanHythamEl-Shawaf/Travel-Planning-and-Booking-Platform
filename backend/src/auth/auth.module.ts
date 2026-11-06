@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { APP_GUARD } from '@nestjs/core';
 import { JwtModule } from '@nestjs/jwt';
 
+import { ModeratorAssignmentsModule } from '../moderator-assignments/moderator-assignments.module';
 import { UsersModule } from '../users/users.module';
 import { UsersController } from '../users/users.controller';
 import { AuthController } from './auth.controller';
@@ -12,7 +13,7 @@ import { RolesGuard } from './guards/roles.guard';
 import { ProviderOwnershipGuard } from './guards/provider-ownership.guard';
 
 @Module({
-  imports: [UsersModule, JwtModule.register({})],
+  imports: [UsersModule, ModeratorAssignmentsModule, JwtModule.register({})],
   controllers: [AuthController, UsersController],
   providers: [
     AuthService,

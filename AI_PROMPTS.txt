@@ -65,3 +65,24 @@ Claude produced the spec after a Q&A on design decisions; Claude Code
 implemented it. I reviewed the code, ran the tests and the seed twice
 against the shared Atlas database, and checked the endpoints in Swagger.
 ================================================
+
+================================================
+Date: 2026-11-05
+Student: Wael (Person 2)
+Tool: Claude Code
+Related Requirement: ACC-13, ACC-15
+
+Prompt:
+Implement the moderator assignment from the agreed admin spec
+(docs/requirements/ACC-13-admin-spec.md): a standalone
+ModeratorAssignmentsModule with a unique-per-moderator assignment schema,
+a reader implementing Hassan's ProviderAssignmentReader (returns null for a
+missing or deactivated provider), and ProviderDirectory / BookingDirectory
+adapters that read teammates' collections by the names in one contracts
+file. Add unit tests for the reader and for Hassan's guard wired to it.
+
+How the output was used:
+Claude Code wrote the module, adapters and tests. I reviewed the code,
+checked that the only change to Hassan's files is the module import in
+auth.module.ts, and ran the tests, lint and build.
+================================================
