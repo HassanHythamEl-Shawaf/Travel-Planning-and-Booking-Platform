@@ -12,12 +12,18 @@ import { AirlinesService } from './airlines.service';
 import { FlightsController } from './flights.controller';
 import { Airline, AirlineSchema } from './schemas/airline.schema';
 import { Flight, FlightSchema } from './schemas/flight.schema';
+import {
+  FlightInventoryHold,
+  FlightInventoryHoldSchema,
+} from './schemas/flight-inventory-hold.schema';
+import { FlightInventoryService, FLIGHT_INVENTORY } from './flight-inventory';
 
 @Module({
   imports: [
     MongooseModule.forFeature([
       { name: Airline.name, schema: AirlineSchema },
       { name: Flight.name, schema: FlightSchema },
+      { name: FlightInventoryHold.name, schema: FlightInventoryHoldSchema },
     ]),
     AuthModule,
     UsersModule,
@@ -29,9 +35,11 @@ import { Flight, FlightSchema } from './schemas/flight.schema';
   controllers: [AirlinesController, FlightsController],
   providers: [
     AirlinesService,
+    FlightInventoryService,
+    { provide: FLIGHT_INVENTORY, useExisting: FlightInventoryService },
     // TODO(Person 8): replace this null binding with the shared image-upload adapter.
     { provide: AIRLINE_LOGO_STORE, useValue: null },
   ],
-  exports: [AirlinesService, MongooseModule],
+  exports: [AirlinesService, FlightInventoryService, FLIGHT_INVENTORY, MongooseModule],
 })
 export class AirlinesModule {}

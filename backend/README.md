@@ -315,6 +315,11 @@ or persisted `Cancelled` status from the flight departure time. The
 `AirlinesService.getFlightStatus` method is the scheduler-facing contract; no
 cron job is added here.
 
+The FLT-22 `FLIGHT_INVENTORY` contract is exported for the booking module. It
+provides `checkAvailability`, `createHold`, `confirmInventory`, and
+`releaseHold`. Hold creation uses one atomic conditional flight update, so
+parallel requests cannot exceed `seatCount`; infants must be excluded from the
+requested seat count by the booking caller.
 `GET /api/airlines/flights/search` (FLT-11) searches active airlines for
 scheduled flights between seeded airports on the departure airport's local
 date. Results include cabin availability; insufficient-capacity flights are
@@ -331,8 +336,7 @@ helper. An inverted price range is rejected with a client error.
 
 `GET /api/airlines/flights/:id` (FLT-17) returns the airline identity,
 airport-local departure and arrival times, duration, status, cabin prices and
-baggage allowances, remaining seats, and cancellation tiers. Until FLT-22 is
-merged, remaining seats reflect the configured cabin capacity.
+baggage allowances, inventory-backed remaining seats, and cancellation tiers.
 
 ## Deployment
 
