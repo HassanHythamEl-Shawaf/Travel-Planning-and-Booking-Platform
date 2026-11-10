@@ -22,6 +22,10 @@ import {
 } from '@nestjs/swagger';
 
 import { ProviderOwnership } from '../auth/decorators/provider-ownership.decorator';
+import {
+  AuthenticatedUser,
+  CurrentUser,
+} from '../auth/decorators/current-user.decorator';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { AuthGuard } from '../auth/guards/auth.guard';
 import { ProviderOwnershipGuard } from '../auth/guards/provider-ownership.guard';
@@ -35,6 +39,7 @@ import {
 } from './dto/airline.dto';
 import { AirlinesService } from './airlines.service';
 import { AirportResponseDto } from './dto/airport.dto';
+import { CreateFlightDto, FlightResponseDto } from './dto/flight.dto';
 
 const ID_PARAM = {
   name: 'id',
@@ -54,6 +59,29 @@ export class AirlinesController {
   @ApiOkResponse({ type: [AirportResponseDto] })
   listAirports(): Promise<AirportResponseDto[]> {
     return this.airlines.listAirports();
+  }
+
+  @Post('flights')
+  @UseGuards(AuthGuard, RolesGuard)
+  @Roles(UserRole.MODERATOR)
+  @ApiCookieAuth('access_token')
+  @ApiOperation({
+    summary: 'Create a flight (FLT-03)',
+    description:
+      'Airline moderators may create flights only for their assigned airline. Input date-times are local to each seeded airport and are stored in UTC with both IANA zones.',
+  })
+  @ApiCreatedResponse({ type: FlightResponseDto })
+  @ApiBadRequestResponse({ description: 'Invalid flight input' })
+  @ApiConflictResponse({
+    description: 'Invalid schedule, past departure or duplicate flight',
+  })
+  @ApiUnauthorizedResponse({ description: 'Authentication is required' })
+  @ApiForbiddenResponse({ description: 'Airline moderator role required' })
+  createFlight(
+    @CurrentUser() user: AuthenticatedUser,
+    @Body() dto: CreateFlightDto,
+  ): Promise<FlightResponseDto> {
+    return this.airlines.createFlight(user.sub, dto);
   }
 
   @Post()

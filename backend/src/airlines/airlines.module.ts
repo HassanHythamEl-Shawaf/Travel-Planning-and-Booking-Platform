@@ -10,10 +10,14 @@ import { AIRLINE_LOGO_STORE } from './airline-logo-store';
 import { AirlinesController } from './airlines.controller';
 import { AirlinesService } from './airlines.service';
 import { Airline, AirlineSchema } from './schemas/airline.schema';
+import { Flight, FlightSchema } from './schemas/flight.schema';
 
 @Module({
   imports: [
-    MongooseModule.forFeature([{ name: Airline.name, schema: AirlineSchema }]),
+    MongooseModule.forFeature([
+      { name: Airline.name, schema: AirlineSchema },
+      { name: Flight.name, schema: FlightSchema },
+    ]),
     AuthModule,
     UsersModule,
     ReferenceDataModule,
