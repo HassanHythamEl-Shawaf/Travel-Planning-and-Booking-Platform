@@ -26,6 +26,10 @@ import {
   UpdateAirlineDto,
 } from './dto/airline.dto';
 import { AirportResponseDto } from './dto/airport.dto';
+import {
+  BaggagePolicyResponseDto,
+  UpdateBaggagePolicyDto,
+} from './dto/baggage-policy.dto';
 import { CreateFlightDto, FlightResponseDto } from './dto/flight.dto';
 import {
   CabinResponseDto,
@@ -229,6 +233,25 @@ export class AirlinesService {
       dto.logoUrl === undefined
     ) {
       throw new ConflictException('At least one airline field is required');
+    }
+
+    async updateBaggagePolicy(
+      id: string,
+      dto: UpdateBaggagePolicyDto,
+    ): Promise<BaggagePolicyResponseDto> {
+      const airline = await this.airlineModel
+        .findByIdAndUpdate(
+          id,
+          { $set: { baggagePolicy: dto } },
+          { returnDocument: 'after', runValidators: true },
+        )
+        .lean()
+        .exec();
+      if (!airline) throw new NotFoundException('Airline not found');
+      return {
+        pricePerExtraBag: dto.pricePerExtraBag,
+        maxExtraBagsPerPassenger: dto.maxExtraBagsPerPassenger,
+      };
     }
 
     try {
