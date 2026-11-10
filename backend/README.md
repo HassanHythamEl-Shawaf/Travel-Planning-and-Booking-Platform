@@ -315,6 +315,12 @@ or persisted `Cancelled` status from the flight departure time. The
 `AirlinesService.getFlightStatus` method is the scheduler-facing contract; no
 cron job is added here.
 
+The FLT-22 `FLIGHT_INVENTORY` contract is exported for the booking module. It
+provides `checkAvailability`, `createHold`, `confirmInventory`, and
+`releaseHold`. Hold creation uses one atomic conditional flight update, so
+parallel requests cannot exceed `seatCount`; infants must be excluded from the
+requested seat count by the booking caller.
+
 ## Deployment
 
 When you're ready to deploy your NestJS application to production, there are some key steps you can take to ensure it runs as efficiently as possible. Check out the [deployment documentation](https://docs.nestjs.com/deployment) for more information.
