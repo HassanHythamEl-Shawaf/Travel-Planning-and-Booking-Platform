@@ -512,9 +512,10 @@ export class AirlinesService {
     if (!updated) {
       throw new ConflictException('Only Scheduled flights can be cancelled');
     }
-    await this.bookingCanceller.cancelConfirmedBookings(flightId);
+    const affectedUserIds =
+      await this.bookingCanceller.cancelConfirmedBookings(flightId);
     await this.inventory.releaseFlightHolds(flightId);
-    await this.notifyFlightCancellation(updated);
+    await this.notifyFlightCancellation(updated, affectedUserIds);
     return { id: flightId, status: FlightStatus.CANCELLED };
   }
 
@@ -772,13 +773,13 @@ export class AirlinesService {
 
   private async notifyFlightCancellation(
     flight: Flight & { _id: unknown },
+    affectedUserIds: string[],
   ): Promise<void> {
-    if (!this.passengers || !this.notifications) return;
-    const passengerIds = await this.passengers.findConfirmedPassengerIds(
-      String(flight._id),
-    );
+    // The bookings are already cancelled here, so the recipients come from
+    // the canceller rather than from a lookup of Confirmed bookings.
+    if (!this.notifications) return;
     await this.notifications.sendMany(
-      passengerIds,
+      affectedUserIds,
       NotificationType.FLIGHT_CANCELLED,
       { flightId: String(flight._id), flightNumber: flight.flightNumber },
     );
