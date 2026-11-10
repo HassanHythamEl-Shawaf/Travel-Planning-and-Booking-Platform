@@ -349,6 +349,14 @@ contract is bound.
 booking cancellation to Person 4, releases inventory holds, and sends shared
 flight-cancelled notifications when the passenger reader is bound.
 
+FLT-29 provides moderator-only `GET /api/airlines/flights/:id/bookings` and
+`GET /api/airlines/flights/:id/bookings/export` endpoints. The service verifies
+that the moderator owns the flight's airline, then reads booking references,
+passengers, cabin, seats and status through the `FLIGHT_BOOKING_READER` contract.
+The export is CSV and includes remaining seats for each cabin. Person 4 must
+bind that contract; until then these endpoints fail explicitly with a
+not-configured response.
+
 ## Deployment
 
 When you're ready to deploy your NestJS application to production, there are some key steps you can take to ensure it runs as efficiently as possible. Check out the [deployment documentation](https://docs.nestjs.com/deployment) for more information.
