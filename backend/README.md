@@ -287,6 +287,10 @@ npm test -- --runInBand src/airlines/airlines.service.spec.ts
 npm run build
 ```
 
+`GET /api/airlines/airports` (FLT-02) exposes the seeded, read-only airport
+list with IATA code, name, city, country and IANA time zone. Flight inputs must
+use these seeded airport identifiers.
+
 ## Deployment
 
 When you're ready to deploy your NestJS application to production, there are some key steps you can take to ensure it runs as efficiently as possible. Check out the [deployment documentation](https://docs.nestjs.com/deployment) for more information.
