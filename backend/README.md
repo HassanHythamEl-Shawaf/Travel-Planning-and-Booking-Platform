@@ -344,6 +344,11 @@ booked plus held seats. Confirmed-passenger schedule notifications are routed
 through the shared notification service when the Person 4 passenger-reader
 contract is bound.
 
+`POST /api/airlines/flights/:id/cancel` (FLT-06) requires
+`{ "confirm": true }`, cancels only Scheduled flights, delegates confirmed
+booking cancellation to Person 4, releases inventory holds, and sends shared
+flight-cancelled notifications when the passenger reader is bound.
+
 ## Deployment
 
 When you're ready to deploy your NestJS application to production, there are some key steps you can take to ensure it runs as efficiently as possible. Check out the [deployment documentation](https://docs.nestjs.com/deployment) for more information.

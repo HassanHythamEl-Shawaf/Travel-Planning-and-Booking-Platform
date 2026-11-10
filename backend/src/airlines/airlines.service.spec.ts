@@ -298,4 +298,10 @@ describe('AirlinesService', () => {
       }),
     ).rejects.toThrow('Seat count cannot be below booked and held seats');
   });
+
+  it('requires explicit cancellation confirmation', async () => {
+    await expect(
+      service.cancelFlight('moderator-id', id.toString(), false),
+    ).rejects.toThrow('Cancellation must be explicitly confirmed');
+  });
 });
