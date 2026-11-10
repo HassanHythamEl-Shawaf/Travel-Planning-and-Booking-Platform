@@ -345,3 +345,18 @@ Added the flight schema and DTOs, Luxon-based local-to-UTC conversion, assigned
 moderator ownership validation, seeded-airport checks and the compound
 duplicate-flight index. Added timezone tests and documented the endpoint.
 ================================================
+
+================================================
+Date: 2026-11-10
+Student: Yahia Mohamed
+Tool: GitHub Copilot (VS Code)
+Related Requirement: FLT-04
+Prompt:
+Implement only the FLT-04 flight cabin categories and capacity endpoints,
+keeping booking and inventory constraints for later branches, with tests and
+documentation.
+How the output was used:
+Added embedded fixed-category cabin documents with seat, price and baggage
+validation, assigned-moderator cabin create/update endpoints, focused tests and
+README documentation. Booking-dependent seat floors remain deferred.
+================================================

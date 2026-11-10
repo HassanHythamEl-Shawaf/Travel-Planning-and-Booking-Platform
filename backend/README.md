@@ -297,6 +297,11 @@ airport's IANA zone, stores UTC instants plus both zones, rejects past or
 non-positive schedules, and enforces unique flight number per airline and
 departure date.
 
+Cabin inventory endpoints (FLT-04) are `POST /api/flights/:id/cabins` and
+`PATCH /api/flights/:id/cabins/:cabinId`. They support Economy, Premium
+Economy, Business and First once each, with positive seats and price plus
+free-baggage count and maximum bag weight.
+
 ## Deployment
 
 When you're ready to deploy your NestJS application to production, there are some key steps you can take to ensure it runs as efficiently as possible. Check out the [deployment documentation](https://docs.nestjs.com/deployment) for more information.
