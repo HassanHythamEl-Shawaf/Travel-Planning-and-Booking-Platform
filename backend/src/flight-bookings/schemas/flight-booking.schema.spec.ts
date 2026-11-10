@@ -169,7 +169,10 @@ describe('FlightBooking schema (FLT-19)', () => {
       connection = await mongoose
         .createConnection(server.getUri(), { dbName: 'flight-bookings-test' })
         .asPromise();
-      Booking = connection.model(FlightBooking.name, FlightBookingSchema);
+      Booking = connection.model(
+        FlightBooking.name,
+        FlightBookingSchema,
+      ) as unknown as Model<FlightBooking>;
       await Booking.syncIndexes();
     });
 
