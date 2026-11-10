@@ -14,6 +14,19 @@ Used it as the team work split and work order documents.
 Date: 2026-11-10
 Student: Yahia Mohamed
 Tool: GitHub Copilot (VS Code)
+Related Requirement: FLT-06
+Prompt:
+Implement FLT-06 only: explicit-confirmation cancellation for Scheduled
+flights, booking cancellation and inventory-hold release contracts, shared
+passenger notifications, tests and documentation.
+How the output was used:
+Added the confirmation DTO and endpoint, atomic Scheduled-to-Cancelled
+transition, TODO booking-canceller contract, inventory hold release method,
+shared cancellation notification path, tests and README documentation.
+================================================
+Date: 2026-11-10
+Student: Yahia Mohamed
+Tool: GitHub Copilot (VS Code)
 Related Requirement: FLT-05
 Prompt:
 Implement FLT-05 only: assigned-moderator updates for Scheduled flight times

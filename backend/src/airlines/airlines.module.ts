@@ -18,6 +18,7 @@ import {
 } from './schemas/flight-inventory-hold.schema';
 import { FlightInventoryService, FLIGHT_INVENTORY } from './flight-inventory';
 import { FLIGHT_PASSENGER_READER } from './flight-passenger-reader';
+import { FLIGHT_BOOKING_CANCELLER } from './flight-booking-canceller';
 import { NotificationsModule } from '../notifications/notifications.module';
 
 @Module({
@@ -42,6 +43,8 @@ import { NotificationsModule } from '../notifications/notifications.module';
     { provide: FLIGHT_INVENTORY, useExisting: FlightInventoryService },
     // TODO(Person 4): bind FLIGHT_PASSENGER_READER to the booking adapter.
     { provide: FLIGHT_PASSENGER_READER, useValue: null },
+    // TODO(Person 4): bind FLIGHT_BOOKING_CANCELLER to the booking adapter.
+    { provide: FLIGHT_BOOKING_CANCELLER, useValue: null },
     // TODO(Person 8): replace this null binding with the shared image-upload adapter.
     { provide: AIRLINE_LOGO_STORE, useValue: null },
   ],

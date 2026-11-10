@@ -41,6 +41,7 @@ export interface FlightInventoryReader {
   ): Promise<FlightInventoryHoldResult>;
   confirmInventory(holdId: string): Promise<void>;
   releaseHold(holdId: string): Promise<void>;
+  releaseFlightHolds(flightId: string): Promise<void>;
 }
 
 export const FLIGHT_INVENTORY = Symbol('FLIGHT_INVENTORY');
@@ -173,6 +174,16 @@ export class FlightInventoryService implements FlightInventoryReader {
       hold.cabinId.toString(),
       hold.seats,
     );
+  }
+
+  async releaseFlightHolds(flightId: string): Promise<void> {
+    const holds = await this.holdModel
+      .find({ flightId: new Types.ObjectId(flightId), status: InventoryHoldStatus.HELD })
+      .lean()
+      .exec();
+    for (const hold of holds) {
+      await this.releaseHold(hold.holdId);
+    }
   }
 
   private async releaseSeats(
