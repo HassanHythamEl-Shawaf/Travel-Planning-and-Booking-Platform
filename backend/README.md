@@ -262,6 +262,31 @@ comment updates `commentCount`, and deleting a post removes its comments, likes 
 
 Tests: `npm run test:e2e -- blog` (in-memory replica set, includes 20 parallel likes).
 
+## Airlines (FLT-01)
+
+Airline profiles are exposed through Swagger under the **Airlines** tag:
+
+- `POST /api/airlines` — administrator-only creation with a unique name and
+  airline code. New airlines are active by default.
+- `GET /api/airlines/:id` — public profile lookup.
+- `PATCH /api/airlines/:id` — only the assigned airline moderator may edit the
+  profile name or code. This route uses `ProviderOwnershipGuard` and does not
+  grant administrators moderator editing access.
+
+The `isActive` flag is owned by the profile for the separate administrator
+deactivate/reactivate endpoints. Existing confirmed bookings are unaffected by
+that flag. Airline logos are intentionally not accepted as direct URLs; the
+profile has a `logoUrl` field and the module exposes an
+`AIRLINE_LOGO_STORE` boundary for Person 8's shared JPG/PNG upload integration.
+Until that integration is merged, sending `logoUrl` returns `501`.
+
+Targeted validation:
+
+```bash
+npm test -- --runInBand src/airlines/airlines.service.spec.ts
+npm run build
+```
+
 ## Deployment
 
 When you're ready to deploy your NestJS application to production, there are some key steps you can take to ensure it runs as efficiently as possible. Check out the [deployment documentation](https://docs.nestjs.com/deployment) for more information.
