@@ -315,6 +315,11 @@ or persisted `Cancelled` status from the flight departure time. The
 `AirlinesService.getFlightStatus` method is the scheduler-facing contract; no
 cron job is added here.
 
+`GET /api/airlines/flights/search` (FLT-11) searches active airlines for
+scheduled flights between seeded airports on the departure airport's local
+date. Results include cabin availability; insufficient-capacity flights are
+excluded and an empty result returns a friendly message.
+
 ## Deployment
 
 When you're ready to deploy your NestJS application to production, there are some key steps you can take to ensure it runs as efficiently as possible. Check out the [deployment documentation](https://docs.nestjs.com/deployment) for more information.

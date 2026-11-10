@@ -43,6 +43,11 @@ import {
 import { Airline } from './schemas/airline.schema';
 import { CabinCategory, Flight, FlightStatus } from './schemas/flight.schema';
 import { FlightStatusResponseDto } from './dto/flight-status.dto';
+import {
+  FlightSearchResponseDto,
+  FlightSearchResultDto,
+  SearchFlightsDto,
+} from './dto/flight-search.dto';
 
 function isDuplicateKeyError(error: unknown): boolean {
   return (
@@ -194,11 +199,57 @@ export class AirlinesService {
     if (flight.status === FlightStatus.CANCELLED) {
       return { status: FlightStatus.CANCELLED };
     }
+
     return {
       status:
         new Date(flight.departureAt).getTime() <= now.getTime()
           ? FlightStatus.DEPARTED
           : FlightStatus.SCHEDULED,
+    };
+  }
+
+  async searchFlights(
+    dto: SearchFlightsDto,
+  ): Promise<FlightSearchResponseDto> {
+    if (!this.referenceData) {
+      throw new NotImplementedException(
+        'Airport reference data is not configured',
+      );
+    }
+    const [departureAirport, arrivalAirport] = await Promise.all([
+      this.referenceData.findAirport(dto.departureAirportCode),
+      this.referenceData.findAirport(dto.arrivalAirportCode),
+    ]);
+    if (!departureAirport || !arrivalAirport) {
+      throw new NotFoundException('Both airports must be seeded airports');
+    }
+    const airlines = await this.airlineModel
+      .find({ isActive: { $ne: false } })
+      .select({ _id: 1 })
+      .lean()
+      .exec();
+    const flights = await this.flightModel
+      .find({
+        airlineId: { $in: airlines.map((airline) => airline._id) },
+        departureAirportCode: dto.departureAirportCode,
+        arrivalAirportCode: dto.arrivalAirportCode,
+        departureLocalDate: dto.departureDate.slice(0, 10),
+        status: FlightStatus.SCHEDULED,
+      })
+      .sort({ departureAt: 1 })
+      .lean()
+      .exec();
+    const items = flights
+      .map((flight) => this.toSearchResult(flight))
+      .filter((flight) =>
+        flight.cabins.some(
+          (cabin: { seatsAvailable: number }) =>
+            cabin.seatsAvailable >= dto.passengers,
+        ),
+      );
+    return {
+      items,
+      message: items.length === 0 ? 'No flights found' : 'Flights found',
     };
   }
 
@@ -418,6 +469,47 @@ export class AirlinesService {
           : new Date(flight.departureAt).getTime() <= Date.now()
             ? FlightStatus.DEPARTED
             : FlightStatus.SCHEDULED,
+    };
+  }
+
+  private toSearchResult(flight: {
+    _id: unknown;
+    flightNumber: string;
+    departureAirportCode: string;
+    arrivalAirportCode: string;
+    departureAt: Date;
+    arrivalAt: Date;
+    departureTimeZone: string;
+    arrivalTimeZone: string;
+    cabins: Array<{
+      _id?: unknown;
+      category: CabinCategory;
+      price: number;
+      seatCount: number;
+      seatsBooked?: number;
+      seatsHeld?: number;
+      freeBaggageAllowance: number;
+      maxWeightPerBagKg: number;
+    }>;
+  }): FlightSearchResultDto {
+    return {
+      id: String(flight._id),
+      flightNumber: flight.flightNumber,
+      departureAirportCode: flight.departureAirportCode,
+      arrivalAirportCode: flight.arrivalAirportCode,
+      departureAt: flight.departureAt,
+      arrivalAt: flight.arrivalAt,
+      departureTimeZone: flight.departureTimeZone,
+      arrivalTimeZone: flight.arrivalTimeZone,
+      cabins: flight.cabins.map((cabin) => ({
+        id: String(cabin._id),
+        category: cabin.category,
+        price: cabin.price,
+        seatsAvailable:
+          cabin.seatCount - (cabin.seatsBooked ?? 0) - (cabin.seatsHeld ?? 0),
+        freeBaggageAllowance: cabin.freeBaggageAllowance,
+        maxWeightPerBagKg: cabin.maxWeightPerBagKg,
+      })),
     };
   }
 

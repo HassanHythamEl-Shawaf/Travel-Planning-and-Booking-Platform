@@ -402,5 +402,17 @@ Added the status response DTO, public status endpoint, deterministic service
 derivation for Scheduled, Departed and Cancelled, focused tests and README
 documentation.
 ================================================
-================================================
+Date: 2026-11-10
+Student: Yahia Mohamed
+Tool: GitHub Copilot (VS Code)
+Related Requirement: FLT-11
+Prompt:
+Implement the FLT-11 public flight search requirement only, using seeded
+airports, active airlines, Scheduled flights, local departure date,
+passenger-capacity filtering, friendly empty results, tests and docs.
+How the output was used:
+Added validated search DTOs, an active-airline scheduled-flight query with
+cabin availability mapping, a public Swagger endpoint, focused tests and README
+documentation. Round-trip, passenger-type, price, sorting and pagination
+features remain for their later requirements.
 ================================================
