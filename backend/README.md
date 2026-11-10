@@ -310,6 +310,11 @@ days-before-departure thresholds and refund percentages. The exported
 `calculateRefundPercentage` helper selects the highest applicable threshold for
 refund services.
 
+`GET /api/airlines/flights/:id/status` (FLT-30) derives `Scheduled`, `Departed`,
+or persisted `Cancelled` status from the flight departure time. The
+`AirlinesService.getFlightStatus` method is the scheduler-facing contract; no
+cron job is added here.
+
 ## Deployment
 
 When you're ready to deploy your NestJS application to production, there are some key steps you can take to ensure it runs as efficiently as possible. Check out the [deployment documentation](https://docs.nestjs.com/deployment) for more information.
