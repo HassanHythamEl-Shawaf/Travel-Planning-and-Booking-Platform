@@ -2,6 +2,7 @@ import {
   Body,
   Controller,
   Get,
+  Header,
   Param,
   Patch,
   Post,
@@ -15,6 +16,7 @@ import {
   ApiCookieAuth,
   ApiCreatedResponse,
   ApiForbiddenResponse,
+  ApiHeader,
   ApiNotFoundResponse,
   ApiOkResponse,
   ApiOperation,
@@ -64,6 +66,7 @@ import {
   SearchFlightsDto,
 } from './dto/flight-search.dto';
 import { FlightDetailsResponseDto } from './dto/flight-details.dto';
+import { FlightBookingsResponseDto } from './dto/flight-booking.dto';
 
 const ID_PARAM = {
   name: 'id',
@@ -153,6 +156,52 @@ export class AirlinesController {
     @Param('id', ParseObjectIdPipe) id: string,
   ): Promise<FlightDetailsResponseDto> {
     return this.airlines.getFlightDetails(id);
+  }
+
+  @Get('flights/:id/bookings')
+  @UseGuards(AuthGuard, RolesGuard)
+  @Roles(UserRole.MODERATOR)
+  @ApiCookieAuth('access_token')
+  @ApiOperation({
+    summary: 'List bookings for an assigned flight (FLT-29)',
+    description:
+      'The assigned airline moderator can inspect booking references, passengers, cabin, seats, status and remaining cabin seats.',
+  })
+  @ApiParam(ID_PARAM)
+  @ApiOkResponse({ type: FlightBookingsResponseDto })
+  @ApiUnauthorizedResponse({ description: 'Authentication is required' })
+  @ApiForbiddenResponse({ description: 'Airline moderator role required' })
+  @ApiNotFoundResponse({ description: 'Flight not found or not assigned' })
+  listFlightBookings(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id', ParseObjectIdPipe) id: string,
+  ): Promise<FlightBookingsResponseDto> {
+    return this.airlines.listFlightBookings(user.sub, id);
+  }
+
+  @Get('flights/:id/bookings/export')
+  @UseGuards(AuthGuard, RolesGuard)
+  @Roles(UserRole.MODERATOR)
+  @ApiCookieAuth('access_token')
+  @ApiOperation({
+    summary: 'Export bookings for an assigned flight (FLT-29)',
+  })
+  @ApiParam(ID_PARAM)
+  @ApiHeader({
+    name: 'Content-Disposition',
+    description: 'CSV attachment filename',
+  })
+  @ApiOkResponse({ description: 'CSV passenger booking export' })
+  @ApiUnauthorizedResponse({ description: 'Authentication is required' })
+  @ApiForbiddenResponse({ description: 'Airline moderator role required' })
+  @ApiNotFoundResponse({ description: 'Flight not found or not assigned' })
+  @Header('Content-Type', 'text/csv; charset=utf-8')
+  @Header('Content-Disposition', 'attachment; filename="flight-bookings.csv"')
+  exportFlightBookings(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id', ParseObjectIdPipe) id: string,
+  ): Promise<string> {
+    return this.airlines.exportFlightBookings(user.sub, id);
   }
 
   @Patch('flights/:id')
