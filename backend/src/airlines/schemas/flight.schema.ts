@@ -7,6 +7,34 @@ export enum FlightStatus {
   DEPARTED = 'Departed',
 }
 
+export enum CabinCategory {
+  ECONOMY = 'Economy',
+  PREMIUM_ECONOMY = 'Premium Economy',
+  BUSINESS = 'Business',
+  FIRST = 'First',
+}
+
+@Schema({ _id: true })
+export class Cabin {
+  _id?: Types.ObjectId;
+  @Prop({ required: true, enum: CabinCategory })
+  category: CabinCategory;
+
+  @Prop({ required: true, min: 1 })
+  seatCount: number;
+
+  @Prop({ required: true, min: 0 })
+  price: number;
+
+  @Prop({ required: true, min: 0 })
+  freeBaggageAllowance: number;
+
+  @Prop({ required: true, min: 0 })
+  maxWeightPerBagKg: number;
+}
+
+export const CabinSchema = SchemaFactory.createForClass(Cabin);
+
 export type FlightDocument = HydratedDocument<Flight>;
 
 @Schema({ timestamps: true })
@@ -40,6 +68,9 @@ export class Flight {
 
   @Prop({ required: true, enum: FlightStatus, default: FlightStatus.SCHEDULED })
   status: FlightStatus;
+
+  @Prop({ type: [CabinSchema], default: [] })
+  cabins: Cabin[];
 
   createdAt: Date;
   updatedAt: Date;
