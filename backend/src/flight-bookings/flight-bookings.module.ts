@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { forwardRef, Module } from '@nestjs/common';
 import { JwtModule } from '@nestjs/jwt';
 import { MongooseModule } from '@nestjs/mongoose';
 
@@ -8,6 +8,7 @@ import { NotificationsModule } from '../notifications/notifications.module';
 import { UsersModule } from '../users/users.module';
 import { AirlineTierRefunds } from './airline-tier-refunds';
 import { FlightBookingCancellationService } from './flight-booking-cancellation.service';
+import { FlightBookingReaders } from './flight-booking-readers';
 import { FLIGHT_BOOKING_PAYMENTS } from './flight-booking-payments.contract';
 import { FLIGHT_REFUNDS } from './flight-refunds.contract';
 import { FlightBookingLifecycleService } from './flight-booking-lifecycle.service';
@@ -28,7 +29,8 @@ import {
     MongooseModule.forFeature([
       { name: FlightBooking.name, schema: FlightBookingSchema },
     ]),
-    AirlinesModule,
+    // Inventory and flight models; AirlinesModule uses this module's adapters.
+    forwardRef(() => AirlinesModule),
     AuthModule,
     // AuthGuard is instantiated in this module, so its dependencies
     // (JwtService, UsersService) must be visible here.
@@ -41,6 +43,7 @@ import {
     FlightBookingsService,
     FlightBookingLifecycleService,
     FlightBookingCancellationService,
+    FlightBookingReaders,
     // TODO(Person 7): bind FLIGHT_REFUNDS to the payments refund service.
     // Until then refunds are calculated from airline tiers but not issued.
     { provide: FLIGHT_REFUNDS, useClass: AirlineTierRefunds },
@@ -50,6 +53,13 @@ import {
       useExisting: FlightBookingLifecycleService,
     },
   ],
-  exports: [FlightBookingsService, FLIGHT_BOOKING_PAYMENTS, MongooseModule],
+  exports: [
+    FlightBookingsService,
+    FLIGHT_BOOKING_PAYMENTS,
+    // Person 3's flight module binds its booking adapters to these two.
+    FlightBookingCancellationService,
+    FlightBookingReaders,
+    MongooseModule,
+  ],
 })
 export class FlightBookingsModule {}

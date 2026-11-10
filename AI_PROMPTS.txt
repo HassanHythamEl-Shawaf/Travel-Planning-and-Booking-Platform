@@ -632,3 +632,23 @@ on the booking, a cancellation service that claims the cancel with one
 conditional update and refuses if the refund changed since the preview,
 two Swagger endpoints, and in-memory MongoDB tests.
 ================================================
+Date: 2026-11-10
+Student: Yassin Arafa
+Tool: Claude Code (Claude Opus 5.5)
+Related Requirement: FLT-06, FLT-05, FLT-29, ACC-12, GEN-01
+Prompt:
+Bind the booking adapters other teammates left as TODO(Person 4): the
+flight canceller for FLT-06 (100% refund, return the affected users and
+send nothing), the passenger reader for schedule-change notifications,
+the per-flight booking reader for the moderator list and CSV (FLT-29),
+and the upcoming-booking check that blocks account deactivation (ACC-12).
+Avoid circular imports and prove the whole app works over HTTP.
+How the output was used:
+Found that flight cancellation notified nobody (bookings were cancelled
+before looking up who to notify) and changed the canceller to return the
+affected user ids for Person 3 to notify. Added cancel-all-for-flight
+(pending holds expired first to close a race with late payments),
+read-only booking readers, a contract-based eligibility reader covering
+flights and hotels, forwardRef module wiring, adapter tests and an HTTP
+end-to-end test from booking to airline cancellation.
+================================================

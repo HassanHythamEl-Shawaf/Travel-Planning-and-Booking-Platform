@@ -5,5 +5,10 @@ export const FLIGHT_BOOKING_CANCELLER = Symbol('FLIGHT_BOOKING_CANCELLER');
  * TODO(Person 7): bind the refund workflow after booking cancellation.
  */
 export interface FlightBookingCanceller {
-  cancelConfirmedBookings(flightId: string): Promise<void>;
+  /**
+   * FLT-06: cancels every Confirmed booking on the flight with a 100% refund
+   * and expires its Pending Payment bookings. Returns the ids of the users
+   * affected, to be notified by the caller (it sends nothing itself).
+   */
+  cancelConfirmedBookings(flightId: string): Promise<string[]>;
 }

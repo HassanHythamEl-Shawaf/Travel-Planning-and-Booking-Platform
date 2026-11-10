@@ -10,6 +10,7 @@ import { Model, Types } from 'mongoose';
 
 import { FLIGHT_INVENTORY } from '../airlines/flight-inventory';
 import type { FlightInventoryReader } from '../airlines/flight-inventory';
+import type { FlightBookingCanceller } from '../airlines/flight-booking-canceller';
 import { Airline } from '../airlines/schemas/airline.schema';
 import { NotificationType } from '../notifications/notification.constants';
 import { NotificationsService } from '../notifications/notifications.service';
@@ -35,9 +36,12 @@ import { FlightBooking } from './schemas/flight-booking.schema';
  * FLT-26: a user cancels their own Confirmed booking before departure,
  * after seeing the refund. A round trip is cancelled as a whole using the
  * outbound segment's tier (FLT-12).
+ *
+ * FLT-06: also Person 3's FlightBookingCanceller, used when an airline
+ * cancels a whole flight.
  */
 @Injectable()
-export class FlightBookingCancellationService {
+export class FlightBookingCancellationService implements FlightBookingCanceller {
   private readonly logger = new Logger(FlightBookingCancellationService.name);
 
   constructor(
@@ -161,6 +165,99 @@ export class FlightBookingCancellationService {
         status: issued.status,
       },
     };
+  }
+
+  /**
+   * FLT-06: the airline cancelled the flight. Every Confirmed booking with a
+   * segment on it becomes Cancelled with a 100% refund of the whole booking
+   * (both flights of a round trip), and every Pending Payment booking on it
+   * becomes Expired. All their seats and holds are returned. Sends no
+   * notification: Person 3 notifies the returned users with FLIGHT_CANCELLED.
+   */
+  async cancelConfirmedBookings(
+    flightId: string,
+    now = new Date(),
+  ): Promise<string[]> {
+    const onFlight = { 'segments.flightId': new Types.ObjectId(flightId) };
+    const affected = new Set<string>();
+
+    // Pending first: a booking confirmed by a payment while this runs is then
+    // still caught by the Confirmed pass below.
+    const pending = await this.bookingModel
+      .find({ ...onFlight, status: FlightBookingStatus.PENDING_PAYMENT })
+      .lean<LeanBooking[]>()
+      .exec();
+    for (const booking of pending) {
+      const expired = await this.bookingModel
+        .findOneAndUpdate(
+          { _id: booking._id, status: FlightBookingStatus.PENDING_PAYMENT },
+          {
+            $set: {
+              status: FlightBookingStatus.EXPIRED,
+              expiredAt: now,
+              holdExpiresAt: null,
+            },
+          },
+          { returnDocument: 'after' },
+        )
+        .lean<LeanBooking>()
+        .exec();
+      if (!expired) continue; // it was confirmed or expired meanwhile
+      affected.add(expired.userId.toString());
+      await Promise.all(
+        expired.segments
+          .filter((segment) => segment.holdId)
+          .map((segment) => this.inventory.releaseHold(segment.holdId!)),
+      );
+    }
+
+    const confirmed = await this.bookingModel
+      .find({ ...onFlight, status: FlightBookingStatus.CONFIRMED })
+      .lean<LeanBooking[]>()
+      .exec();
+    for (const booking of confirmed) {
+      const request = refundRequest(
+        booking,
+        CancellationSource.FLIGHT_CANCELLED,
+      );
+      const quote = await this.refunds.previewRefund(request, now);
+      const cancelled = await this.bookingModel
+        .findOneAndUpdate(
+          { _id: booking._id, status: FlightBookingStatus.CONFIRMED },
+          {
+            $set: {
+              status: FlightBookingStatus.CANCELLED,
+              cancelledAt: now,
+              cancellationSource: CancellationSource.FLIGHT_CANCELLED,
+              refundPercentage: quote.refundPercentage,
+              refundAmount: quote.refundAmount,
+            },
+          },
+          { returnDocument: 'after' },
+        )
+        .lean<LeanBooking>()
+        .exec();
+      if (!cancelled) continue; // the user cancelled it a moment earlier
+      affected.add(cancelled.userId.toString());
+      await Promise.all(
+        cancelled.segments
+          .filter((segment) => segment.holdId)
+          .map((segment) =>
+            this.inventory.releaseConfirmedSeats(segment.holdId!),
+          ),
+      );
+      const issued = await this.issueRefund(request, quote);
+      if (issued.refundId) {
+        await this.bookingModel
+          .updateOne(
+            { _id: cancelled._id },
+            { $set: { refundId: issued.refundId } },
+          )
+          .exec();
+      }
+    }
+
+    return [...affected];
   }
 
   /** PAY-03: only a positive amount is refunded; a refund failure never undoes the cancellation. */
