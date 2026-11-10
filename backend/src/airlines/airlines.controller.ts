@@ -56,6 +56,10 @@ import {
   UpdateFlightScheduleDto,
 } from './dto/flight-update.dto';
 import {
+  CancelFlightDto,
+  FlightCancellationResponseDto,
+} from './dto/flight-cancellation.dto';
+import {
   FlightSearchResponseDto,
   SearchFlightsDto,
 } from './dto/flight-search.dto';
@@ -170,6 +174,27 @@ export class AirlinesController {
     @Body() dto: UpdateFlightScheduleDto,
   ): Promise<FlightUpdateResponseDto> {
     return this.airlines.updateFlightSchedule(user.sub, id, dto);
+  }
+
+  @Post('flights/:id/cancel')
+  @UseGuards(AuthGuard, RolesGuard)
+  @Roles(UserRole.MODERATOR)
+  @ApiCookieAuth('access_token')
+  @ApiOperation({
+    summary: 'Cancel a scheduled flight (FLT-06)',
+    description:
+      'The assigned airline moderator must confirm cancellation. Confirmed bookings are delegated to the booking adapter and pending holds are released.',
+  })
+  @ApiParam({ name: 'id', example: '6650f1c2a1b2c3d4e5f60719' })
+  @ApiOkResponse({ type: FlightCancellationResponseDto })
+  @ApiBadRequestResponse({ description: 'Confirmation is required' })
+  @ApiConflictResponse({ description: 'Flight is not Scheduled' })
+  cancelFlight(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id', ParseObjectIdPipe) id: string,
+    @Body() dto: CancelFlightDto,
+  ): Promise<FlightCancellationResponseDto> {
+    return this.airlines.cancelFlight(user.sub, id, dto.confirm);
   }
 
   @Post()
