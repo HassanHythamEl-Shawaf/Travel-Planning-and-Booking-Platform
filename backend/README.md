@@ -90,10 +90,11 @@ closed.
 
 `DELETE /api/users/me` requires `{ "confirm": true }` and checks
 `BookingEligibilityReader.hasUpcomingConfirmedBookings(userId)` before
-deactivating the account and clearing cookies. The flight and hotel booking
-owners must provide a combined reader using the token
-`BOOKING_ELIGIBILITY_READER` in a module imported by `AuthModule`. The endpoint
-fails closed with service unavailable until that integration is registered.
+deactivating the account and clearing cookies. `AuthModule` binds the token
+`BOOKING_ELIGIBILITY_READER` to `MongoBookingEligibilityReader`
+(`src/integrations/booking-eligibility.ts`), which checks Confirmed flight
+bookings with a flight still ahead and Confirmed hotel bookings whose check-in
+is ahead, through the collection contract in `teammate-contracts.ts`.
 User content owners must also resolve deactivated-user public references as
 `Deleted user`.
 
@@ -345,17 +346,87 @@ through the shared notification service when the Person 4 passenger-reader
 contract is bound.
 
 `POST /api/airlines/flights/:id/cancel` (FLT-06) requires
-`{ "confirm": true }`, cancels only Scheduled flights, delegates confirmed
-booking cancellation to Person 4, releases inventory holds, and sends shared
-flight-cancelled notifications when the passenger reader is bound.
+`{ "confirm": true }`, cancels only Scheduled flights, delegates booking
+cancellation to the flight bookings module (Confirmed bookings are cancelled
+with a 100% refund, unpaid holds expire), releases inventory holds, and sends
+`FLIGHT_CANCELLED` to the affected users the canceller returns.
 
 FLT-29 provides moderator-only `GET /api/airlines/flights/:id/bookings` and
 `GET /api/airlines/flights/:id/bookings/export` endpoints. The service verifies
 that the moderator owns the flight's airline, then reads booking references,
 passengers, cabin, seats and status through the `FLIGHT_BOOKING_READER` contract.
-The export is CSV and includes remaining seats for each cabin. Person 4 must
-bind that contract; until then these endpoints fail explicitly with a
-not-configured response.
+The export is CSV and includes remaining seats for each cabin. The contract is
+bound to the flight bookings module (see below).
+
+## Flight bookings (FLT-19 – FLT-26)
+
+All endpoints are under the **Flight Bookings** tag in Swagger, require a
+logged-in registered user (role `user`) and only ever show the caller's own
+bookings; another user's booking is reported as not found (ACC-11).
+
+| Method | Endpoint | Requirement |
+|---|---|---|
+| POST | `/api/flight-bookings` | FLT-19, FLT-21: validate passengers and baggage, return the price summary (nothing saved) |
+| POST | `/api/flight-bookings/hold` | FLT-22: hold the seats, booking in Pending Payment for 10 minutes |
+| GET | `/api/flight-bookings?group=upcoming\|past\|cancelled&page=1` | FLT-25: my bookings, 10 per page, with `counts` per group |
+| GET | `/api/flight-bookings/:id` | FLT-25: full details, including refund fields |
+| GET | `/api/flight-bookings/:id/refund-preview` | FLT-26: refund the airline's tiers give today |
+| POST | `/api/flight-bookings/:id/cancel` | FLT-26: `{ "confirm": true, "expectedRefundAmount"?: number }` |
+| GET | `/api/flight-bookings/:id/e-ticket` | FLT-23: PDF download, Confirmed or Completed bookings only |
+
+Rules enforced on the backend:
+
+- **Passengers (FLT-12, FLT-19):** adult 12+, child 2–11, infant under 2,
+  checked against the date of birth on the outbound departure date. At least
+  one adult and no more infants than adults. Infants pay 10% and take no seat.
+- **Baggage (FLT-08):** extra bags apply to every flight of the trip, up to the
+  airline's maximum, each up to the cabin's weight per bag.
+- **Round trip (FLT-12):** send `returnFlight`; it must fly the reverse route
+  after the outbound lands. One booking, two segments, one payment and one
+  reference, cancelled as a whole using the outbound flight's tier.
+- **Holds (FLT-22):** each flight's seats are reserved with one atomic update
+  through `FlightInventoryService`, so parallel requests never oversell; a
+  round trip holds both flights or neither. Deactivated airlines and flights
+  that are not Scheduled or have departed are rejected.
+- **Statuses (GEN-11):** only Pending Payment → Confirmed/Expired and
+  Confirmed → Completed/Cancelled; each change is one conditional update, so
+  confirmation, expiry and cancellation can never both win.
+
+### Contracts for payments (Person 7)
+
+Import `FlightBookingsModule` and inject `FLIGHT_BOOKING_PAYMENTS`
+(`src/flight-bookings/flight-booking-payments.contract.ts`):
+
+- `getForPayment(id)`: amount, currency, owner, status and `holdExpiresAt`.
+- `confirmBooking(id)`: call after the webhook verifies the PaymentIntent.
+  Books the seats, issues the reference, sends `BOOKING_CONFIRMED`. Safe to
+  repeat; refuses an expired hold (refund the payment).
+- `releaseHold(id)`, `releaseExpiredHolds()`: expire unpaid holds, free the
+  seats, send `BOOKING_EXPIRED`.
+- `completeDepartedBookings()`: Confirmed → Completed once every flight has
+  departed (GEN-11).
+
+Refunds go through `FLIGHT_REFUNDS` (`flight-refunds.contract.ts`). Until the
+payments module binds its Stripe refund service in `flight-bookings.module.ts`,
+`AirlineTierRefunds` calculates the amount from the airline's tiers (100% for
+airline cancellations) and logs that no money was refunded.
+
+### Adapters for other modules
+
+| Token | Used by | Bound to |
+|---|---|---|
+| `FLIGHT_BOOKING_CANCELLER` | FLT-06 flight cancellation | `FlightBookingCancellationService` |
+| `FLIGHT_PASSENGER_READER` | FLT-05 schedule-change notifications | `FlightBookingReaders` |
+| `FLIGHT_BOOKING_READER` | FLT-29 moderator list and CSV | `FlightBookingReaders` |
+| `BOOKING_ELIGIBILITY_READER` | ACC-12 account deactivation | `MongoBookingEligibilityReader` |
+
+### Tests
+
+Unit tests run against an in-memory MongoDB (`mongodb-memory-server`), never
+Atlas: `npm test -- src/flight-bookings`. `test/flight-bookings.e2e-spec.ts`
+(`npm run test:e2e`) drives the whole app over HTTP, from booking and payment
+to the airline cancelling the flight, plus 20 parallel holds on a 5-seat
+cabin.
 
 The requirements-compatible aliases `/api/airports` and `/api/flights/...`
 are also available. The existing `/api/airlines/...` routes remain supported.

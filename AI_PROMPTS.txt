@@ -669,3 +669,19 @@ attachment, unit tests for the PDF and helpers, and e2e checks that the
 download works after payment and is refused for unpaid or cancelled
 bookings. Rendered a sample and adjusted the column layout after review.
 ================================================
+Date: 2026-11-10
+Student: Yassin Arafa
+Tool: Claude Code (Claude Opus 5.5)
+Related Requirement: FLT-22, FLT-19 to FLT-26
+Prompt:
+Final checks for my flight booking work: prove over HTTP that parallel
+hold requests never oversell a flight, check every endpoint in the
+running app's Swagger UI, and document the module, the payment contracts
+and the adapters in the README.
+How the output was used:
+Added an e2e test where four users send 20 parallel holds for a 5-seat
+cabin (exactly 5 succeed, 15 get 409, all 5 confirm), ran it repeatedly to
+confirm it is stable, checked the Swagger UI of the built app against an
+in-memory database, and added a Flight bookings section to the README
+while updating notes that said the booking adapters were still missing.
+================================================

@@ -316,4 +316,82 @@ describe('Flight bookings (e2e)', () => {
     // With nothing upcoming, deactivation is allowed (ACC-12).
     await traveller.delete('/api/users/me').send({ confirm: true }).expect(200);
   });
+
+  it('never sells more seats than exist under parallel HTTP holds (FLT-22)', async () => {
+    const airline = await connection
+      .collection('airlines')
+      .findOne({ code: 'NA' });
+    const departure = DateTime.now()
+      .setZone('Africa/Cairo')
+      .plus({ days: 20 })
+      .set({ hour: 9, minute: 0, second: 0, millisecond: 0 });
+    const flights = app.get<Model<Flight>>(getModelToken(Flight.name));
+    const flight = await flights.create({
+      airlineId: airline!._id,
+      flightNumber: 'NA201',
+      departureAirportCode: 'CAI',
+      arrivalAirportCode: 'DXB',
+      departureAt: departure.toUTC().toJSDate(),
+      arrivalAt: departure.plus({ hours: 3 }).toUTC().toJSDate(),
+      departureTimeZone: 'Africa/Cairo',
+      arrivalTimeZone: 'Asia/Dubai',
+      departureLocalDate: departure.toISODate()!,
+      status: FlightStatus.SCHEDULED,
+      cabins: [
+        {
+          category: CabinCategory.ECONOMY,
+          seatCount: 5,
+          price: 150,
+          freeBaggageAllowance: 1,
+          maxWeightPerBagKg: 23,
+        },
+      ],
+    });
+
+    // Four travellers each fire five hold requests for one seat, all at once.
+    const travellers = await Promise.all(
+      [1, 2, 3, 4].map(async (n) => {
+        await insertUser(`rush${n}@e2e.test`, 'user');
+        return login(`rush${n}@e2e.test`, PASSWORD);
+      }),
+    );
+    const hold = (agent: TestAgent, i: number) =>
+      agent.post('/api/flight-bookings/hold').send({
+        outbound: { flightId: flight._id.toString(), cabinCategory: 'Economy' },
+        passengers: [
+          {
+            fullName: `Passenger ${i}`,
+            dateOfBirth: '1988-03-03',
+            documentNumber: `RUSH${1000 + i}`,
+            type: 'Adult',
+          },
+        ],
+      });
+    const responses = await Promise.all(
+      travellers.flatMap((agent, a) =>
+        [0, 1, 2, 3, 4].map((r) => hold(agent, a * 5 + r)),
+      ),
+    );
+
+    const created = responses.filter((r) => r.status === 201);
+    expect(created).toHaveLength(5);
+    expect(responses.filter((r) => r.status === 409)).toHaveLength(15);
+    expect(responses.every((r) => [201, 409].includes(r.status))).toBe(true);
+
+    const cabinAfterHolds = (await flights.findById(flight._id).lean().exec())!
+      .cabins[0];
+    expect(cabinAfterHolds).toMatchObject({ seatsHeld: 5, seatsBooked: 0 });
+
+    // Paying for all five turns every held seat into a booked one.
+    const payments = app.get<FlightBookingPayments>(FLIGHT_BOOKING_PAYMENTS);
+    await Promise.all(created.map((r) => payments.confirmBooking(r.body.id)));
+    const cabinAfterPayment = (await flights
+      .findById(flight._id)
+      .lean()
+      .exec())!.cabins[0];
+    expect(cabinAfterPayment).toMatchObject({ seatsHeld: 0, seatsBooked: 5 });
+
+    // The flight is full now.
+    await hold(travellers[0], 99).expect(409);
+  });
 });
