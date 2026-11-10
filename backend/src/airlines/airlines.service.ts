@@ -57,21 +57,24 @@ export class AirlinesService {
         throw new ConflictException('An airline with this code already exists');
       }
 
-      async listAirports(): Promise<AirportResponseDto[]> {
-        if (!this.referenceData) {
-          throw new NotImplementedException('Airport reference data is not configured');
-        }
-        const result = await this.referenceData.listAirports();
-        return result.items.map((airport) => ({
-          iataCode: airport._id,
-          name: airport.name,
-          city: airport.cityId,
-          country: airport.countryCode,
-          timeZone: airport.timeZone,
-        }));
-      }
       throw error;
     }
+  }
+
+  async listAirports(): Promise<AirportResponseDto[]> {
+    if (!this.referenceData) {
+      throw new NotImplementedException(
+        'Airport reference data is not configured',
+      );
+    }
+    const result = await this.referenceData.listAirports();
+    return result.items.map((airport) => ({
+      iataCode: airport._id,
+      name: airport.name,
+      city: airport.cityId,
+      country: airport.countryCode,
+      timeZone: airport.timeZone,
+    }));
   }
 
   async findOne(id: string): Promise<AirlineResponseDto> {
