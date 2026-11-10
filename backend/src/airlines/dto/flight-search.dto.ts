@@ -4,6 +4,8 @@ import {
   IsDateString,
   IsInt,
   IsString,
+  IsIn,
+  IsOptional,
   Length,
   Max,
   Min,
@@ -29,12 +31,52 @@ export class SearchFlightsDto {
   @IsDateString()
   departureDate: string;
 
-  @ApiProperty({ example: 2, minimum: 1, maximum: 100 })
+  @ApiProperty({ example: '2026-12-08', required: false })
+  @IsOptional()
+  @IsDateString()
+  returnDate?: string;
+
+  @ApiProperty({ enum: ['one-way', 'round-trip'], default: 'one-way' })
+  @IsOptional()
+  @IsIn(['one-way', 'round-trip'])
+  tripType?: 'one-way' | 'round-trip';
+
+  @ApiProperty({ example: 1, minimum: 0, maximum: 100, required: false })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  @Max(100)
+  adults?: number;
+
+  @ApiProperty({ example: 1, minimum: 0, maximum: 100, required: false })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  @Max(100)
+  children?: number;
+
+  @ApiProperty({ example: 0, minimum: 0, maximum: 100, required: false })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  @Max(100)
+  infants?: number;
+
+  @ApiProperty({ example: 2, minimum: 1, maximum: 100, required: false })
+  @IsOptional()
   @Type(() => Number)
   @IsInt()
   @Min(1)
   @Max(100)
-  passengers: number;
+  passengers?: number;
+
+  @ApiProperty({ example: 'Economy', required: false })
+  @IsOptional()
+  @IsString()
+  cabinClass?: string;
 }
 
 export class FlightSearchCabinDto {
@@ -47,6 +89,8 @@ export class FlightSearchCabinDto {
   @ApiProperty({ example: 250 })
   price: number;
 
+  @ApiProperty({ example: 25 })
+  infantPrice: number;
   @ApiProperty({ example: 120 })
   seatsAvailable: number;
 
@@ -92,4 +136,7 @@ export class FlightSearchResponseDto {
 
   @ApiProperty({ example: 'No flights found' })
   message: string;
+
+  @ApiProperty({ type: [FlightSearchResultDto], required: false })
+  returnItems?: FlightSearchResultDto[];
 }
