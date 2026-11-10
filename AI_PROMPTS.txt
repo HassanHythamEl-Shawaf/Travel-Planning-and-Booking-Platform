@@ -508,3 +508,19 @@ Added a details DTO, service mapping and Swagger endpoint with timezone-aware
 local times, duration, cabin information and cancellation tiers. Added a
 clearly marked FLT-22 inventory boundary for remaining seats, tests and docs.
 ================================================
+Date: 2026-11-10
+Student: Yassin Arafa
+Tool: Claude Code (Claude Opus 5.5)
+Related Requirement: FLT-19, FLT-12, FLT-22, FLT-23, GEN-11
+Prompt:
+Design the flight booking schema for Person 4: one booking per trip with
+one or two segments (round trip), passengers with type validated against
+date of birth, extra baggage, agreed prices, hold expiry, booking reference
+and the shared GEN-11 status lifecycle, matching the field names admin
+booking inspection already reads. Add tests.
+How the output was used:
+Added the FlightBooking schema with snapshotted segment fares and baggage
+rules, passenger age/type and composition rules, infant 10% fare, a
+six-character booking reference generator with a unique partial index,
+allowed status transitions, and unit plus in-memory MongoDB tests.
+================================================
