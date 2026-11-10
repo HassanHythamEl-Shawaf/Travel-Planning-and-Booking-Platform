@@ -26,6 +26,16 @@ import type { FlightBookingPayments } from '../src/flight-bookings/flight-bookin
 
 jest.setTimeout(180_000);
 
+/** Collects a binary response (the PDF) into a Buffer. */
+const binary = (
+  res: NodeJS.ReadableStream,
+  done: (error: Error | null, body: Buffer) => void,
+) => {
+  const chunks: Buffer[] = [];
+  res.on('data', (chunk: Buffer) => chunks.push(chunk));
+  res.on('end', () => done(null, Buffer.concat(chunks)));
+};
+
 describe('Flight bookings (e2e)', () => {
   let replSet: MongoMemoryReplSet;
   let app: INestApplication;
@@ -225,6 +235,18 @@ describe('Flight bookings (e2e)', () => {
     });
     await traveller.get(`/api/flight-bookings/${bookingId}`).expect(200);
 
+    // FLT-23: the e-ticket downloads as a PDF once confirmed.
+    const ticket = await traveller
+      .get(`/api/flight-bookings/${bookingId}/e-ticket`)
+      .buffer(true)
+      .parse(binary)
+      .expect(200);
+    expect(ticket.headers['content-type']).toBe('application/pdf');
+    expect(ticket.headers['content-disposition']).toBe(
+      `attachment; filename="e-ticket-${bookingReference}.pdf"`,
+    );
+    expect((ticket.body as Buffer).subarray(0, 5).toString()).toBe('%PDF-');
+
     // ACC-12: deactivation is blocked by the upcoming Confirmed booking.
     await traveller.delete('/api/users/me').send({ confirm: true }).expect(409);
 
@@ -252,6 +274,9 @@ describe('Flight bookings (e2e)', () => {
       .post('/api/flight-bookings/hold')
       .send(body('DOC00004'))
       .expect(201);
+    await traveller
+      .get(`/api/flight-bookings/${unpaid.body.id}/e-ticket`)
+      .expect(409);
 
     // FLT-06: the airline cancels the flight.
     await moderator
@@ -268,6 +293,9 @@ describe('Flight bookings (e2e)', () => {
       refundPercentage: 100,
       refundAmount: 250,
     });
+    await traveller
+      .get(`/api/flight-bookings/${bookingId}/e-ticket`)
+      .expect(409);
     const expired = await traveller
       .get(`/api/flight-bookings/${unpaid.body.id}`)
       .expect(200);

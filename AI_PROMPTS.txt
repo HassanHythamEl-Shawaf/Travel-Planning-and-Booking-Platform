@@ -652,3 +652,20 @@ read-only booking readers, a contract-based eligibility reader covering
 flights and hotels, forwardRef module wiring, adapter tests and an HTTP
 end-to-end test from booking to airline cancellation.
 ================================================
+Date: 2026-11-10
+Student: Yassin Arafa
+Tool: Claude Code (Claude Opus 5.5)
+Related Requirement: FLT-23, GEN-06
+Prompt:
+Add GET /api/flight-bookings/:id/e-ticket returning a downloadable PDF,
+only for the owner and only once the booking is Confirmed. Show the
+booking reference, each flight in its airports' local times, cabin and
+baggage allowance, passengers with masked ID numbers, and the amount paid.
+How the output was used:
+Added pdfkit, a pure renderer that builds a one-page A4 e-ticket, a
+service method that checks ownership and status and looks up airline
+names, a Swagger-documented endpoint that streams the file as an
+attachment, unit tests for the PDF and helpers, and e2e checks that the
+download works after payment and is refused for unpaid or cancelled
+bookings. Rendered a sample and adjusted the column layout after review.
+================================================

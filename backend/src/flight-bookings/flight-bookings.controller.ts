@@ -7,6 +7,7 @@ import {
   Param,
   Post,
   Query,
+  StreamableFile,
   UseGuards,
 } from '@nestjs/common';
 import {
@@ -19,6 +20,7 @@ import {
   ApiOkResponse,
   ApiOperation,
   ApiParam,
+  ApiProduces,
   ApiTags,
   ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
@@ -183,5 +185,34 @@ export class FlightBookingsController {
     @Body() dto: CancelFlightBookingDto,
   ): Promise<FlightCancellationResultDto> {
     return this.cancellations.cancel(user.sub, id, dto);
+  }
+
+  @Get(':id/e-ticket')
+  @ApiProduces('application/pdf')
+  @ApiOperation({
+    summary: 'Download my e-ticket as a PDF (FLT-23)',
+    description:
+      'Available once the booking is Confirmed (also after the trip, when Completed). Shows the booking reference, flights in local airport times, cabin and baggage, passengers and the amount paid.',
+  })
+  @ApiParam({ name: 'id', example: '6650f1c2a1b2c3d4e5f60740' })
+  @ApiOkResponse({
+    description: 'The e-ticket PDF, as a file download',
+    schema: { type: 'string', format: 'binary' },
+  })
+  @ApiBadRequestResponse({ description: 'Invalid booking id' })
+  @ApiNotFoundResponse({ description: 'No such booking of yours' })
+  @ApiConflictResponse({ description: 'The booking is not confirmed' })
+  @ApiUnauthorizedResponse({ description: 'Authentication is required' })
+  @ApiForbiddenResponse({ description: 'Registered user role required' })
+  async eTicket(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id', ParseObjectIdPipe) id: string,
+  ): Promise<StreamableFile> {
+    const { filename, pdf } = await this.bookings.getETicket(user.sub, id);
+    return new StreamableFile(pdf, {
+      type: 'application/pdf',
+      disposition: `attachment; filename="${filename}"`,
+      length: pdf.length,
+    });
   }
 }

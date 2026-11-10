@@ -39,6 +39,7 @@ import {
   TripType,
 } from './flight-booking.constants';
 import { FlightBookingStatus } from './flight-booking-status';
+import { renderETicket } from './e-ticket';
 import { groupFilter, groupSort } from './flight-booking-groups';
 import {
   ageOnDate,
@@ -205,6 +206,48 @@ export class FlightBookingsService {
       : null;
     if (!booking) throw new NotFoundException('Flight booking not found');
     return toDetails(booking);
+  }
+
+  /**
+   * FLT-23: the e-ticket PDF of the owner's booking, available once it is
+   * Confirmed (and still after the trip, when it is Completed).
+   */
+  async getETicket(
+    userId: string,
+    bookingId: string,
+  ): Promise<{ filename: string; pdf: Buffer }> {
+    const booking = Types.ObjectId.isValid(bookingId)
+      ? await this.bookingModel
+          .findOne({
+            _id: new Types.ObjectId(bookingId),
+            userId: new Types.ObjectId(userId),
+          })
+          .lean<LeanBooking>()
+          .exec()
+      : null;
+    if (!booking) throw new NotFoundException('Flight booking not found');
+    if (
+      booking.status !== FlightBookingStatus.CONFIRMED &&
+      booking.status !== FlightBookingStatus.COMPLETED
+    ) {
+      throw new ConflictException(
+        `The e-ticket is available once the booking is confirmed; this booking is ${booking.status}`,
+      );
+    }
+
+    const airlineIds = [
+      ...new Set(booking.segments.map((s) => s.airlineId.toString())),
+    ];
+    const airlines = await this.airlineModel
+      .find({ _id: { $in: airlineIds } }, { name: 1 })
+      .lean<{ _id: Types.ObjectId; name: string }[]>()
+      .exec();
+    const airlineNames = Object.fromEntries(
+      airlines.map((a) => [a._id.toString(), a.name]),
+    );
+
+    const pdf = await renderETicket({ booking, airlineNames });
+    return { filename: `e-ticket-${booking.bookingReference}.pdf`, pdf };
   }
 
   private async holdSeats(
