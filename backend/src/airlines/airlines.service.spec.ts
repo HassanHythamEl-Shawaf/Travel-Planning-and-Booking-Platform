@@ -9,7 +9,9 @@ const leanExec = (value: unknown) => ({ lean: () => exec(value) });
 
 describe('AirlinesService', () => {
   let model: Record<string, jest.Mock>;
+  let flightModel: Record<string, jest.Mock>;
   let referenceData: { listAirports: jest.Mock };
+  let assignments: { findByModeratorId: jest.Mock };
   let service: AirlinesService;
 
   const id = new Types.ObjectId();
@@ -29,6 +31,20 @@ describe('AirlinesService', () => {
       findById: jest.fn().mockReturnValue(leanExec(stored)),
       findByIdAndUpdate: jest.fn().mockReturnValue(leanExec(stored)),
     };
+    flightModel = {
+      create: jest.fn().mockResolvedValue({
+        _id: new Types.ObjectId(),
+        airlineId: id,
+        flightNumber: 'CA101',
+        departureAirportCode: 'CAI',
+        arrivalAirportCode: 'DXB',
+        departureAt: new Date('2027-01-01T08:30:00.000Z'),
+        arrivalAt: new Date('2027-01-01T10:00:00.000Z'),
+        departureTimeZone: 'Africa/Cairo',
+        arrivalTimeZone: 'Asia/Dubai',
+        departureLocalDate: '2027-01-01',
+      }),
+    };
     referenceData = {
       listAirports: jest.fn().mockResolvedValue({
         items: [
@@ -42,7 +58,19 @@ describe('AirlinesService', () => {
         ],
       }),
     };
-    service = new AirlinesService(model as never, null, referenceData as never);
+    assignments = {
+      findByModeratorId: jest.fn().mockResolvedValue({
+        providerType: 'airline',
+        providerId: id.toString(),
+      }),
+    };
+    service = new AirlinesService(
+      model as never,
+      flightModel as never,
+      null,
+      referenceData as never,
+      assignments as never,
+    );
   });
 
   it('creates an active airline with a null logo until upload integration exists', async () => {
@@ -112,5 +140,21 @@ describe('AirlinesService', () => {
         timeZone: 'Africa/Cairo',
       },
     ]);
+  });
+
+  it('converts airport-local date-times to UTC and stores both zones', async () => {
+    const result = await service.createFlight('moderator-id', {
+      airlineId: id.toString(),
+      flightNumber: 'CA101',
+      departureAirportCode: 'CAI',
+      arrivalAirportCode: 'DXB',
+      departureLocalTime: '2027-01-01T10:30:00',
+      arrivalLocalTime: '2027-01-01T14:00:00',
+    });
+
+    expect(result.departureAt).toEqual(new Date('2027-01-01T08:30:00.000Z'));
+    expect(result.arrivalAt).toEqual(new Date('2027-01-01T10:00:00.000Z'));
+    expect(result.departureTimeZone).toBe('Africa/Cairo');
+    expect(result.arrivalTimeZone).toBe('Asia/Dubai');
   });
 });
