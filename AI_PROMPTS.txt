@@ -5,6 +5,20 @@ Add one entry per prompt that materially contributed to the project.
 Date: 2026-11-10
 Student: Yahia Mohamed
 Tool: GitHub Copilot (VS Code)
+Related Requirement: FLT-01, FLT-02, FLT-03, FLT-04, FLT-05, FLT-06, FLT-08, FLT-09, FLT-11, FLT-12, FLT-15, FLT-17, FLT-22, FLT-29, FLT-30
+Prompt:
+Create a final compatibility branch without changing teammate-owned work.
+Fix the requirements-compatible endpoint paths, add the missing Phase 0
+report, preserve explicit Person 4/7/8 integration contracts, and open a PR.
+How the output was used:
+Added a root-level compatibility controller that delegates to the existing
+airline service, added the required passenger-export path, documented the
+remaining TODO integrations, and saved the Phase 0 findings and validation.
+================================================
+
+Date: 2026-11-10
+Student: Yahia Mohamed
+Tool: GitHub Copilot (VS Code)
 Related Requirement: FLT-29
 Prompt:
 Implement FLT-29 only: assigned airline moderator booking listing and CSV
@@ -511,16 +525,17 @@ clearly marked FLT-22 inventory boundary for remaining seats, tests and docs.
 Date: 2026-11-10
 Student: Yassin Arafa
 Tool: Claude Code (Claude Opus 5.5)
-Related Requirement: FLT-19, FLT-12, FLT-22, FLT-23, GEN-11
+Related Requirement: FLT-22
 Prompt:
-Design the flight booking schema for Person 4: one booking per trip with
-one or two segments (round trip), passengers with type validated against
-date of birth, extra baggage, agreed prices, hold expiry, booking reference
-and the shared GEN-11 status lifecycle, matching the field names admin
-booking inspection already reads. Add tests.
+My flight booking hold tests fail against an in-memory MongoDB with
+"$expr can only be applied to the top-level document" from
+FlightInventoryService.createHold(). Find the cause, fix the inventory
+queries without changing the interface, and add tests that run against a
+real MongoDB instead of mocks.
 How the output was used:
-Added the FlightBooking schema with snapshotted segment fares and baggage
-rules, passenger age/type and composition rules, infant 10% fare, a
-six-character booking reference generator with a unique partial index,
-allowed status transitions, and unit plus in-memory MongoDB tests.
+Moved the seat-availability check in createHold() to a top-level $expr over
+the cabins array, and used $elemMatch in confirmInventory() and
+releaseSeats() so the positional update always targets the held cabin (it
+could previously update a different cabin). Added in-memory MongoDB tests
+for parallel holds, confirm, release and multi-cabin flights.
 ================================================

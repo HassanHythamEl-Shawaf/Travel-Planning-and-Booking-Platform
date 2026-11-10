@@ -8,6 +8,7 @@ import { UsersModule } from '../users/users.module';
 import { ReferenceDataModule } from '../reference-data/reference-data.module';
 import { AIRLINE_LOGO_STORE } from './airline-logo-store';
 import { AirlinesController } from './airlines.controller';
+import { FlightCompatibilityController } from './flight-compatibility.controller';
 import { AirlinesService } from './airlines.service';
 import { FlightsController } from './flights.controller';
 import { Airline, AirlineSchema } from './schemas/airline.schema';
@@ -37,7 +38,11 @@ import { NotificationsModule } from '../notifications/notifications.module';
     JwtModule.register({}),
     NotificationsModule,
   ],
-  controllers: [AirlinesController, FlightsController],
+  controllers: [
+    AirlinesController,
+    FlightsController,
+    FlightCompatibilityController,
+  ],
   providers: [
     AirlinesService,
     FlightInventoryService,
