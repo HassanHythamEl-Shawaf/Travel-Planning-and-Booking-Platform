@@ -49,6 +49,7 @@ import {
   FlightSearchResultDto,
   SearchFlightsDto,
 } from './dto/flight-search.dto';
+import { FlightDetailsResponseDto } from './dto/flight-details.dto';
 
 function isDuplicateKeyError(error: unknown): boolean {
   return (
@@ -219,6 +220,7 @@ export class AirlinesService {
     ) {
       throw new ConflictException('Minimum price must not exceed maximum price');
     }
+
     const adults = dto.adults ?? dto.passengers ?? 0;
     const children = dto.children ?? 0;
     const infants = dto.infants ?? 0;
@@ -296,6 +298,58 @@ export class AirlinesService {
         items.length === 0 || (returnItems && returnItems.length === 0)
           ? 'No flights found'
           : 'Flights found',
+    };
+  }
+
+  async getFlightDetails(
+    flightId: string,
+  ): Promise<FlightDetailsResponseDto> {
+    const flight = await this.flightModel.findById(flightId).lean().exec();
+    if (!flight) throw new NotFoundException('Flight not found');
+    const airline = await this.airlineModel
+      .findById(flight.airlineId)
+      .lean()
+      .exec();
+    if (!airline) throw new NotFoundException('Airline not found');
+    const departureAt = new Date(flight.departureAt);
+    const arrivalAt = new Date(flight.arrivalAt);
+    return {
+      id: String(flight._id),
+      airlineId: String(flight.airlineId),
+      airlineName: airline.name,
+      airlineCode: airline.code,
+      flightNumber: flight.flightNumber,
+      departureAirportCode: flight.departureAirportCode,
+      arrivalAirportCode: flight.arrivalAirportCode,
+      departureLocalTime: DateTime.fromJSDate(departureAt)
+        .setZone(flight.departureTimeZone)
+        .toISO({ suppressMilliseconds: true })!,
+      arrivalLocalTime: DateTime.fromJSDate(arrivalAt)
+        .setZone(flight.arrivalTimeZone)
+        .toISO({ suppressMilliseconds: true })!,
+      departureTimeZone: flight.departureTimeZone,
+      arrivalTimeZone: flight.arrivalTimeZone,
+      durationMinutes: (arrivalAt.getTime() - departureAt.getTime()) / 60000,
+      status:
+        flight.status === FlightStatus.CANCELLED
+          ? FlightStatus.CANCELLED
+          : departureAt.getTime() <= Date.now()
+            ? FlightStatus.DEPARTED
+            : FlightStatus.SCHEDULED,
+      cabins: flight.cabins.map((cabin) => ({
+        id: String(cabin._id),
+        category: cabin.category,
+        price: cabin.price,
+        // TODO(FLT-22): subtract booked and held seats once the inventory
+        // schema is merged into develop.
+        seatsRemaining: cabin.seatCount,
+        freeBaggageAllowance: cabin.freeBaggageAllowance,
+        maxWeightPerBagKg: cabin.maxWeightPerBagKg,
+      })),
+      cancellationPolicy: (airline.cancellationPolicy ?? []).map((tier) => ({
+        daysBeforeDeparture: tier.daysBeforeDeparture,
+        refundPercentage: tier.refundPercentage,
+      })),
     };
   }
 
