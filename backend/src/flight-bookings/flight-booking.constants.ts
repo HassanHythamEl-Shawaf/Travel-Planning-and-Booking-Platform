@@ -2,6 +2,14 @@
 export const HOLD_DURATION_MINUTES = 10;
 
 /**
+ * The seat hold in Person 3's inventory outlives the booking's hold by this
+ * margin. The booking's holdExpiresAt is the deadline that counts; the margin
+ * only guarantees that a booking confirmed just before its deadline can still
+ * convert its seats (confirmInventory rejects expired inventory holds).
+ */
+export const INVENTORY_HOLD_GRACE_MINUTES = 2;
+
+/**
  * PAY-04: one platform currency for every price, payment and refund.
  * Payments (Person 7) must charge in this currency as well.
  */

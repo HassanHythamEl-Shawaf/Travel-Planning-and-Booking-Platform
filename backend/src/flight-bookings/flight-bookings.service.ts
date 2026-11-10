@@ -26,6 +26,7 @@ import {
 } from './dto/flight-booking-response.dto';
 import {
   HOLD_DURATION_MINUTES,
+  INVENTORY_HOLD_GRACE_MINUTES,
   PLATFORM_CURRENCY,
   SegmentDirection,
   TripType,
@@ -107,10 +108,14 @@ export class FlightBookingsService {
     const priced = await this.price(dto, { checkSeats: false });
     const holdExpiresAt = new Date(Date.now() + HOLD_DURATION_MINUTES * 60_000);
 
+    const inventoryExpiresAt = new Date(
+      holdExpiresAt.getTime() + INVENTORY_HOLD_GRACE_MINUTES * 60_000,
+    );
+
     const heldIds: string[] = [];
     try {
       for (const segment of priced.segments) {
-        segment.holdId = await this.holdSeats(segment, holdExpiresAt);
+        segment.holdId = await this.holdSeats(segment, inventoryExpiresAt);
         heldIds.push(segment.holdId);
       }
       const booking = await this.bookingModel.create({
