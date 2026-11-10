@@ -14,8 +14,9 @@ export enum CabinCategory {
   FIRST = 'First',
 }
 
-@Schema({ _id: true, _idType: Types.ObjectId })
+@Schema({ _id: true })
 export class Cabin {
+  _id?: Types.ObjectId;
   @Prop({ required: true, enum: CabinCategory })
   category: CabinCategory;
 

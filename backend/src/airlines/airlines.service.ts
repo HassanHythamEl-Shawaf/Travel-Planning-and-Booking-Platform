@@ -9,6 +9,7 @@ import {
 import { InjectModel } from '@nestjs/mongoose';
 import { DateTime } from 'luxon';
 import { Model } from 'mongoose';
+import { Types } from 'mongoose';
 
 import {
   PROVIDER_ASSIGNMENT_READER,
@@ -26,8 +27,13 @@ import {
 } from './dto/airline.dto';
 import { AirportResponseDto } from './dto/airport.dto';
 import { CreateFlightDto, FlightResponseDto } from './dto/flight.dto';
+import {
+  CabinResponseDto,
+  CreateCabinDto,
+  UpdateCabinDto,
+} from './dto/cabin.dto';
 import { Airline } from './schemas/airline.schema';
-import { Flight } from './schemas/flight.schema';
+import { CabinCategory, Flight } from './schemas/flight.schema';
 
 function isDuplicateKeyError(error: unknown): boolean {
   return (
@@ -98,6 +104,7 @@ export class AirlinesService {
         'Moderator assignment integration is not configured',
       );
     }
+
     const assignment = await this.assignments.findByModeratorId(moderatorId);
     if (
       !assignment ||
@@ -106,11 +113,13 @@ export class AirlinesService {
     ) {
       throw new NotFoundException('Assigned airline not found');
     }
+
     if (!this.referenceData) {
       throw new NotImplementedException(
         'Airport reference data is not configured',
       );
     }
+
 
     const [airline, departureAirport, arrivalAirport] = await Promise.all([
       this.airlineModel.findById(dto.airlineId).lean().exec(),
@@ -165,6 +174,41 @@ export class AirlinesService {
       }
       throw error;
     }
+  }
+
+  async addCabin(
+    moderatorId: string,
+    flightId: string,
+    dto: CreateCabinDto,
+  ): Promise<CabinResponseDto> {
+    const flight = await this.getOwnedFlight(moderatorId, flightId);
+    if (flight.cabins.some((cabin) => cabin.category === dto.category)) {
+      throw new ConflictException(
+        'Each cabin category may be used once per flight',
+      );
+    }
+    flight.cabins.push(dto);
+    await flight.save();
+    return this.toCabinResponse(flight.cabins[flight.cabins.length - 1]);
+  }
+
+  async updateCabin(
+    moderatorId: string,
+    flightId: string,
+    cabinId: string,
+    dto: UpdateCabinDto,
+  ): Promise<CabinResponseDto> {
+    const flight = await this.getOwnedFlight(moderatorId, flightId);
+    if (!Types.ObjectId.isValid(cabinId)) {
+      throw new NotFoundException('Cabin not found');
+    }
+    const cabin = flight.cabins.find(
+      (candidate) => String(candidate._id) === cabinId,
+    );
+    if (!cabin) throw new NotFoundException('Cabin not found');
+    Object.assign(cabin, dto);
+    await flight.save();
+    return this.toCabinResponse(cabin);
   }
 
   async findOne(id: string): Promise<AirlineResponseDto> {
@@ -225,6 +269,7 @@ export class AirlinesService {
         'Flight date-times must be entered as local times without an offset',
       );
     }
+
     const parsed = DateTime.fromISO(value, { zone });
     if (!parsed.isValid) {
       throw new ConflictException(
@@ -232,6 +277,46 @@ export class AirlinesService {
       );
     }
     return parsed;
+  }
+
+  private async getOwnedFlight(
+    moderatorId: string,
+    flightId: string,
+  ): Promise<Flight & { save: () => Promise<unknown> }> {
+    if (!this.assignments) {
+      throw new NotImplementedException(
+        'Moderator assignment integration is not configured',
+      );
+    }
+    const flight = await this.flightModel.findById(flightId).exec();
+    if (!flight) throw new NotFoundException('Flight not found');
+    const assignment = await this.assignments.findByModeratorId(moderatorId);
+    if (
+      !assignment ||
+      assignment.providerType !== 'airline' ||
+      assignment.providerId !== String(flight.airlineId)
+    ) {
+      throw new NotFoundException('Flight not found');
+    }
+    return flight as Flight & { save: () => Promise<unknown> };
+  }
+
+  private toCabinResponse(cabin: {
+    _id?: unknown;
+    category: CabinCategory;
+    seatCount: number;
+    price: number;
+    freeBaggageAllowance: number;
+    maxWeightPerBagKg: number;
+  }): CabinResponseDto {
+    return {
+      id: String(cabin._id),
+      category: cabin.category,
+      seatCount: cabin.seatCount,
+      price: cabin.price,
+      freeBaggageAllowance: cabin.freeBaggageAllowance,
+      maxWeightPerBagKg: cabin.maxWeightPerBagKg,
+    };
   }
 
   private toFlightResponse(flight: {

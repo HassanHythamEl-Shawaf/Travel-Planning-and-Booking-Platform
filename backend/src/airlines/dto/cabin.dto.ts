@@ -13,7 +13,7 @@ export class CreateCabinDto {
   @Min(1)
   seatCount: number;
 
-  @ApiProperty({ example: 250, exclusiveMinimum: 0 })
+  @ApiProperty({ example: 250, minimum: 0.01 })
   @IsNumber()
   @Min(0.01)
   price: number;
@@ -36,7 +36,7 @@ export class UpdateCabinDto {
   @Min(1)
   seatCount?: number;
 
-  @ApiPropertyOptional({ example: 250, exclusiveMinimum: 0 })
+  @ApiPropertyOptional({ example: 250, minimum: 0.01 })
   @IsOptional()
   @IsNumber()
   @Min(0.01)
