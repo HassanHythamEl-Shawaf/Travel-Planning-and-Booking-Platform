@@ -340,9 +340,8 @@ export class AirlinesService {
         id: String(cabin._id),
         category: cabin.category,
         price: cabin.price,
-        // TODO(FLT-22): subtract booked and held seats once the inventory
-        // schema is merged into develop.
-        seatsRemaining: cabin.seatCount,
+        seatsRemaining:
+          cabin.seatCount - (cabin.seatsBooked ?? 0) - (cabin.seatsHeld ?? 0),
         freeBaggageAllowance: cabin.freeBaggageAllowance,
         maxWeightPerBagKg: cabin.maxWeightPerBagKg,
       })),

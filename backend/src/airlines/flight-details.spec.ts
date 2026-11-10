@@ -28,6 +28,8 @@ describe('AirlinesService flight details', () => {
             _id: new Types.ObjectId(),
             category: 'Economy',
             seatCount: 120,
+            seatsBooked: 30,
+            seatsHeld: 10,
             price: 250,
             freeBaggageAllowance: 1,
             maxWeightPerBagKg: 23,
@@ -61,7 +63,7 @@ describe('AirlinesService flight details', () => {
     expect(result.departureLocalTime).toContain('10:30');
     expect(result.arrivalLocalTime).toContain('14:00');
     expect(result.durationMinutes).toBe(90);
-    expect(result.cabins[0].seatsRemaining).toBe(120);
+    expect(result.cabins[0].seatsRemaining).toBe(80);
     expect(result.cancellationPolicy[0].refundPercentage).toBe(75);
   });
 });
