@@ -305,6 +305,11 @@ free-baggage count and maximum bag weight.
 `PUT /api/airlines/:id/baggage-policy` (FLT-08) is restricted to the assigned
 airline moderator and stores the extra-bag price and per-passenger maximum.
 
+`PUT /api/airlines/:id/cancellation-policy` (FLT-09) stores unique
+days-before-departure thresholds and refund percentages. The exported
+`calculateRefundPercentage` helper selects the highest applicable threshold for
+refund services.
+
 ## Deployment
 
 When you're ready to deploy your NestJS application to production, there are some key steps you can take to ensure it runs as efficiently as possible. Check out the [deployment documentation](https://docs.nestjs.com/deployment) for more information.
