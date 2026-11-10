@@ -12,6 +12,7 @@ import { AdminModule } from './admin/admin.module';
 import { ModerationModule } from './moderation/moderation.module';
 import { ReportsModule } from './reports/reports.module';
 import { BlogModule } from './blog/blog.module';
+import { AirlinesModule } from './airlines/airlines.module';
 
 @Module({
   imports: [
@@ -31,6 +32,7 @@ import { BlogModule } from './blog/blog.module';
     ModerationModule,
     ReportsModule,
     BlogModule,
+    AirlinesModule,
   ],
   controllers: [AppController],
   providers: [AppService],
