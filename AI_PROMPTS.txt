@@ -11,6 +11,19 @@ Asked for a split of the Milestone 1 backend work between 8 people, with work or
 How the output was used:
 Used it as the team work split and work order documents.
 ================================================
+Date: 2026-11-10
+Student: Yahia Mohamed
+Tool: GitHub Copilot (VS Code)
+Related Requirement: FLT-05
+Prompt:
+Implement FLT-05 only: assigned-moderator updates for Scheduled flight times
+and cabin seat counts/prices, booked-plus-held seat-floor validation, shared
+schedule notifications, tests and documentation.
+How the output was used:
+Added the schedule update DTO and endpoint, Scheduled-state enforcement,
+booked/held seat-floor validation, and a TODO passenger-reader contract that
+uses the existing notification service when bound by Person 4.
+================================================
 Date: 2026-11-01
 Student: Hassan
 Tool: Claude
