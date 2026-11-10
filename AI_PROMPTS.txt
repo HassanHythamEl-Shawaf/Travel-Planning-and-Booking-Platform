@@ -2,7 +2,6 @@
 AI PROMPT LOG
 Add one entry per prompt that materially contributed to the project.
 
-================================================
 Date: 2026-11-01
 Student: Hassan
 Tool: ChatGPT and Claude
@@ -415,4 +414,17 @@ Added validated search DTOs, an active-airline scheduled-flight query with
 cabin availability mapping, a public Swagger endpoint, focused tests and README
 documentation. Round-trip, passenger-type, price, sorting and pagination
 features remain for their later requirements.
+================================================
+Date: 2026-11-10
+Student: Yahia Mohamed
+Tool: GitHub Copilot (VS Code)
+Related Requirement: FLT-12
+Prompt:
+Extend the existing flight search only for FLT-12: round-trip outbound and
+return options, adult/child/infant validation and pricing, optional cabin
+filter, tests and documentation.
+How the output was used:
+Added round-trip criteria, passenger-type validation, infant pricing at 10%,
+seat requirements for adults and children, cabin filtering, return options,
+focused tests and README documentation.
 ================================================
