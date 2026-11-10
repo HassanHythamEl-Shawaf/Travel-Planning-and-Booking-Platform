@@ -17,6 +17,8 @@ import {
   FlightInventoryHoldSchema,
 } from './schemas/flight-inventory-hold.schema';
 import { FlightInventoryService, FLIGHT_INVENTORY } from './flight-inventory';
+import { FLIGHT_PASSENGER_READER } from './flight-passenger-reader';
+import { NotificationsModule } from '../notifications/notifications.module';
 
 @Module({
   imports: [
@@ -31,15 +33,23 @@ import { FlightInventoryService, FLIGHT_INVENTORY } from './flight-inventory';
     ModeratorAssignmentsModule,
     // AuthGuard and ProviderOwnershipGuard are instantiated in this module.
     JwtModule.register({}),
+    NotificationsModule,
   ],
   controllers: [AirlinesController, FlightsController],
   providers: [
     AirlinesService,
     FlightInventoryService,
     { provide: FLIGHT_INVENTORY, useExisting: FlightInventoryService },
+    // TODO(Person 4): bind FLIGHT_PASSENGER_READER to the booking adapter.
+    { provide: FLIGHT_PASSENGER_READER, useValue: null },
     // TODO(Person 8): replace this null binding with the shared image-upload adapter.
     { provide: AIRLINE_LOGO_STORE, useValue: null },
   ],
-  exports: [AirlinesService, FlightInventoryService, FLIGHT_INVENTORY, MongooseModule],
+  exports: [
+    AirlinesService,
+    FlightInventoryService,
+    FLIGHT_INVENTORY,
+    MongooseModule,
+  ],
 })
 export class AirlinesModule {}
