@@ -613,3 +613,22 @@ per-group counts for tabs, owner-only details that report other users'
 bookings as not found, Swagger docs, and in-memory MongoDB tests for
 grouping, ordering, pagination and ownership.
 ================================================
+Date: 2026-11-10
+Student: Yassin Arafa
+Tool: Claude Code (Claude Opus 5.5)
+Related Requirement: FLT-26, PAY-03, FLT-09, FLT-12
+Prompt:
+Implement cancellation of a user's own Confirmed flight booking before
+departure: a refund preview from the airline's cancellation tiers on the
+full total using the outbound departure, then POST /:id/cancel with
+explicit confirmation. Return the seats to inventory and request the
+refund from Person 7 through an interface, since payments is not built
+yet. Make it safe against double cancellation and refund failures.
+How the output was used:
+Added releaseConfirmedSeats() to the flight inventory interface, a
+FLIGHT_REFUNDS contract with a default tier-based calculator that logs
+instead of moving money until Person 7 binds Stripe refunds, refund fields
+on the booking, a cancellation service that claims the cancel with one
+conditional update and refuses if the refund changed since the preview,
+two Swagger endpoints, and in-memory MongoDB tests.
+================================================

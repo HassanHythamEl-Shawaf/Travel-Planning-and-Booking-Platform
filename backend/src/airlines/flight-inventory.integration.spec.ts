@@ -228,6 +228,27 @@ describe('FlightInventoryService on MongoDB (FLT-22)', () => {
     ).toBe(1);
   });
 
+  it('returns confirmed seats to inventory once (FLT-26)', async () => {
+    const { flightId, economyId } = await createFlight(5);
+    const hold = await service.createHold(flightId, economyId, 2, inTenMinutes());
+    await service.confirmInventory(hold.holdId);
+
+    await service.releaseConfirmedSeats(hold.holdId);
+    await service.releaseConfirmedSeats(hold.holdId);
+
+    expect((await cabins(flightId))[1]).toEqual({ seatsHeld: 0, seatsBooked: 0 });
+    expect((await service.checkAvailability(flightId, economyId)).seatsAvailable).toBe(5);
+  });
+
+  it('does not treat a still-held hold as confirmed seats', async () => {
+    const { flightId, economyId } = await createFlight(5);
+    const hold = await service.createHold(flightId, economyId, 2, inTenMinutes());
+
+    await service.releaseConfirmedSeats(hold.holdId);
+
+    expect((await cabins(flightId))[1]).toEqual({ seatsHeld: 2, seatsBooked: 0 });
+  });
+
   it('releases every open hold of a flight', async () => {
     const { flightId, economyId, businessId } = await createFlight(5);
     await service.createHold(flightId, economyId, 2, inTenMinutes());

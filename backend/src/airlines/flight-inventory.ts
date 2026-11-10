@@ -42,6 +42,8 @@ export interface FlightInventoryReader {
   confirmInventory(holdId: string): Promise<void>;
   releaseHold(holdId: string): Promise<void>;
   releaseFlightHolds(flightId: string): Promise<void>;
+  /** FLT-26: returns a cancelled booking's booked seats to inventory, once. */
+  releaseConfirmedSeats(holdId: string): Promise<void>;
 }
 
 export const FLIGHT_INVENTORY = Symbol('FLIGHT_INVENTORY');
@@ -200,6 +202,25 @@ export class FlightInventoryService implements FlightInventoryReader {
       hold.cabinId.toString(),
       hold.seats,
     );
+  }
+
+  async releaseConfirmedSeats(holdId: string): Promise<void> {
+    // Claiming the hold first (Confirmed -> Released) makes a repeated call a no-op.
+    const hold = await this.holdModel.findOneAndUpdate(
+      { holdId, status: InventoryHoldStatus.CONFIRMED },
+      { $set: { status: InventoryHoldStatus.RELEASED } },
+      { returnDocument: 'after' },
+    ).lean().exec();
+    if (!hold) return;
+    await this.flightModel.updateOne(
+      {
+        _id: hold.flightId,
+        cabins: {
+          $elemMatch: { _id: hold.cabinId, seatsBooked: { $gte: hold.seats } },
+        },
+      },
+      { $inc: { 'cabins.$.seatsBooked': -hold.seats } },
+    ).exec();
   }
 
   async releaseFlightHolds(flightId: string): Promise<void> {

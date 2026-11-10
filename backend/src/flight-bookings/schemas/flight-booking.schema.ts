@@ -239,6 +239,17 @@ export class FlightBooking {
   })
   cancellationSource: CancellationSource | null;
 
+  /** Refund decided at cancellation (PAY-03); null if never cancelled. */
+  @Prop({ type: Number, min: 0, max: 100, default: null })
+  refundPercentage: number | null;
+
+  @Prop({ type: Number, min: 0, default: null })
+  refundAmount: number | null;
+
+  /** Person 7's refund record, once issued; its status lives there. */
+  @Prop({ type: String, default: null })
+  refundId: string | null;
+
   @Prop({ type: Date, default: null })
   completedAt: Date | null;
 
