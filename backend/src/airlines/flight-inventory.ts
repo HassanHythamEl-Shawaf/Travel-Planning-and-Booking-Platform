@@ -83,26 +83,49 @@ export class FlightInventoryService implements FlightInventoryReader {
     expiresAt: Date,
   ): Promise<FlightInventoryHoldResult> {
     this.validateSeatRequest(flightId, cabinId, seats, expiresAt);
+    const cabinObjectId = new Types.ObjectId(cabinId);
+    // MongoDB only allows $expr at the top level of a filter, so the cabin is
+    // matched by _id in $elemMatch (which also sets the positional `cabins.$`
+    // for the update) and the seat check runs over the cabins array in a
+    // top-level $expr. Both happen in one findOneAndUpdate, so the check and
+    // the increment stay atomic under concurrent requests.
     const flight = await this.flightModel
       .findOneAndUpdate(
         {
           _id: new Types.ObjectId(flightId),
           status: FlightStatus.SCHEDULED,
-          cabins: {
-            $elemMatch: {
-              _id: new Types.ObjectId(cabinId),
-              $expr: {
-                $gte: [
-                  {
-                    $subtract: [
-                      '$seatCount',
-                      { $add: ['$seatsBooked', '$seatsHeld', seats] },
+          cabins: { $elemMatch: { _id: cabinObjectId } },
+          $expr: {
+            $anyElementTrue: [
+              {
+                $map: {
+                  input: '$cabins',
+                  as: 'cabin',
+                  in: {
+                    $and: [
+                      { $eq: ['$$cabin._id', cabinObjectId] },
+                      {
+                        $gte: [
+                          {
+                            $subtract: [
+                              '$$cabin.seatCount',
+                              {
+                                $add: [
+                                  { $ifNull: ['$$cabin.seatsBooked', 0] },
+                                  { $ifNull: ['$$cabin.seatsHeld', 0] },
+                                  seats,
+                                ],
+                              },
+                            ],
+                          },
+                          0,
+                        ],
+                      },
                     ],
                   },
-                  0,
-                ],
+                },
               },
-            },
+            ],
           },
         },
         { $inc: { 'cabins.$.seatsHeld': seats } },
@@ -140,11 +163,14 @@ export class FlightInventoryService implements FlightInventoryReader {
       { returnDocument: 'after' },
     ).lean().exec();
     if (!hold) throw new ConflictException('Hold is missing, expired or finalized');
+    // $elemMatch makes both conditions apply to the same cabin, so the
+    // positional `cabins.$` below updates the held cabin and no other.
     const updated = await this.flightModel.updateOne(
       {
         _id: hold.flightId,
-        'cabins._id': hold.cabinId,
-        'cabins.seatsHeld': { $gte: hold.seats },
+        cabins: {
+          $elemMatch: { _id: hold.cabinId, seatsHeld: { $gte: hold.seats } },
+        },
       },
       {
         $inc: {
@@ -194,8 +220,12 @@ export class FlightInventoryService implements FlightInventoryReader {
     await this.flightModel.updateOne(
       {
         _id: new Types.ObjectId(flightId),
-        'cabins._id': new Types.ObjectId(cabinId),
-        'cabins.seatsHeld': { $gte: seats },
+        cabins: {
+          $elemMatch: {
+            _id: new Types.ObjectId(cabinId),
+            seatsHeld: { $gte: seats },
+          },
+        },
       },
       { $inc: { 'cabins.$.seatsHeld': -seats } },
     ).exec();

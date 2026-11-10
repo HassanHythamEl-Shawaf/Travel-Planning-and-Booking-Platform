@@ -524,3 +524,20 @@ rules, passenger age/type and composition rules, infant 10% fare, a
 six-character booking reference generator with a unique partial index,
 allowed status transitions, and unit plus in-memory MongoDB tests.
 ================================================
+Date: 2026-11-10
+Student: Yassin Arafa
+Tool: Claude Code (Claude Opus 5.5)
+Related Requirement: FLT-22
+Prompt:
+My flight booking hold tests fail against an in-memory MongoDB with
+"$expr can only be applied to the top-level document" from
+FlightInventoryService.createHold(). Find the cause, fix the inventory
+queries without changing the interface, and add tests that run against a
+real MongoDB instead of mocks.
+How the output was used:
+Moved the seat-availability check in createHold() to a top-level $expr over
+the cabins array, and used $elemMatch in confirmInventory() and
+releaseSeats() so the positional update always targets the held cabin (it
+could previously update a different cabin). Added in-memory MongoDB tests
+for parallel holds, confirm, release and multi-cabin flights.
+================================================
