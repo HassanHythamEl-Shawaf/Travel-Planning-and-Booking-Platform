@@ -18,6 +18,13 @@ import {
   FlightSelectionDto,
   PassengerInputDto,
 } from './dto/create-flight-booking.dto';
+import { getPagination } from '../common/pagination';
+import {
+  FlightBookingDetailsDto,
+  FlightBookingGroup,
+  FlightBookingListItemDto,
+  FlightBookingListResponseDto,
+} from './dto/list-flight-bookings.dto';
 import {
   FlightBookingResponseDto,
   FlightBookingSummaryDto,
@@ -32,6 +39,7 @@ import {
   TripType,
 } from './flight-booking.constants';
 import { FlightBookingStatus } from './flight-booking-status';
+import { groupFilter, groupSort } from './flight-booking-groups';
 import {
   ageOnDate,
   compositionError,
@@ -48,6 +56,7 @@ import {
 } from './schemas/flight-booking.schema';
 
 type LeanFlight = Flight & { _id: Types.ObjectId };
+type LeanBooking = FlightBooking & { _id: Types.ObjectId };
 type LeanAirline = Airline & { _id: Types.ObjectId };
 
 /** A flight, its airline and the chosen cabin, all validated as bookable. */
@@ -131,6 +140,78 @@ export class FlightBookingsService {
       );
       throw error;
     }
+  }
+
+  /**
+   * FLT-25: the user's bookings in one group, 10 per page (GEN-05), with the
+   * size of every group for the tabs.
+   */
+  async listMine(
+    userId: string,
+    group: FlightBookingGroup,
+    page: number | string = 1,
+    now = new Date(),
+  ): Promise<FlightBookingListResponseDto> {
+    const pagination = getPagination(page);
+    const owner = { userId: new Types.ObjectId(userId) };
+    const groups = Object.values(FlightBookingGroup);
+
+    const [docs, ...sizes] = await Promise.all([
+      this.bookingModel
+        .find({ ...owner, ...groupFilter(group, now) })
+        .sort(groupSort(group))
+        .skip(pagination.skip)
+        .limit(pagination.limit)
+        .lean<LeanBooking[]>()
+        .exec(),
+      ...groups.map((g) =>
+        this.bookingModel
+          .countDocuments({ ...owner, ...groupFilter(g, now) })
+          .exec(),
+      ),
+    ]);
+    const counts = Object.fromEntries(
+      groups.map((g, i) => [g, sizes[i]]),
+    ) as Record<FlightBookingGroup, number>;
+    const total = counts[group];
+
+    return {
+      group,
+      items: docs.map(toListItem),
+      page: pagination.page,
+      limit: pagination.limit,
+      total,
+      totalPages: Math.ceil(total / pagination.limit),
+      counts,
+    };
+  }
+
+  /**
+   * FLT-25 / ACC-11: full details for the owner. Someone else's booking is
+   * reported as not found, so booking ids cannot be probed.
+   */
+  async getMine(
+    userId: string,
+    bookingId: string,
+  ): Promise<FlightBookingDetailsDto> {
+    const booking = Types.ObjectId.isValid(bookingId)
+      ? await this.bookingModel
+          .findOne({
+            _id: new Types.ObjectId(bookingId),
+            userId: new Types.ObjectId(userId),
+          })
+          .lean<LeanBooking>()
+          .exec()
+      : null;
+    if (!booking) throw new NotFoundException('Flight booking not found');
+    return {
+      ...toResponse(booking),
+      confirmedAt: booking.confirmedAt,
+      expiredAt: booking.expiredAt,
+      cancelledAt: booking.cancelledAt,
+      cancellationSource: booking.cancellationSource,
+      completedAt: booking.completedAt,
+    };
   }
 
   private async holdSeats(
@@ -488,7 +569,7 @@ function toSummary(
 }
 
 export function toResponse(
-  booking: FlightBookingDocument,
+  booking: FlightBookingDocument | LeanBooking,
 ): FlightBookingResponseDto {
   return {
     id: booking._id.toString(),
@@ -496,6 +577,35 @@ export function toResponse(
     ...toSummary(booking),
     holdExpiresAt: booking.holdExpiresAt,
     bookingReference: booking.bookingReference,
+    createdAt: booking.createdAt,
+  };
+}
+
+function toListItem(booking: LeanBooking): FlightBookingListItemDto {
+  return {
+    id: booking._id.toString(),
+    bookingReference: booking.bookingReference,
+    status: booking.status,
+    tripType: booking.tripType,
+    segments: booking.segments.map((segment) => ({
+      direction: segment.direction,
+      flightNumber: segment.flightNumber,
+      departureAirportCode: segment.departureAirportCode,
+      arrivalAirportCode: segment.arrivalAirportCode,
+      departureAt: segment.departureAt,
+      departureLocalTime: localTime(
+        segment.departureAt,
+        segment.departureTimeZone,
+      ),
+      cabinCategory: segment.cabinCategory,
+    })),
+    passengers: booking.passengers.map(({ fullName, type }) => ({
+      fullName,
+      type,
+    })),
+    totalPrice: booking.totalPrice,
+    currency: booking.currency,
+    holdExpiresAt: booking.holdExpiresAt,
     createdAt: booking.createdAt,
   };
 }
