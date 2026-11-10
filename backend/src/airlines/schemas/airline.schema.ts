@@ -11,6 +11,14 @@ export class BaggagePolicy {
   maxExtraBagsPerPassenger: number;
 }
 
+export class CancellationTier {
+  @Prop({ required: true, min: 0 })
+  daysBeforeDeparture: number;
+
+  @Prop({ required: true, min: 0, max: 100 })
+  refundPercentage: number;
+}
+
 @Schema({ timestamps: true })
 export class Airline {
   @Prop({ required: true, trim: true })
@@ -33,6 +41,17 @@ export class Airline {
     default: null,
   })
   baggagePolicy: BaggagePolicy | null;
+
+  @Prop({
+    type: [
+      {
+        daysBeforeDeparture: { type: Number, required: true, min: 0 },
+        refundPercentage: { type: Number, required: true, min: 0, max: 100 },
+      },
+    ],
+    default: [],
+  })
+  cancellationPolicy: CancellationTier[];
 
   createdAt: Date;
   updatedAt: Date;
