@@ -375,3 +375,18 @@ Added the embedded airline baggage policy, validated DTOs, assigned-moderator
 PUT endpoint, focused service coverage and README documentation. Cabin-specific
 maximum bag weight remains represented by the cabin policy for later booking use.
 ================================================
+
+================================================
+Date: 2026-11-10
+Student: Yahia Mohamed
+Tool: GitHub Copilot (VS Code)
+Related Requirement: FLT-09
+Prompt:
+Implement only the FLT-09 airline cancellation policy endpoint with unique
+days-before-departure tiers, refund percentages from 0 to 100, ownership
+protection, a reusable refund-tier helper, tests and documentation.
+How the output was used:
+Added validated cancellation tiers, assigned-moderator PUT endpoint, pure refund
+tier selection helper, focused service and helper tests, and README documentation.
+================================================
+================================================

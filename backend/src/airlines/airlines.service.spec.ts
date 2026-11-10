@@ -203,14 +203,30 @@ describe('AirlinesService', () => {
   });
 
   it('updates the airline extra-baggage policy', async () => {
-      await expect(
-        service.updateBaggagePolicy(id.toString(), {
-          pricePerExtraBag: 35,
-          maxExtraBagsPerPassenger: 2,
-        }),
-      ).resolves.toEqual({
+    await expect(
+      service.updateBaggagePolicy(id.toString(), {
         pricePerExtraBag: 35,
         maxExtraBagsPerPassenger: 2,
+      }),
+    ).resolves.toEqual({
+      pricePerExtraBag: 35,
+      maxExtraBagsPerPassenger: 2,
+    });
+  });
+
+  it('sorts and stores unique cancellation tiers', async () => {
+    await expect(
+      service.updateCancellationPolicy(id.toString(), {
+        tiers: [
+          { daysBeforeDeparture: 0, refundPercentage: 0 },
+          { daysBeforeDeparture: 30, refundPercentage: 75 },
+        ],
+      }),
+    ).resolves.toEqual({
+      tiers: [
+        { daysBeforeDeparture: 30, refundPercentage: 75 },
+        { daysBeforeDeparture: 0, refundPercentage: 0 },
+      ],
     });
   });
 });

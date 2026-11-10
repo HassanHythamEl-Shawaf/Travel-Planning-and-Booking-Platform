@@ -30,6 +30,10 @@ import {
   BaggagePolicyResponseDto,
   UpdateBaggagePolicyDto,
 } from './dto/baggage-policy.dto';
+import {
+  CancellationPolicyResponseDto,
+  UpdateCancellationPolicyDto,
+} from './dto/cancellation-policy.dto';
 import { CreateFlightDto, FlightResponseDto } from './dto/flight.dto';
 import {
   CabinResponseDto,
@@ -275,6 +279,29 @@ export class AirlinesService {
       pricePerExtraBag: dto.pricePerExtraBag,
       maxExtraBagsPerPassenger: dto.maxExtraBagsPerPassenger,
     };
+  }
+
+  async updateCancellationPolicy(
+    id: string,
+    dto: UpdateCancellationPolicyDto,
+  ): Promise<CancellationPolicyResponseDto> {
+    const thresholds = dto.tiers.map((tier) => tier.daysBeforeDeparture);
+    if (new Set(thresholds).size !== thresholds.length) {
+      throw new ConflictException('Cancellation thresholds must be unique');
+    }
+    const tiers = [...dto.tiers].sort(
+      (left, right) => right.daysBeforeDeparture - left.daysBeforeDeparture,
+    );
+    const airline = await this.airlineModel
+      .findByIdAndUpdate(
+        id,
+        { $set: { cancellationPolicy: tiers } },
+        { returnDocument: 'after', runValidators: true },
+      )
+      .lean()
+      .exec();
+    if (!airline) throw new NotFoundException('Airline not found');
+    return { tiers };
   }
 
   private rejectDirectLogoUrl(logoUrl: string | undefined): void {

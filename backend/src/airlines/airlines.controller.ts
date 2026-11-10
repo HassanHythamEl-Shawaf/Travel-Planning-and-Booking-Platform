@@ -44,6 +44,10 @@ import {
   BaggagePolicyResponseDto,
   UpdateBaggagePolicyDto,
 } from './dto/baggage-policy.dto';
+import {
+  CancellationPolicyResponseDto,
+  UpdateCancellationPolicyDto,
+} from './dto/cancellation-policy.dto';
 import { CreateFlightDto, FlightResponseDto } from './dto/flight.dto';
 
 const ID_PARAM = {
@@ -165,5 +169,28 @@ export class AirlinesController {
     @Body() dto: UpdateBaggagePolicyDto,
   ): Promise<BaggagePolicyResponseDto> {
     return this.airlines.updateBaggagePolicy(id, dto);
+  }
+
+  @Put(':id/cancellation-policy')
+  @UseGuards(AuthGuard, RolesGuard, ProviderOwnershipGuard)
+  @Roles(UserRole.MODERATOR)
+  @ProviderOwnership('airline')
+  @ApiCookieAuth('access_token')
+  @ApiOperation({
+    summary: 'Update airline cancellation policy (FLT-09)',
+    description:
+      'Unique days-before-departure tiers are stored in descending threshold order. Refund selection uses the highest threshold not exceeding days remaining.',
+  })
+  @ApiParam(ID_PARAM)
+  @ApiOkResponse({ type: CancellationPolicyResponseDto })
+  @ApiBadRequestResponse({ description: 'Invalid or duplicate cancellation tiers' })
+  @ApiUnauthorizedResponse({ description: 'Authentication is required' })
+  @ApiForbiddenResponse({ description: 'Assigned airline moderator required' })
+  @ApiNotFoundResponse({ description: 'Airline not found' })
+  updateCancellationPolicy(
+    @Param('id', ParseObjectIdPipe) id: string,
+    @Body() dto: UpdateCancellationPolicyDto,
+  ): Promise<CancellationPolicyResponseDto> {
+    return this.airlines.updateCancellationPolicy(id, dto);
   }
 }
