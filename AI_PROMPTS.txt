@@ -575,3 +575,24 @@ times) and holds seats per segment with compensation on failure, and a
 controller restricted to registered users. Added in-memory MongoDB tests
 including 20 parallel holds on a 5-seat cabin.
 ================================================
+Date: 2026-11-10
+Student: Yassin Arafa
+Tool: Claude Code (Claude Opus 5.5)
+Related Requirement: FLT-23, FLT-22, GEN-11, PAY-01
+Prompt:
+Expose confirmBooking(id) and releaseHold(id) for Person 7's payments and
+shared ExpiryService. Confirmation runs only after the webhook verifies
+payment: convert held seats to booked through the inventory interface,
+issue a unique booking reference, set Confirmed and send BOOKING_CONFIRMED.
+Release expires the booking, frees the seats and sends BOOKING_EXPIRED.
+Make both safe against repeated webhooks and against racing each other,
+and add helpers for the cron (release expired holds, mark departed
+bookings Completed).
+How the output was used:
+Added a FlightBookingPayments contract and token for Person 7, and a
+lifecycle service that claims each transition with one conditional status
+update so confirm and expiry cannot both win, retries on reference
+collisions, rolls back if inventory confirmation fails, and gives the
+inventory hold a 2-minute grace beyond the booking hold. Added in-memory
+MongoDB tests for idempotency, concurrency, expiry and completion.
+================================================

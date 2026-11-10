@@ -4,7 +4,10 @@ import { MongooseModule } from '@nestjs/mongoose';
 
 import { AirlinesModule } from '../airlines/airlines.module';
 import { AuthModule } from '../auth/auth.module';
+import { NotificationsModule } from '../notifications/notifications.module';
 import { UsersModule } from '../users/users.module';
+import { FLIGHT_BOOKING_PAYMENTS } from './flight-booking-payments.contract';
+import { FlightBookingLifecycleService } from './flight-booking-lifecycle.service';
 import { FlightBookingsController } from './flight-bookings.controller';
 import { FlightBookingsService } from './flight-bookings.service';
 import {
@@ -28,9 +31,18 @@ import {
     // (JwtService, UsersService) must be visible here.
     UsersModule,
     JwtModule.register({}),
+    NotificationsModule,
   ],
   controllers: [FlightBookingsController],
-  providers: [FlightBookingsService],
-  exports: [FlightBookingsService, MongooseModule],
+  providers: [
+    FlightBookingsService,
+    FlightBookingLifecycleService,
+    // Person 7 (payments, ExpiryService) depends on this token only.
+    {
+      provide: FLIGHT_BOOKING_PAYMENTS,
+      useExisting: FlightBookingLifecycleService,
+    },
+  ],
+  exports: [FlightBookingsService, FLIGHT_BOOKING_PAYMENTS, MongooseModule],
 })
 export class FlightBookingsModule {}
