@@ -389,4 +389,18 @@ How the output was used:
 Added validated cancellation tiers, assigned-moderator PUT endpoint, pure refund
 tier selection helper, focused service and helper tests, and README documentation.
 ================================================
+Date: 2026-11-10
+Student: Yahia Mohamed
+Tool: GitHub Copilot (VS Code)
+Related Requirement: FLT-30
+Prompt:
+Implement only FLT-30 flight status derivation from persisted cancellation
+state and departure time, expose a scheduler-facing service method and status
+endpoint without adding a cron job, with tests and documentation.
+How the output was used:
+Added the status response DTO, public status endpoint, deterministic service
+derivation for Scheduled, Departed and Cancelled, focused tests and README
+documentation.
+================================================
+================================================
 ================================================

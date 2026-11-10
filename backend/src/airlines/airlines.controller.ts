@@ -49,6 +49,7 @@ import {
   UpdateCancellationPolicyDto,
 } from './dto/cancellation-policy.dto';
 import { CreateFlightDto, FlightResponseDto } from './dto/flight.dto';
+import { FlightStatusResponseDto } from './dto/flight-status.dto';
 
 const ID_PARAM = {
   name: 'id',
@@ -91,6 +92,22 @@ export class AirlinesController {
     @Body() dto: CreateFlightDto,
   ): Promise<FlightResponseDto> {
     return this.airlines.createFlight(user.sub, dto);
+  }
+
+  @Get('flights/:id/status')
+  @ApiOperation({
+    summary: 'Get the current flight status (FLT-30)',
+    description:
+      'Status is derived from persisted cancellation state and the departure time. A scheduler can call the same service method without a cron job in this module.',
+  })
+  @ApiParam({ name: 'id', example: '6650f1c2a1b2c3d4e5f60719' })
+  @ApiOkResponse({ type: FlightStatusResponseDto })
+  @ApiBadRequestResponse({ description: 'Invalid flight id' })
+  @ApiNotFoundResponse({ description: 'Flight not found' })
+  getFlightStatus(
+    @Param('id', ParseObjectIdPipe) id: string,
+  ): Promise<FlightStatusResponseDto> {
+    return this.airlines.getFlightStatus(id);
   }
 
   @Post()
