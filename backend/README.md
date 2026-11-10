@@ -338,6 +338,12 @@ helper. An inverted price range is rejected with a client error.
 airport-local departure and arrival times, duration, status, cabin prices and
 baggage allowances, inventory-backed remaining seats, and cancellation tiers.
 
+FLT-05 provides `PATCH /api/airlines/flights/:id` for assigned moderators to
+change local times on Scheduled flights and prevents cabin seat counts below
+booked plus held seats. Confirmed-passenger schedule notifications are routed
+through the shared notification service when the Person 4 passenger-reader
+contract is bound.
+
 ## Deployment
 
 When you're ready to deploy your NestJS application to production, there are some key steps you can take to ensure it runs as efficiently as possible. Check out the [deployment documentation](https://docs.nestjs.com/deployment) for more information.

@@ -270,4 +270,32 @@ describe('AirlinesService', () => {
       ),
     ).resolves.toEqual({ status: FlightStatus.CANCELLED });
   });
+
+  it('rejects reducing cabin seats below booked and held seats', async () => {
+    const cabinId = new Types.ObjectId();
+    flightModel.findById.mockReturnValue({
+      exec: () =>
+        Promise.resolve({
+          airlineId: id,
+          status: 'Scheduled',
+          cabins: [
+            {
+              _id: cabinId,
+              category: CabinCategory.ECONOMY,
+              seatCount: 10,
+              seatsBooked: 4,
+              seatsHeld: 2,
+              save: jest.fn(),
+            },
+          ],
+          save: jest.fn(),
+        }),
+    });
+
+    await expect(
+      service.updateCabin('moderator-id', id.toString(), cabinId.toString(), {
+        seatCount: 5,
+      }),
+    ).rejects.toThrow('Seat count cannot be below booked and held seats');
+  });
 });
