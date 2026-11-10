@@ -539,3 +539,39 @@ releaseSeats() so the positional update always targets the held cabin (it
 could previously update a different cabin). Added in-memory MongoDB tests
 for parallel holds, confirm, release and multi-cabin flights.
 ================================================
+Date: 2026-11-10
+Student: Yassin Arafa
+Tool: Claude Code (Claude Opus 5.5)
+Related Requirement: FLT-22
+Prompt:
+My flight booking hold tests fail against an in-memory MongoDB with
+"$expr can only be applied to the top-level document" from
+FlightInventoryService.createHold(). Find the cause, fix the inventory
+queries without changing the interface, and add tests that run against a
+real MongoDB instead of mocks.
+How the output was used:
+Moved the seat-availability check in createHold() to a top-level $expr over
+the cabins array, and used $elemMatch in confirmInventory() and
+releaseSeats() so the positional update always targets the held cabin (it
+could previously update a different cabin). Added in-memory MongoDB tests
+for parallel holds, confirm, release and multi-cabin flights.
+================================================
+Date: 2026-11-10
+Student: Yassin Arafa
+Tool: Claude Code (Claude Opus 5.5)
+Related Requirement: FLT-22, FLT-19, FLT-21, FLT-12
+Prompt:
+Implement POST /api/flight-bookings (booking summary, nothing saved) and
+POST /api/flight-bookings/hold (atomic seat hold through Person 3's
+inventory interface, Pending Payment booking for 10 minutes). Validate
+passenger type against date of birth, adult/infant rules, extra-bag limits
+and weights, deactivated airlines, non-Scheduled or departed flights and
+round-trip route pairing. A round trip holds both flights or neither.
+Test with parallel requests.
+How the output was used:
+Added request/response DTOs with Swagger docs, a service that validates and
+prices the booking (infant 10% fare, per-segment extra-bag fees, local
+times) and holds seats per segment with compensation on failure, and a
+controller restricted to registered users. Added in-memory MongoDB tests
+including 20 parallel holds on a 5-seat cabin.
+================================================
