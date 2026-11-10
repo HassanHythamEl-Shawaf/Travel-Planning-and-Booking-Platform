@@ -5,6 +5,7 @@ import {
   Param,
   Patch,
   Post,
+  Put,
   UseGuards,
 } from '@nestjs/common';
 import {
@@ -39,6 +40,10 @@ import {
 } from './dto/airline.dto';
 import { AirlinesService } from './airlines.service';
 import { AirportResponseDto } from './dto/airport.dto';
+import {
+  BaggagePolicyResponseDto,
+  UpdateBaggagePolicyDto,
+} from './dto/baggage-policy.dto';
 import { CreateFlightDto, FlightResponseDto } from './dto/flight.dto';
 
 const ID_PARAM = {
@@ -137,5 +142,28 @@ export class AirlinesController {
     @Body() dto: UpdateAirlineDto,
   ): Promise<AirlineResponseDto> {
     return this.airlines.update(id, dto);
+  }
+
+  @Put(':id/baggage-policy')
+  @UseGuards(AuthGuard, RolesGuard, ProviderOwnershipGuard)
+  @Roles(UserRole.MODERATOR)
+  @ProviderOwnership('airline')
+  @ApiCookieAuth('access_token')
+  @ApiOperation({
+    summary: 'Update airline extra-baggage policy (FLT-08)',
+    description:
+      'The assigned airline moderator sets the extra-bag price and maximum bags per passenger. Extra bags use the selected cabin max-weight rule.',
+  })
+  @ApiParam(ID_PARAM)
+  @ApiOkResponse({ type: BaggagePolicyResponseDto })
+  @ApiBadRequestResponse({ description: 'Invalid baggage policy or airline id' })
+  @ApiUnauthorizedResponse({ description: 'Authentication is required' })
+  @ApiForbiddenResponse({ description: 'Assigned airline moderator required' })
+  @ApiNotFoundResponse({ description: 'Airline not found' })
+  updateBaggagePolicy(
+    @Param('id', ParseObjectIdPipe) id: string,
+    @Body() dto: UpdateBaggagePolicyDto,
+  ): Promise<BaggagePolicyResponseDto> {
+    return this.airlines.updateBaggagePolicy(id, dto);
   }
 }
