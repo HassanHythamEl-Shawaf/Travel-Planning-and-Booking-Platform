@@ -77,6 +77,30 @@ export class SearchFlightsDto {
   @IsOptional()
   @IsString()
   cabinClass?: string;
+
+  @ApiProperty({ example: 100, minimum: 0, required: false })
+  @IsOptional()
+  @Type(() => Number)
+  @Min(0)
+  minPrice?: number;
+
+  @ApiProperty({ example: 500, minimum: 0, required: false })
+  @IsOptional()
+  @Type(() => Number)
+  @Min(0)
+  maxPrice?: number;
+
+  @ApiProperty({ enum: ['price', 'duration', 'departure'], required: false })
+  @IsOptional()
+  @IsIn(['price', 'duration', 'departure'])
+  sort?: 'price' | 'duration' | 'departure';
+
+  @ApiProperty({ example: 1, minimum: 1, required: false })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  page?: number;
 }
 
 export class FlightSearchCabinDto {
@@ -126,6 +150,9 @@ export class FlightSearchResultDto {
   @ApiProperty({ example: 'Asia/Dubai' })
   arrivalTimeZone: string;
 
+  @ApiProperty({ example: 90 })
+  durationMinutes: number;
+
   @ApiProperty({ type: [FlightSearchCabinDto] })
   cabins: FlightSearchCabinDto[];
 }
@@ -139,4 +166,16 @@ export class FlightSearchResponseDto {
 
   @ApiProperty({ type: [FlightSearchResultDto], required: false })
   returnItems?: FlightSearchResultDto[];
+
+  @ApiProperty({ example: 1, required: false })
+  page?: number;
+
+  @ApiProperty({ example: 10, required: false })
+  limit?: number;
+
+  @ApiProperty({ example: 1, required: false })
+  totalPages?: number;
+
+  @ApiProperty({ example: 1, required: false })
+  total?: number;
 }

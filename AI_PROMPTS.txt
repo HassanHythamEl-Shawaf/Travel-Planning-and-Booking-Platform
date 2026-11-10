@@ -428,3 +428,16 @@ Added round-trip criteria, passenger-type validation, infant pricing at 10%,
 seat requirements for adults and children, cabin filtering, return options,
 focused tests and README documentation.
 ================================================
+Date: 2026-11-10
+Student: Yahia Mohamed
+Tool: GitHub Copilot (VS Code)
+Related Requirement: FLT-15
+Prompt:
+Extend the existing search only for FLT-15 with inclusive minimum and maximum
+price filters, price/duration/departure sorting, shared page-size-10
+pagination, inverted-range validation, tests and documentation.
+How the output was used:
+Added validated price, sort and page criteria, cabin-price filtering,
+deterministic sorting, shared pagination metadata and focused validation tests
+with README documentation.
+================================================

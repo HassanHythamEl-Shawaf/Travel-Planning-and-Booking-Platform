@@ -142,4 +142,22 @@ describe('AirlinesService flight search', () => {
       adults: 0,
     })).rejects.toThrow('At least one adult is required');
   });
+
+  it('rejects an inverted price range before querying', async () => {
+    const service = new AirlinesService(
+      {} as never,
+      {} as never,
+      null,
+      {} as never,
+      undefined,
+    );
+    await expect(service.searchFlights({
+      departureAirportCode: 'CAI',
+      arrivalAirportCode: 'DXB',
+      departureDate: '2026-12-01',
+      passengers: 1,
+      minPrice: 500,
+      maxPrice: 100,
+    })).rejects.toThrow('Minimum price must not exceed maximum price');
+  });
 });
