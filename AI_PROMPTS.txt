@@ -330,3 +330,18 @@ stub, rejected direct logo URLs until Person 8's upload module is merged,
 added focused service tests, updated the backend README, and verified the
 targeted tests, lint and build.
 ================================================
+
+================================================
+Date: 2026-11-10
+Student: Yahia Mohamed
+Tool: GitHub Copilot (VS Code)
+Related Requirement: FLT-03
+Prompt:
+Implement FLT-03 flight creation with seeded-airport validation, airport-local
+date-time conversion using IANA zones, UTC persistence, duplicate-flight
+protection, tests and documentation without editing teammate files.
+How the output was used:
+Added the flight schema and DTOs, Luxon-based local-to-UTC conversion, assigned
+moderator ownership validation, seeded-airport checks and the compound
+duplicate-flight index. Added timezone tests and documented the endpoint.
+================================================
