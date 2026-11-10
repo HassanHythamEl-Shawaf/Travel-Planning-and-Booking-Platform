@@ -48,12 +48,21 @@ import {
   FlightUpdateResponseDto,
   UpdateFlightScheduleDto,
 } from './dto/flight-update.dto';
+import { FlightCancellationResponseDto } from './dto/flight-cancellation.dto';
 import {
   FLIGHT_PASSENGER_READER,
 } from './flight-passenger-reader';
 import type { FlightPassengerReader } from './flight-passenger-reader';
 import { NotificationsService } from '../notifications/notifications.service';
 import { NotificationType } from '../notifications/notification.constants';
+import {
+  FLIGHT_BOOKING_CANCELLER,
+} from './flight-booking-canceller';
+import type { FlightBookingCanceller } from './flight-booking-canceller';
+import {
+  FLIGHT_INVENTORY,
+} from './flight-inventory';
+import type { FlightInventoryReader } from './flight-inventory';
 import {
   FlightSearchResponseDto,
   FlightSearchResultDto,
@@ -87,6 +96,12 @@ export class AirlinesService {
     private readonly passengers?: FlightPassengerReader,
     @Optional()
     private readonly notifications?: NotificationsService,
+    @Optional()
+    @Inject(FLIGHT_BOOKING_CANCELLER)
+    private readonly bookingCanceller?: FlightBookingCanceller,
+    @Optional()
+    @Inject(FLIGHT_INVENTORY)
+    private readonly inventory?: FlightInventoryReader,
   ) {}
 
   async create(dto: CreateAirlineDto): Promise<AirlineResponseDto> {
@@ -385,6 +400,7 @@ export class AirlinesService {
     if (departureLocal.toMillis() <= Date.now()) {
       throw new ConflictException('Departure must be in the future');
     }
+
     if (arrivalLocal.toMillis() <= departureLocal.toMillis()) {
       throw new ConflictException('Arrival must be after departure');
     }
@@ -394,6 +410,37 @@ export class AirlinesService {
     await flight.save();
     await this.notifyScheduleChange(flight);
     return this.toFlightResponse(flight);
+  }
+
+  async cancelFlight(
+    moderatorId: string,
+    flightId: string,
+    confirm: boolean,
+  ): Promise<FlightCancellationResponseDto> {
+    if (!confirm) {
+      throw new ConflictException('Cancellation must be explicitly confirmed');
+    }
+    if (!this.bookingCanceller || !this.inventory) {
+      throw new NotImplementedException(
+        'Flight booking and inventory integrations are not configured',
+      );
+    }
+    const flight = await this.getOwnedFlight(moderatorId, flightId);
+    const updated = await this.flightModel
+      .findOneAndUpdate(
+        { _id: flight._id, status: FlightStatus.SCHEDULED },
+        { $set: { status: FlightStatus.CANCELLED } },
+        { returnDocument: 'after' },
+      )
+      .lean()
+      .exec();
+    if (!updated) {
+      throw new ConflictException('Only Scheduled flights can be cancelled');
+    }
+    await this.bookingCanceller.cancelConfirmedBookings(flightId);
+    await this.inventory.releaseFlightHolds(flightId);
+    await this.notifyFlightCancellation(updated);
+    return { id: flightId, status: FlightStatus.CANCELLED };
   }
 
   private async findSearchFlights(
@@ -645,6 +692,20 @@ export class AirlinesService {
         flightNumber: flight.flightNumber,
         newDepartureTime: flight.departureAt,
       },
+    );
+  }
+
+  private async notifyFlightCancellation(
+    flight: Flight & { _id: unknown },
+  ): Promise<void> {
+    if (!this.passengers || !this.notifications) return;
+    const passengerIds = await this.passengers.findConfirmedPassengerIds(
+      String(flight._id),
+    );
+    await this.notifications.sendMany(
+      passengerIds,
+      NotificationType.FLIGHT_CANCELLED,
+      { flightId: String(flight._id), flightNumber: flight.flightNumber },
     );
   }
 
