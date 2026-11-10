@@ -291,6 +291,12 @@ npm run build
 list with IATA code, name, city, country and IANA time zone. Flight inputs must
 use these seeded airport identifiers.
 
+`POST /api/airlines/flights` (FLT-03) is restricted to airline moderators and
+accepts local departure and arrival date-times. The service resolves each
+airport's IANA zone, stores UTC instants plus both zones, rejects past or
+non-positive schedules, and enforces unique flight number per airline and
+departure date.
+
 ## Deployment
 
 When you're ready to deploy your NestJS application to production, there are some key steps you can take to ensure it runs as efficiently as possible. Check out the [deployment documentation](https://docs.nestjs.com/deployment) for more information.
