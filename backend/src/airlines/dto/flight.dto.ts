@@ -1,6 +1,7 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { Transform } from 'class-transformer';
 import { IsISO8601, IsMongoId, IsString, Length, Matches } from 'class-validator';
+import { FlightStatus } from '../schemas/flight.schema';
 
 const trimUpper = ({ value }: { value: unknown }) =>
   typeof value === 'string' ? value.trim().toUpperCase() : value;
@@ -74,4 +75,7 @@ export class FlightResponseDto {
 
   @ApiProperty({ example: '2026-12-01' })
   departureLocalDate: string;
+
+  @ApiProperty({ enum: FlightStatus, example: FlightStatus.SCHEDULED })
+  status: FlightStatus;
 }
