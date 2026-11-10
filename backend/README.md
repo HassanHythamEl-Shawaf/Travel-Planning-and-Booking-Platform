@@ -357,6 +357,11 @@ The export is CSV and includes remaining seats for each cabin. Person 4 must
 bind that contract; until then these endpoints fail explicitly with a
 not-configured response.
 
+The requirements-compatible aliases `/api/airports` and `/api/flights/...`
+are also available. The existing `/api/airlines/...` routes remain supported.
+FLT-29 passenger CSV export is available at
+`GET /api/flights/:id/passengers/export`.
+
 ## Deployment
 
 When you're ready to deploy your NestJS application to production, there are some key steps you can take to ensure it runs as efficiently as possible. Check out the [deployment documentation](https://docs.nestjs.com/deployment) for more information.
