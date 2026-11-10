@@ -30,7 +30,6 @@ import {
 
 jest.setTimeout(120_000);
 
-
 describe('FlightBookingsService quote and hold (FLT-19, FLT-21, FLT-22)', () => {
   let server: MongoMemoryServer;
   let connection: Connection;
@@ -118,7 +117,7 @@ describe('FlightBookingsService quote and hold (FLT-19, FLT-21, FLT-22)', () => 
       arrivalAt: departureLocal.plus({ hours: 5 }).toUTC().toJSDate(),
       departureTimeZone: 'Africa/Cairo',
       arrivalTimeZone: 'Europe/London',
-      departureLocalDate: departureLocal.toISODate(),
+      departureLocalDate: departureLocal.toISODate()!,
       status: options.status ?? FlightStatus.SCHEDULED,
       cabins: [
         {
