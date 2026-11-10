@@ -2,6 +2,18 @@
 AI PROMPT LOG
 Add one entry per prompt that materially contributed to the project.
 
+Date: 2026-11-10
+Student: Yahia Mohamed
+Tool: GitHub Copilot (VS Code)
+Related Requirement: FLT-29
+Prompt:
+Implement FLT-29 only: assigned airline moderator booking listing and CSV
+passenger export, using a TODO contract for Person 4's booking integration.
+Include ownership checks, cabin remaining-seat calculations, tests and docs.
+How the output was used:
+Added the FLIGHT_BOOKING_READER contract, moderator-only booking endpoints,
+CSV escaping, ownership enforcement, focused tests and README documentation.
+================================================
 Date: 2026-11-01
 Student: Hassan
 Tool: ChatGPT and Claude
