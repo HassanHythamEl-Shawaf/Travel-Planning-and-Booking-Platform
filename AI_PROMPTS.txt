@@ -596,3 +596,20 @@ collisions, rolls back if inventory confirmation fails, and gives the
 inventory hold a 2-minute grace beyond the booking hold. Added in-memory
 MongoDB tests for idempotency, concurrency, expiry and completion.
 ================================================
+Date: 2026-11-10
+Student: Yassin Arafa
+Tool: Claude Code (Claude Opus 5.5)
+Related Requirement: FLT-25, ACC-11, GEN-05
+Prompt:
+Implement GET /api/flight-bookings (my bookings grouped as Upcoming, Past
+and Cancelled, 10 per page, showing reference, flight, date, passengers,
+cabin and status) and GET /api/flight-bookings/:id (full details, owner
+only). Every status must fall into exactly one group even before the
+expiry job runs. Add tests.
+How the output was used:
+Added group filters that cover every status once (pending holds by expiry
+time, confirmed bookings by outbound departure), a paginated list with
+per-group counts for tabs, owner-only details that report other users'
+bookings as not found, Swagger docs, and in-memory MongoDB tests for
+grouping, ordering, pagination and ownership.
+================================================
