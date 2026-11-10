@@ -45,6 +45,16 @@ import { Airline } from './schemas/airline.schema';
 import { CabinCategory, Flight, FlightStatus } from './schemas/flight.schema';
 import { FlightStatusResponseDto } from './dto/flight-status.dto';
 import {
+  FlightUpdateResponseDto,
+  UpdateFlightScheduleDto,
+} from './dto/flight-update.dto';
+import {
+  FLIGHT_PASSENGER_READER,
+} from './flight-passenger-reader';
+import type { FlightPassengerReader } from './flight-passenger-reader';
+import { NotificationsService } from '../notifications/notifications.service';
+import { NotificationType } from '../notifications/notification.constants';
+import {
   FlightSearchResponseDto,
   FlightSearchResultDto,
   SearchFlightsDto,
@@ -72,6 +82,11 @@ export class AirlinesService {
     private readonly referenceData?: ReferenceDataService,
     @Inject(PROVIDER_ASSIGNMENT_READER)
     private readonly assignments?: ProviderAssignmentReader,
+    @Optional()
+    @Inject(FLIGHT_PASSENGER_READER)
+    private readonly passengers?: FlightPassengerReader,
+    @Optional()
+    private readonly notifications?: NotificationsService,
   ) {}
 
   async create(dto: CreateAirlineDto): Promise<AirlineResponseDto> {
@@ -352,6 +367,35 @@ export class AirlinesService {
     };
   }
 
+  async updateFlightSchedule(
+    moderatorId: string,
+    flightId: string,
+    dto: UpdateFlightScheduleDto,
+  ): Promise<FlightUpdateResponseDto> {
+    const flight = await this.getOwnedFlight(moderatorId, flightId);
+    this.ensureScheduled(flight.status);
+    const departureLocal = this.parseLocalDateTime(
+      dto.departureLocalTime,
+      flight.departureTimeZone,
+    );
+    const arrivalLocal = this.parseLocalDateTime(
+      dto.arrivalLocalTime,
+      flight.arrivalTimeZone,
+    );
+    if (departureLocal.toMillis() <= Date.now()) {
+      throw new ConflictException('Departure must be in the future');
+    }
+    if (arrivalLocal.toMillis() <= departureLocal.toMillis()) {
+      throw new ConflictException('Arrival must be after departure');
+    }
+    flight.departureAt = departureLocal.toUTC().toJSDate();
+    flight.arrivalAt = arrivalLocal.toUTC().toJSDate();
+    flight.departureLocalDate = departureLocal.toISODate()!;
+    await flight.save();
+    await this.notifyScheduleChange(flight);
+    return this.toFlightResponse(flight);
+  }
+
   private async findSearchFlights(
     departureAirportCode: string,
     arrivalAirportCode: string,
@@ -425,6 +469,7 @@ export class AirlinesService {
     dto: UpdateCabinDto,
   ): Promise<CabinResponseDto> {
     const flight = await this.getOwnedFlight(moderatorId, flightId);
+    this.ensureScheduled(flight.status);
     if (!Types.ObjectId.isValid(cabinId)) {
       throw new NotFoundException('Cabin not found');
     }
@@ -432,6 +477,14 @@ export class AirlinesService {
       (candidate) => String(candidate._id) === cabinId,
     );
     if (!cabin) throw new NotFoundException('Cabin not found');
+    if (
+      dto.seatCount !== undefined &&
+      dto.seatCount < (cabin.seatsBooked ?? 0) + (cabin.seatsHeld ?? 0)
+    ) {
+      throw new ConflictException(
+        'Seat count cannot be below booked and held seats',
+      );
+    }
     Object.assign(cabin, dto);
     await flight.save();
     return this.toCabinResponse(cabin);
@@ -551,12 +604,13 @@ export class AirlinesService {
   private async getOwnedFlight(
     moderatorId: string,
     flightId: string,
-  ): Promise<Flight & { save: () => Promise<unknown> }> {
+  ): Promise<Flight & { _id: unknown; save: () => Promise<unknown> }> {
     if (!this.assignments) {
       throw new NotImplementedException(
         'Moderator assignment integration is not configured',
       );
     }
+
     const flight = await this.flightModel.findById(flightId).exec();
     if (!flight) throw new NotFoundException('Flight not found');
     const assignment = await this.assignments.findByModeratorId(moderatorId);
@@ -567,7 +621,31 @@ export class AirlinesService {
     ) {
       throw new NotFoundException('Flight not found');
     }
-    return flight as Flight & { save: () => Promise<unknown> };
+    return flight as Flight & { _id: unknown; save: () => Promise<unknown> };
+  }
+
+  private ensureScheduled(status: FlightStatus): void {
+    if (status !== FlightStatus.SCHEDULED) {
+      throw new ConflictException('Only Scheduled flights can be edited');
+    }
+  }
+
+  private async notifyScheduleChange(
+    flight: Flight & { _id: unknown },
+  ): Promise<void> {
+    if (!this.passengers || !this.notifications) return;
+    const passengerIds = await this.passengers.findConfirmedPassengerIds(
+      String(flight._id),
+    );
+    await this.notifications.sendMany(
+      passengerIds,
+      NotificationType.FLIGHT_SCHEDULE_CHANGED,
+      {
+        flightId: String(flight._id),
+        flightNumber: flight.flightNumber,
+        newDepartureTime: flight.departureAt,
+      },
+    );
   }
 
   private toCabinResponse(cabin: {
