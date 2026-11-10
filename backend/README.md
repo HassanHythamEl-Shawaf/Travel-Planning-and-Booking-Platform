@@ -329,6 +329,11 @@ FLT-15 adds inclusive `minPrice`/`maxPrice` filters, `price`, `duration` and
 `departure` sorting, and page-size-10 pagination through the shared pagination
 helper. An inverted price range is rejected with a client error.
 
+`GET /api/airlines/flights/:id` (FLT-17) returns the airline identity,
+airport-local departure and arrival times, duration, status, cabin prices and
+baggage allowances, remaining seats, and cancellation tiers. Until FLT-22 is
+merged, remaining seats reflect the configured cabin capacity.
+
 ## Deployment
 
 When you're ready to deploy your NestJS application to production, there are some key steps you can take to ensure it runs as efficiently as possible. Check out the [deployment documentation](https://docs.nestjs.com/deployment) for more information.
