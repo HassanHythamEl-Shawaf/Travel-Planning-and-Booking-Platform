@@ -118,7 +118,7 @@ export class AirlinesService {
     updatedAt: Date;
   }): AirlineResponseDto {
     return {
-      id: airline._id.toString(),
+      id: String(airline._id),
       name: airline.name,
       code: airline.code,
       logoUrl: airline.logoUrl ?? null,
