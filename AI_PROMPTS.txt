@@ -2,7 +2,6 @@
 AI PROMPT LOG
 Add one entry per prompt that materially contributed to the project.
 
-================================================
 Date: 2026-11-01
 Student: Hassan
 Tool: ChatGPT and Claude
@@ -296,4 +295,23 @@ moderation handlers, the afterDelete hook with its GEN-09 unit tests, the
 README section and the rest of the blog e2e. I reviewed the code and ran the
 unit tests, the blog, reports and admin e2e suites (in-memory MongoDB, not
 Atlas), lint and build.
+================================================
+
+================================================
+Date: 2026-11-10
+Student: Yahia Mohamed
+Tool: GitHub Copilot (VS Code)
+Related Requirement: FLT-01
+Prompt:
+Implement only the FLT-01 airline profile branch from the latest develop:
+admin-only airline creation, assigned-moderator-only profile editing with the
+existing ProviderOwnershipGuard, a Person 8 logo-upload interface stub, tests,
+documentation and separate conventional commits.
+How the output was used:
+Used the existing NestJS, Mongoose, Swagger, AuthGuard, RolesGuard and
+ProviderOwnershipGuard conventions to add the airline schema, DTOs, service,
+controller and module. Kept logo handling behind an AIRLINE_LOGO_STORE TODO
+stub, rejected direct logo URLs until Person 8's upload module is merged,
+added focused service tests, updated the backend README, and verified the
+targeted tests, lint and build.
 ================================================
