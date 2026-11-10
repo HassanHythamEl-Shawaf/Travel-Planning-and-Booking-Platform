@@ -3,6 +3,14 @@ import { HydratedDocument } from 'mongoose';
 
 export type AirlineDocument = HydratedDocument<Airline>;
 
+export class BaggagePolicy {
+  @Prop({ required: true, min: 0.01 })
+  pricePerExtraBag: number;
+
+  @Prop({ required: true, min: 0 })
+  maxExtraBagsPerPassenger: number;
+}
+
 @Schema({ timestamps: true })
 export class Airline {
   @Prop({ required: true, trim: true })
@@ -16,6 +24,15 @@ export class Airline {
 
   @Prop({ required: true, default: true })
   isActive: boolean;
+
+  @Prop({
+    type: {
+      pricePerExtraBag: { type: Number, required: true, min: 0.01 },
+      maxExtraBagsPerPassenger: { type: Number, required: true, min: 0 },
+    },
+    default: null,
+  })
+  baggagePolicy: BaggagePolicy | null;
 
   createdAt: Date;
   updatedAt: Date;
