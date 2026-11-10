@@ -2,6 +2,7 @@
 AI PROMPT LOG
 Add one entry per prompt that materially contributed to the project.
 
+================================================
 Date: 2026-11-01
 Student: Hassan
 Tool: ChatGPT and Claude
@@ -10,8 +11,6 @@ Prompt:
 Asked for a split of the Milestone 1 backend work between 8 people, with work order and shared contracts, checked against the project description and requirements sheet.
 How the output was used:
 Used it as the team work split and work order documents.
-================================================
-
 ================================================
 Date: 2026-11-01
 Student: Hassan
@@ -295,6 +294,22 @@ moderation handlers, the afterDelete hook with its GEN-09 unit tests, the
 README section and the rest of the blog e2e. I reviewed the code and ran the
 unit tests, the blog, reports and admin e2e suites (in-memory MongoDB, not
 Atlas), lint and build.
+================================================
+
+================================================
+Date: 2026-11-10
+Student: Yahia Mohamed
+Tool: GitHub Copilot (VS Code)
+Related Requirement: FLT-02
+Prompt:
+Implement the FLT-02 seeded-airports endpoint using the existing reference
+data without editing Person 2's files, and add tests, documentation and the
+required separate commit.
+How the output was used:
+Added a read-only airport response DTO and `/api/airlines/airports` route that
+maps Person 2's seeded airport records to the FLT-02 contract. The existing
+ReferenceDataModule is imported unchanged; tests cover the mapping and the
+README documents the endpoint.
 ================================================
 
 ================================================

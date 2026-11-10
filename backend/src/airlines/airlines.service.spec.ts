@@ -9,6 +9,7 @@ const leanExec = (value: unknown) => ({ lean: () => exec(value) });
 
 describe('AirlinesService', () => {
   let model: Record<string, jest.Mock>;
+  let referenceData: { listAirports: jest.Mock };
   let service: AirlinesService;
 
   const id = new Types.ObjectId();
@@ -28,7 +29,20 @@ describe('AirlinesService', () => {
       findById: jest.fn().mockReturnValue(leanExec(stored)),
       findByIdAndUpdate: jest.fn().mockReturnValue(leanExec(stored)),
     };
-    service = new AirlinesService(model as never, null);
+    referenceData = {
+      listAirports: jest.fn().mockResolvedValue({
+        items: [
+          {
+            _id: 'CAI',
+            name: 'Cairo International Airport',
+            cityId: 'cairo',
+            countryCode: 'EG',
+            timeZone: 'Africa/Cairo',
+          },
+        ],
+      }),
+    };
+    service = new AirlinesService(model as never, null, referenceData as never);
   });
 
   it('creates an active airline with a null logo until upload integration exists', async () => {
@@ -86,5 +100,17 @@ describe('AirlinesService', () => {
       }),
     ).rejects.toBeInstanceOf(NotImplementedException);
     expect(model.create).not.toHaveBeenCalled();
+  });
+
+  it('maps seeded airports to the public airport contract', async () => {
+    await expect(service.listAirports()).resolves.toEqual([
+      {
+        iataCode: 'CAI',
+        name: 'Cairo International Airport',
+        city: 'cairo',
+        country: 'EG',
+        timeZone: 'Africa/Cairo',
+      },
+    ]);
   });
 });

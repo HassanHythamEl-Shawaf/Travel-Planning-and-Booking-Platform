@@ -9,6 +9,7 @@ import {
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 
+import { ReferenceDataService } from '../reference-data/reference-data.service';
 import {
   AIRLINE_LOGO_STORE,
   AirlineLogoStore,
@@ -18,6 +19,7 @@ import {
   CreateAirlineDto,
   UpdateAirlineDto,
 } from './dto/airline.dto';
+import { AirportResponseDto } from './dto/airport.dto';
 import { Airline } from './schemas/airline.schema';
 
 function isDuplicateKeyError(error: unknown): boolean {
@@ -36,6 +38,7 @@ export class AirlinesService {
     @Optional()
     @Inject(AIRLINE_LOGO_STORE)
     private readonly logoStore?: AirlineLogoStore | null,
+    private readonly referenceData?: ReferenceDataService,
   ) {}
 
   async create(dto: CreateAirlineDto): Promise<AirlineResponseDto> {
@@ -53,8 +56,25 @@ export class AirlinesService {
       if (isDuplicateKeyError(error)) {
         throw new ConflictException('An airline with this code already exists');
       }
+
       throw error;
     }
+  }
+
+  async listAirports(): Promise<AirportResponseDto[]> {
+    if (!this.referenceData) {
+      throw new NotImplementedException(
+        'Airport reference data is not configured',
+      );
+    }
+    const result = await this.referenceData.listAirports();
+    return result.items.map((airport) => ({
+      iataCode: airport._id,
+      name: airport.name,
+      city: airport.cityId,
+      country: airport.countryCode,
+      timeZone: airport.timeZone,
+    }));
   }
 
   async findOne(id: string): Promise<AirlineResponseDto> {

@@ -34,6 +34,7 @@ import {
   UpdateAirlineDto,
 } from './dto/airline.dto';
 import { AirlinesService } from './airlines.service';
+import { AirportResponseDto } from './dto/airport.dto';
 
 const ID_PARAM = {
   name: 'id',
@@ -44,6 +45,16 @@ const ID_PARAM = {
 @Controller('airlines')
 export class AirlinesController {
   constructor(private readonly airlines: AirlinesService) {}
+
+  @Get('airports')
+  @ApiOperation({
+    summary: 'List seeded airports (FLT-02)',
+    description: 'Read-only airport reference data used by flight creation and search.',
+  })
+  @ApiOkResponse({ type: [AirportResponseDto] })
+  listAirports(): Promise<AirportResponseDto[]> {
+    return this.airlines.listAirports();
+  }
 
   @Post()
   @UseGuards(AuthGuard, RolesGuard)
