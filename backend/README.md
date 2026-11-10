@@ -320,6 +320,23 @@ provides `checkAvailability`, `createHold`, `confirmInventory`, and
 `releaseHold`. Hold creation uses one atomic conditional flight update, so
 parallel requests cannot exceed `seatCount`; infants must be excluded from the
 requested seat count by the booking caller.
+`GET /api/airlines/flights/search` (FLT-11) searches active airlines for
+scheduled flights between seeded airports on the departure airport's local
+date. Results include cabin availability; insufficient-capacity flights are
+excluded and an empty result returns a friendly message.
+
+FLT-12 extends search with `tripType=round-trip`, `returnDate`, adult/child/
+infant counts and an optional `cabinClass`. Adults and children consume seats
+at the cabin fare; infants consume no seats and are priced at 10%. At least one
+adult is required and infants cannot exceed adults.
+
+FLT-15 adds inclusive `minPrice`/`maxPrice` filters, `price`, `duration` and
+`departure` sorting, and page-size-10 pagination through the shared pagination
+helper. An inverted price range is rejected with a client error.
+
+`GET /api/airlines/flights/:id` (FLT-17) returns the airline identity,
+airport-local departure and arrival times, duration, status, cabin prices and
+baggage allowances, inventory-backed remaining seats, and cancellation tiers.
 
 ## Deployment
 

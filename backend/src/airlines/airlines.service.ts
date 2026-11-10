@@ -10,6 +10,7 @@ import { InjectModel } from '@nestjs/mongoose';
 import { DateTime } from 'luxon';
 import { Model } from 'mongoose';
 import { Types } from 'mongoose';
+import { getPagination } from '../common/pagination';
 
 import {
   PROVIDER_ASSIGNMENT_READER,
@@ -43,6 +44,12 @@ import {
 import { Airline } from './schemas/airline.schema';
 import { CabinCategory, Flight, FlightStatus } from './schemas/flight.schema';
 import { FlightStatusResponseDto } from './dto/flight-status.dto';
+import {
+  FlightSearchResponseDto,
+  FlightSearchResultDto,
+  SearchFlightsDto,
+} from './dto/flight-search.dto';
+import { FlightDetailsResponseDto } from './dto/flight-details.dto';
 
 function isDuplicateKeyError(error: unknown): boolean {
   return (
@@ -194,12 +201,206 @@ export class AirlinesService {
     if (flight.status === FlightStatus.CANCELLED) {
       return { status: FlightStatus.CANCELLED };
     }
+
     return {
       status:
         new Date(flight.departureAt).getTime() <= now.getTime()
           ? FlightStatus.DEPARTED
           : FlightStatus.SCHEDULED,
     };
+  }
+
+  async searchFlights(
+    dto: SearchFlightsDto,
+  ): Promise<FlightSearchResponseDto> {
+    if (
+      dto.minPrice !== undefined &&
+      dto.maxPrice !== undefined &&
+      dto.minPrice > dto.maxPrice
+    ) {
+      throw new ConflictException('Minimum price must not exceed maximum price');
+    }
+
+    const adults = dto.adults ?? dto.passengers ?? 0;
+    const children = dto.children ?? 0;
+    const infants = dto.infants ?? 0;
+    if (adults < 1) {
+      throw new ConflictException('At least one adult is required');
+    }
+    if (infants > adults) {
+      throw new ConflictException('Infants cannot exceed adults');
+    }
+    if (dto.tripType === 'round-trip' && !dto.returnDate) {
+      throw new ConflictException('Return date is required for round trips');
+    }
+    if (dto.returnDate && dto.returnDate < dto.departureDate) {
+      throw new ConflictException('Return date must not be before departure date');
+    }
+    if (!this.referenceData) {
+      throw new NotImplementedException(
+        'Airport reference data is not configured',
+      );
+    }
+    const [departureAirport, arrivalAirport] = await Promise.all([
+      this.referenceData.findAirport(dto.departureAirportCode),
+      this.referenceData.findAirport(dto.arrivalAirportCode),
+    ]);
+    if (!departureAirport || !arrivalAirport) {
+      throw new NotFoundException('Both airports must be seeded airports');
+    }
+    const airlines = await this.airlineModel
+      .find({ isActive: { $ne: false } })
+      .select({ _id: 1 })
+      .lean()
+      .exec();
+    const airlineIds = airlines.map((airline) => airline._id);
+    const items = await this.findSearchFlights(
+      dto.departureAirportCode,
+      dto.arrivalAirportCode,
+      dto.departureDate,
+      adults + children,
+      dto.cabinClass,
+      airlineIds,
+      dto.minPrice,
+      dto.maxPrice,
+      dto.sort,
+    );
+    const returnItems = dto.returnDate
+      ? await this.findSearchFlights(
+          dto.arrivalAirportCode,
+          dto.departureAirportCode,
+          dto.returnDate,
+          adults + children,
+          dto.cabinClass,
+          airlineIds,
+          dto.minPrice,
+          dto.maxPrice,
+          dto.sort,
+        )
+      : undefined;
+    const pagination = getPagination(dto.page ?? 1);
+    const total = items.length;
+    const pagedItems = items.slice(
+      pagination.skip,
+      pagination.skip + pagination.limit,
+    );
+    return {
+      items: pagedItems,
+      returnItems: returnItems?.slice(
+        pagination.skip,
+        pagination.skip + pagination.limit,
+      ),
+      page: pagination.page,
+      limit: pagination.limit,
+      total,
+      totalPages: Math.ceil(total / pagination.limit),
+      message:
+        items.length === 0 || (returnItems && returnItems.length === 0)
+          ? 'No flights found'
+          : 'Flights found',
+    };
+  }
+
+  async getFlightDetails(
+    flightId: string,
+  ): Promise<FlightDetailsResponseDto> {
+    const flight = await this.flightModel.findById(flightId).lean().exec();
+    if (!flight) throw new NotFoundException('Flight not found');
+    const airline = await this.airlineModel
+      .findById(flight.airlineId)
+      .lean()
+      .exec();
+    if (!airline) throw new NotFoundException('Airline not found');
+    const departureAt = new Date(flight.departureAt);
+    const arrivalAt = new Date(flight.arrivalAt);
+    return {
+      id: String(flight._id),
+      airlineId: String(flight.airlineId),
+      airlineName: airline.name,
+      airlineCode: airline.code,
+      flightNumber: flight.flightNumber,
+      departureAirportCode: flight.departureAirportCode,
+      arrivalAirportCode: flight.arrivalAirportCode,
+      departureLocalTime: DateTime.fromJSDate(departureAt)
+        .setZone(flight.departureTimeZone)
+        .toISO({ suppressMilliseconds: true })!,
+      arrivalLocalTime: DateTime.fromJSDate(arrivalAt)
+        .setZone(flight.arrivalTimeZone)
+        .toISO({ suppressMilliseconds: true })!,
+      departureTimeZone: flight.departureTimeZone,
+      arrivalTimeZone: flight.arrivalTimeZone,
+      durationMinutes: (arrivalAt.getTime() - departureAt.getTime()) / 60000,
+      status:
+        flight.status === FlightStatus.CANCELLED
+          ? FlightStatus.CANCELLED
+          : departureAt.getTime() <= Date.now()
+            ? FlightStatus.DEPARTED
+            : FlightStatus.SCHEDULED,
+      cabins: flight.cabins.map((cabin) => ({
+        id: String(cabin._id),
+        category: cabin.category,
+        price: cabin.price,
+        // TODO(FLT-22): subtract booked and held seats once the inventory
+        // schema is merged into develop.
+        seatsRemaining: cabin.seatCount,
+        freeBaggageAllowance: cabin.freeBaggageAllowance,
+        maxWeightPerBagKg: cabin.maxWeightPerBagKg,
+      })),
+      cancellationPolicy: (airline.cancellationPolicy ?? []).map((tier) => ({
+        daysBeforeDeparture: tier.daysBeforeDeparture,
+        refundPercentage: tier.refundPercentage,
+      })),
+    };
+  }
+
+  private async findSearchFlights(
+    departureAirportCode: string,
+    arrivalAirportCode: string,
+    departureDate: string,
+    requiredSeats: number,
+    cabinClass: string | undefined,
+    airlineIds: Types.ObjectId[],
+    minPrice: number | undefined,
+    maxPrice: number | undefined,
+    sort: 'price' | 'duration' | 'departure' | undefined,
+  ): Promise<FlightSearchResultDto[]> {
+    const flights = await this.flightModel
+      .find({
+        airlineId: { $in: airlineIds },
+        departureAirportCode,
+        arrivalAirportCode,
+        departureLocalDate: departureDate.slice(0, 10),
+        status: FlightStatus.SCHEDULED,
+      })
+      .sort({ departureAt: 1 })
+      .lean()
+      .exec();
+    return flights
+      .map((flight) => this.toSearchResult(flight))
+      .map((flight) => ({
+        ...flight,
+        cabins: flight.cabins.filter(
+          (cabin) =>
+            (!cabinClass || cabin.category === cabinClass) &&
+            (minPrice === undefined || cabin.price >= minPrice) &&
+            (maxPrice === undefined || cabin.price <= maxPrice),
+        ),
+      }))
+      .filter((flight) =>
+        flight.cabins.some((cabin) => cabin.seatsAvailable >= requiredSeats),
+      )
+      .sort((left, right) => {
+        if (sort === 'price') {
+          return (
+            Math.min(...left.cabins.map((cabin) => cabin.price)) -
+            Math.min(...right.cabins.map((cabin) => cabin.price))
+          );
+        }
+        if (sort === 'duration') {
+          return left.durationMinutes - right.durationMinutes;
+        }
+        return left.departureAt.getTime() - right.departureAt.getTime();
+      });
   }
 
   async addCabin(
@@ -418,6 +619,52 @@ export class AirlinesService {
           : new Date(flight.departureAt).getTime() <= Date.now()
             ? FlightStatus.DEPARTED
             : FlightStatus.SCHEDULED,
+    };
+  }
+
+  private toSearchResult(flight: {
+    _id: unknown;
+    flightNumber: string;
+    departureAirportCode: string;
+    arrivalAirportCode: string;
+    departureAt: Date;
+    arrivalAt: Date;
+    departureTimeZone: string;
+    arrivalTimeZone: string;
+    cabins: Array<{
+      _id?: unknown;
+      category: CabinCategory;
+      price: number;
+      seatCount: number;
+      seatsBooked?: number;
+      seatsHeld?: number;
+      freeBaggageAllowance: number;
+      maxWeightPerBagKg: number;
+    }>;
+  }): FlightSearchResultDto {
+    return {
+      id: String(flight._id),
+      flightNumber: flight.flightNumber,
+      departureAirportCode: flight.departureAirportCode,
+      arrivalAirportCode: flight.arrivalAirportCode,
+      departureAt: flight.departureAt,
+      arrivalAt: flight.arrivalAt,
+      departureTimeZone: flight.departureTimeZone,
+      arrivalTimeZone: flight.arrivalTimeZone,
+      durationMinutes:
+        (new Date(flight.arrivalAt).getTime() -
+          new Date(flight.departureAt).getTime()) /
+        60000,
+      cabins: flight.cabins.map((cabin) => ({
+        id: String(cabin._id),
+        category: cabin.category,
+        price: cabin.price,
+        infantPrice: cabin.price * 0.1,
+        seatsAvailable:
+          cabin.seatCount - (cabin.seatsBooked ?? 0) - (cabin.seatsHeld ?? 0),
+        freeBaggageAllowance: cabin.freeBaggageAllowance,
+        maxWeightPerBagKg: cabin.maxWeightPerBagKg,
+      })),
     };
   }
 

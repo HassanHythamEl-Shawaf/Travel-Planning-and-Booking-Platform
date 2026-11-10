@@ -2,7 +2,6 @@
 AI PROMPT LOG
 Add one entry per prompt that materially contributed to the project.
 
-================================================
 Date: 2026-11-01
 Student: Hassan
 Tool: ChatGPT and Claude
@@ -418,5 +417,56 @@ availability tests and README documentation. Booking endpoints and infant
 classification remain with Person 4.
 ================================================
 ================================================
+Date: 2026-11-10
+Student: Yahia Mohamed
+Tool: GitHub Copilot (VS Code)
+Related Requirement: FLT-11
+Prompt:
+Implement the FLT-11 public flight search requirement only, using seeded
+airports, active airlines, Scheduled flights, local departure date,
+passenger-capacity filtering, friendly empty results, tests and docs.
+How the output was used:
+Added validated search DTOs, an active-airline scheduled-flight query with
+cabin availability mapping, a public Swagger endpoint, focused tests and README
+documentation. Round-trip, passenger-type, price, sorting and pagination
+features remain for their later requirements.
 ================================================
+Date: 2026-11-10
+Student: Yahia Mohamed
+Tool: GitHub Copilot (VS Code)
+Related Requirement: FLT-12
+Prompt:
+Extend the existing flight search only for FLT-12: round-trip outbound and
+return options, adult/child/infant validation and pricing, optional cabin
+filter, tests and documentation.
+How the output was used:
+Added round-trip criteria, passenger-type validation, infant pricing at 10%,
+seat requirements for adults and children, cabin filtering, return options,
+focused tests and README documentation.
+================================================
+Date: 2026-11-10
+Student: Yahia Mohamed
+Tool: GitHub Copilot (VS Code)
+Related Requirement: FLT-15
+Prompt:
+Extend the existing search only for FLT-15 with inclusive minimum and maximum
+price filters, price/duration/departure sorting, shared page-size-10
+pagination, inverted-range validation, tests and documentation.
+How the output was used:
+Added validated price, sort and page criteria, cabin-price filtering,
+deterministic sorting, shared pagination metadata and focused validation tests
+with README documentation.
+================================================
+Date: 2026-11-10
+Student: Yahia Mohamed
+Tool: GitHub Copilot (VS Code)
+Related Requirement: FLT-17
+Prompt:
+Implement FLT-17 only as a public flight-details endpoint with airline data,
+airport-local times, duration, current status, cabin prices and availability,
+baggage allowances, cancellation policy, tests and documentation.
+How the output was used:
+Added a details DTO, service mapping and Swagger endpoint with timezone-aware
+local times, duration, cabin information and cancellation tiers. Added a
+clearly marked FLT-22 inventory boundary for remaining seats, tests and docs.
 ================================================

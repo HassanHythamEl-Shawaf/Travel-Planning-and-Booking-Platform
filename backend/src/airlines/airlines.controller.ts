@@ -6,6 +6,7 @@ import {
   Patch,
   Post,
   Put,
+  Query,
   UseGuards,
 } from '@nestjs/common';
 import {
@@ -50,6 +51,11 @@ import {
 } from './dto/cancellation-policy.dto';
 import { CreateFlightDto, FlightResponseDto } from './dto/flight.dto';
 import { FlightStatusResponseDto } from './dto/flight-status.dto';
+import {
+  FlightSearchResponseDto,
+  SearchFlightsDto,
+} from './dto/flight-search.dto';
+import { FlightDetailsResponseDto } from './dto/flight-details.dto';
 
 const ID_PARAM = {
   name: 'id',
@@ -108,6 +114,37 @@ export class AirlinesController {
     @Param('id', ParseObjectIdPipe) id: string,
   ): Promise<FlightStatusResponseDto> {
     return this.airlines.getFlightStatus(id);
+  }
+
+  @Get('flights/search')
+  @ApiOperation({
+    summary: 'Search scheduled flights (FLT-11)',
+    description:
+      'Searches active airlines by seeded airports, local departure date and minimum passenger capacity.',
+  })
+  @ApiOkResponse({ type: FlightSearchResponseDto })
+  @ApiBadRequestResponse({ description: 'Invalid search criteria' })
+  @ApiNotFoundResponse({ description: 'Airport is not a seeded airport' })
+  searchFlights(
+    @Query() dto: SearchFlightsDto,
+  ): Promise<FlightSearchResponseDto> {
+    return this.airlines.searchFlights(dto);
+  }
+
+  @Get('flights/:id')
+  @ApiOperation({
+    summary: 'Get flight details (FLT-17)',
+    description:
+      'Returns airport-local schedule times, duration, current status, cabin availability and the airline cancellation policy.',
+  })
+  @ApiParam({ name: 'id', example: '6650f1c2a1b2c3d4e5f60719' })
+  @ApiOkResponse({ type: FlightDetailsResponseDto })
+  @ApiBadRequestResponse({ description: 'Invalid flight id' })
+  @ApiNotFoundResponse({ description: 'Flight or airline not found' })
+  getFlightDetails(
+    @Param('id', ParseObjectIdPipe) id: string,
+  ): Promise<FlightDetailsResponseDto> {
+    return this.airlines.getFlightDetails(id);
   }
 
   @Post()
