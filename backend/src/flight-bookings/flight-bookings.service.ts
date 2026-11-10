@@ -56,7 +56,7 @@ import {
 } from './schemas/flight-booking.schema';
 
 type LeanFlight = Flight & { _id: Types.ObjectId };
-type LeanBooking = FlightBooking & { _id: Types.ObjectId };
+export type LeanBooking = FlightBooking & { _id: Types.ObjectId };
 type LeanAirline = Airline & { _id: Types.ObjectId };
 
 /** A flight, its airline and the chosen cabin, all validated as bookable. */
@@ -204,14 +204,7 @@ export class FlightBookingsService {
           .exec()
       : null;
     if (!booking) throw new NotFoundException('Flight booking not found');
-    return {
-      ...toResponse(booking),
-      confirmedAt: booking.confirmedAt,
-      expiredAt: booking.expiredAt,
-      cancelledAt: booking.cancelledAt,
-      cancellationSource: booking.cancellationSource,
-      completedAt: booking.completedAt,
-    };
+    return toDetails(booking);
   }
 
   private async holdSeats(
@@ -578,6 +571,20 @@ export function toResponse(
     holdExpiresAt: booking.holdExpiresAt,
     bookingReference: booking.bookingReference,
     createdAt: booking.createdAt,
+  };
+}
+
+export function toDetails(booking: LeanBooking): FlightBookingDetailsDto {
+  return {
+    ...toResponse(booking),
+    confirmedAt: booking.confirmedAt,
+    expiredAt: booking.expiredAt,
+    cancelledAt: booking.cancelledAt,
+    cancellationSource: booking.cancellationSource,
+    refundPercentage: booking.refundPercentage ?? null,
+    refundAmount: booking.refundAmount ?? null,
+    refundId: booking.refundId ?? null,
+    completedAt: booking.completedAt,
   };
 }
 

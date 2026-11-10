@@ -36,10 +36,16 @@ import {
   FlightBookingSummaryDto,
 } from './dto/flight-booking-response.dto';
 import {
+  CancelFlightBookingDto,
+  FlightCancellationResultDto,
+  FlightRefundPreviewDto,
+} from './dto/cancel-flight-booking.dto';
+import {
   FlightBookingDetailsDto,
   FlightBookingListResponseDto,
   ListFlightBookingsQueryDto,
 } from './dto/list-flight-bookings.dto';
+import { FlightBookingCancellationService } from './flight-booking-cancellation.service';
 import { FlightBookingsService } from './flight-bookings.service';
 
 @ApiTags('Flight Bookings')
@@ -48,7 +54,10 @@ import { FlightBookingsService } from './flight-bookings.service';
 @Roles(UserRole.USER)
 @Controller('flight-bookings')
 export class FlightBookingsController {
-  constructor(private readonly bookings: FlightBookingsService) {}
+  constructor(
+    private readonly bookings: FlightBookingsService,
+    private readonly cancellations: FlightBookingCancellationService,
+  ) {}
 
   @Post()
   @HttpCode(HttpStatus.OK)
@@ -130,5 +139,49 @@ export class FlightBookingsController {
     @Param('id', ParseObjectIdPipe) id: string,
   ): Promise<FlightBookingDetailsDto> {
     return this.bookings.getMine(user.sub, id);
+  }
+
+  @Get(':id/refund-preview')
+  @ApiOperation({
+    summary: 'Preview the refund for cancelling my booking (FLT-26)',
+    description:
+      "Shows the refund the airline's cancellation tiers give today, on the full total and based on the outbound departure. Nothing changes. Only Confirmed bookings before departure can be cancelled.",
+  })
+  @ApiParam({ name: 'id', example: '6650f1c2a1b2c3d4e5f60740' })
+  @ApiOkResponse({ type: FlightRefundPreviewDto })
+  @ApiBadRequestResponse({ description: 'Invalid booking id' })
+  @ApiNotFoundResponse({ description: 'No such booking of yours' })
+  @ApiConflictResponse({ description: 'Not Confirmed, or already departed' })
+  @ApiUnauthorizedResponse({ description: 'Authentication is required' })
+  @ApiForbiddenResponse({ description: 'Registered user role required' })
+  refundPreview(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id', ParseObjectIdPipe) id: string,
+  ): Promise<FlightRefundPreviewDto> {
+    return this.cancellations.previewRefund(user.sub, id);
+  }
+
+  @Post(':id/cancel')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Cancel my booking (FLT-26)',
+    description:
+      'Requires confirm=true after viewing the refund preview. Pass expectedRefundAmount to refuse the cancellation if the refund changed since it was shown. The whole booking (both flights of a round trip) becomes Cancelled, its seats return to inventory and a refund is requested for a positive amount (PAY-03).',
+  })
+  @ApiParam({ name: 'id', example: '6650f1c2a1b2c3d4e5f60740' })
+  @ApiOkResponse({ type: FlightCancellationResultDto })
+  @ApiBadRequestResponse({ description: 'Invalid id, or confirm is not true' })
+  @ApiNotFoundResponse({ description: 'No such booking of yours' })
+  @ApiConflictResponse({
+    description: 'Not Confirmed, already departed, or the refund changed',
+  })
+  @ApiUnauthorizedResponse({ description: 'Authentication is required' })
+  @ApiForbiddenResponse({ description: 'Registered user role required' })
+  cancel(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id', ParseObjectIdPipe) id: string,
+    @Body() dto: CancelFlightBookingDto,
+  ): Promise<FlightCancellationResultDto> {
+    return this.cancellations.cancel(user.sub, id, dto);
   }
 }

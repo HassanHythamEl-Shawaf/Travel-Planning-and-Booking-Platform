@@ -156,6 +156,26 @@ export class FlightBookingDetailsDto extends FlightBookingResponseDto {
   })
   cancellationSource: CancellationSource | null;
 
+  @ApiProperty({
+    type: Number,
+    nullable: true,
+    example: null,
+    description: 'Refund percentage decided at cancellation (PAY-03)',
+  })
+  refundPercentage: number | null;
+
+  @ApiProperty({ type: Number, nullable: true, example: null })
+  refundAmount: number | null;
+
+  @ApiProperty({
+    type: String,
+    nullable: true,
+    example: null,
+    description:
+      "Payments' refund record id; see GET /api/refunds/:id for its status",
+  })
+  refundId: string | null;
+
   @ApiProperty({ type: Date, nullable: true, example: null })
   completedAt: Date | null;
 }
