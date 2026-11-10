@@ -10,6 +10,7 @@ import { InjectModel } from '@nestjs/mongoose';
 import { DateTime } from 'luxon';
 import { Model } from 'mongoose';
 import { Types } from 'mongoose';
+import { getPagination } from '../common/pagination';
 
 import {
   PROVIDER_ASSIGNMENT_READER,
@@ -211,6 +212,13 @@ export class AirlinesService {
   async searchFlights(
     dto: SearchFlightsDto,
   ): Promise<FlightSearchResponseDto> {
+    if (
+      dto.minPrice !== undefined &&
+      dto.maxPrice !== undefined &&
+      dto.minPrice > dto.maxPrice
+    ) {
+      throw new ConflictException('Minimum price must not exceed maximum price');
+    }
     const adults = dto.adults ?? dto.passengers ?? 0;
     const children = dto.children ?? 0;
     const infants = dto.infants ?? 0;
@@ -251,6 +259,9 @@ export class AirlinesService {
       adults + children,
       dto.cabinClass,
       airlineIds,
+      dto.minPrice,
+      dto.maxPrice,
+      dto.sort,
     );
     const returnItems = dto.returnDate
       ? await this.findSearchFlights(
@@ -260,11 +271,27 @@ export class AirlinesService {
           adults + children,
           dto.cabinClass,
           airlineIds,
+          dto.minPrice,
+          dto.maxPrice,
+          dto.sort,
         )
       : undefined;
+    const pagination = getPagination(dto.page ?? 1);
+    const total = items.length;
+    const pagedItems = items.slice(
+      pagination.skip,
+      pagination.skip + pagination.limit,
+    );
     return {
-      items,
-      returnItems,
+      items: pagedItems,
+      returnItems: returnItems?.slice(
+        pagination.skip,
+        pagination.skip + pagination.limit,
+      ),
+      page: pagination.page,
+      limit: pagination.limit,
+      total,
+      totalPages: Math.ceil(total / pagination.limit),
       message:
         items.length === 0 || (returnItems && returnItems.length === 0)
           ? 'No flights found'
@@ -279,6 +306,9 @@ export class AirlinesService {
     requiredSeats: number,
     cabinClass: string | undefined,
     airlineIds: Types.ObjectId[],
+    minPrice: number | undefined,
+    maxPrice: number | undefined,
+    sort: 'price' | 'duration' | 'departure' | undefined,
   ): Promise<FlightSearchResultDto[]> {
     const flights = await this.flightModel
       .find({
@@ -296,12 +326,27 @@ export class AirlinesService {
       .map((flight) => ({
         ...flight,
         cabins: flight.cabins.filter(
-          (cabin) => !cabinClass || cabin.category === cabinClass,
+          (cabin) =>
+            (!cabinClass || cabin.category === cabinClass) &&
+            (minPrice === undefined || cabin.price >= minPrice) &&
+            (maxPrice === undefined || cabin.price <= maxPrice),
         ),
       }))
       .filter((flight) =>
         flight.cabins.some((cabin) => cabin.seatsAvailable >= requiredSeats),
-      );
+      )
+      .sort((left, right) => {
+        if (sort === 'price') {
+          return (
+            Math.min(...left.cabins.map((cabin) => cabin.price)) -
+            Math.min(...right.cabins.map((cabin) => cabin.price))
+          );
+        }
+        if (sort === 'duration') {
+          return left.durationMinutes - right.durationMinutes;
+        }
+        return left.departureAt.getTime() - right.departureAt.getTime();
+      });
   }
 
   async addCabin(
@@ -552,6 +597,10 @@ export class AirlinesService {
       arrivalAt: flight.arrivalAt,
       departureTimeZone: flight.departureTimeZone,
       arrivalTimeZone: flight.arrivalTimeZone,
+      durationMinutes:
+        (new Date(flight.arrivalAt).getTime() -
+          new Date(flight.departureAt).getTime()) /
+        60000,
       cabins: flight.cabins.map((cabin) => ({
         id: String(cabin._id),
         category: cabin.category,
