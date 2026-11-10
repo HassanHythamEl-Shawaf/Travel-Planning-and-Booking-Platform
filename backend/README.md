@@ -320,6 +320,11 @@ scheduled flights between seeded airports on the departure airport's local
 date. Results include cabin availability; insufficient-capacity flights are
 excluded and an empty result returns a friendly message.
 
+FLT-12 extends search with `tripType=round-trip`, `returnDate`, adult/child/
+infant counts and an optional `cabinClass`. Adults and children consume seats
+at the cabin fare; infants consume no seats and are priced at 10%. At least one
+adult is required and infants cannot exceed adults.
+
 ## Deployment
 
 When you're ready to deploy your NestJS application to production, there are some key steps you can take to ensure it runs as efficiently as possible. Check out the [deployment documentation](https://docs.nestjs.com/deployment) for more information.
