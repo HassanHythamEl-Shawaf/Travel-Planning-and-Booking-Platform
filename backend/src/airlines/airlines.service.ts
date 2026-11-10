@@ -211,6 +211,21 @@ export class AirlinesService {
   async searchFlights(
     dto: SearchFlightsDto,
   ): Promise<FlightSearchResponseDto> {
+    const adults = dto.adults ?? dto.passengers ?? 0;
+    const children = dto.children ?? 0;
+    const infants = dto.infants ?? 0;
+    if (adults < 1) {
+      throw new ConflictException('At least one adult is required');
+    }
+    if (infants > adults) {
+      throw new ConflictException('Infants cannot exceed adults');
+    }
+    if (dto.tripType === 'round-trip' && !dto.returnDate) {
+      throw new ConflictException('Return date is required for round trips');
+    }
+    if (dto.returnDate && dto.returnDate < dto.departureDate) {
+      throw new ConflictException('Return date must not be before departure date');
+    }
     if (!this.referenceData) {
       throw new NotImplementedException(
         'Airport reference data is not configured',
@@ -228,29 +243,65 @@ export class AirlinesService {
       .select({ _id: 1 })
       .lean()
       .exec();
+    const airlineIds = airlines.map((airline) => airline._id);
+    const items = await this.findSearchFlights(
+      dto.departureAirportCode,
+      dto.arrivalAirportCode,
+      dto.departureDate,
+      adults + children,
+      dto.cabinClass,
+      airlineIds,
+    );
+    const returnItems = dto.returnDate
+      ? await this.findSearchFlights(
+          dto.arrivalAirportCode,
+          dto.departureAirportCode,
+          dto.returnDate,
+          adults + children,
+          dto.cabinClass,
+          airlineIds,
+        )
+      : undefined;
+    return {
+      items,
+      returnItems,
+      message:
+        items.length === 0 || (returnItems && returnItems.length === 0)
+          ? 'No flights found'
+          : 'Flights found',
+    };
+  }
+
+  private async findSearchFlights(
+    departureAirportCode: string,
+    arrivalAirportCode: string,
+    departureDate: string,
+    requiredSeats: number,
+    cabinClass: string | undefined,
+    airlineIds: Types.ObjectId[],
+  ): Promise<FlightSearchResultDto[]> {
     const flights = await this.flightModel
       .find({
-        airlineId: { $in: airlines.map((airline) => airline._id) },
-        departureAirportCode: dto.departureAirportCode,
-        arrivalAirportCode: dto.arrivalAirportCode,
-        departureLocalDate: dto.departureDate.slice(0, 10),
+        airlineId: { $in: airlineIds },
+        departureAirportCode,
+        arrivalAirportCode,
+        departureLocalDate: departureDate.slice(0, 10),
         status: FlightStatus.SCHEDULED,
       })
       .sort({ departureAt: 1 })
       .lean()
       .exec();
-    const items = flights
+    return flights
       .map((flight) => this.toSearchResult(flight))
-      .filter((flight) =>
-        flight.cabins.some(
-          (cabin: { seatsAvailable: number }) =>
-            cabin.seatsAvailable >= dto.passengers,
+      .map((flight) => ({
+        ...flight,
+        cabins: flight.cabins.filter(
+          (cabin) => !cabinClass || cabin.category === cabinClass,
         ),
+      }))
+      .filter((flight) =>
+        flight.cabins.some((cabin) => cabin.seatsAvailable >= requiredSeats),
       );
-    return {
-      items,
-      message: items.length === 0 ? 'No flights found' : 'Flights found',
-    };
   }
 
   async addCabin(
@@ -505,6 +556,7 @@ export class AirlinesService {
         id: String(cabin._id),
         category: cabin.category,
         price: cabin.price,
+        infantPrice: cabin.price * 0.1,
         seatsAvailable:
           cabin.seatCount - (cabin.seatsBooked ?? 0) - (cabin.seatsHeld ?? 0),
         freeBaggageAllowance: cabin.freeBaggageAllowance,
