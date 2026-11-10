@@ -3,6 +3,7 @@ import { Types } from 'mongoose';
 
 import { AirlinesService } from './airlines.service';
 import { CreateAirlineDto, UpdateAirlineDto } from './dto/airline.dto';
+import { CabinCategory } from './schemas/flight.schema';
 
 const exec = (value: unknown) => ({ exec: () => Promise.resolve(value) });
 const leanExec = (value: unknown) => ({ lean: () => exec(value) });
@@ -43,6 +44,14 @@ describe('AirlinesService', () => {
         departureTimeZone: 'Africa/Cairo',
         arrivalTimeZone: 'Asia/Dubai',
         departureLocalDate: '2027-01-01',
+      }),
+      findById: jest.fn().mockReturnValue({
+        exec: () =>
+          Promise.resolve({
+            airlineId: id,
+            cabins: [],
+            save: jest.fn().mockResolvedValue(undefined),
+          }),
       }),
     };
     referenceData = {
@@ -175,5 +184,21 @@ describe('AirlinesService', () => {
     expect(result.arrivalAt).toEqual(new Date('2027-01-01T10:00:00.000Z'));
     expect(result.departureTimeZone).toBe('Africa/Cairo');
     expect(result.arrivalTimeZone).toBe('Asia/Dubai');
+  });
+
+  it('adds one cabin category to an owned flight', async () => {
+    const result = await service.addCabin('moderator-id', id.toString(), {
+      category: CabinCategory.ECONOMY,
+      seatCount: 120,
+      price: 250,
+      freeBaggageAllowance: 1,
+      maxWeightPerBagKg: 23,
+    });
+
+    expect(result).toMatchObject({
+      category: CabinCategory.ECONOMY,
+      seatCount: 120,
+      price: 250,
+    });
   });
 });
