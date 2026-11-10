@@ -200,8 +200,9 @@ describe('AirlinesService', () => {
       seatCount: 120,
       price: 250,
     });
+  });
 
-    it('updates the airline extra-baggage policy', async () => {
+  it('updates the airline extra-baggage policy', async () => {
       await expect(
         service.updateBaggagePolicy(id.toString(), {
           pricePerExtraBag: 35,
@@ -210,7 +211,6 @@ describe('AirlinesService', () => {
       ).resolves.toEqual({
         pricePerExtraBag: 35,
         maxExtraBagsPerPassenger: 2,
-      });
     });
   });
 });

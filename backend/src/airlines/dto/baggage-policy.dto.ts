@@ -1,5 +1,5 @@
-import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsInt, IsNumber, IsOptional, Min } from 'class-validator';
+import { ApiProperty } from '@nestjs/swagger';
+import { IsInt, IsNumber, Min } from 'class-validator';
 
 export class UpdateBaggagePolicyDto {
   @ApiProperty({ example: 35, minimum: 0.01 })

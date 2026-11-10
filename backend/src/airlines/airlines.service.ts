@@ -235,25 +235,6 @@ export class AirlinesService {
       throw new ConflictException('At least one airline field is required');
     }
 
-    async updateBaggagePolicy(
-      id: string,
-      dto: UpdateBaggagePolicyDto,
-    ): Promise<BaggagePolicyResponseDto> {
-      const airline = await this.airlineModel
-        .findByIdAndUpdate(
-          id,
-          { $set: { baggagePolicy: dto } },
-          { returnDocument: 'after', runValidators: true },
-        )
-        .lean()
-        .exec();
-      if (!airline) throw new NotFoundException('Airline not found');
-      return {
-        pricePerExtraBag: dto.pricePerExtraBag,
-        maxExtraBagsPerPassenger: dto.maxExtraBagsPerPassenger,
-      };
-    }
-
     try {
       const airline = await this.airlineModel
         .findByIdAndUpdate(
@@ -272,8 +253,28 @@ export class AirlinesService {
       if (isDuplicateKeyError(error)) {
         throw new ConflictException('An airline with this code already exists');
       }
+
       throw error;
     }
+  }
+
+  async updateBaggagePolicy(
+    id: string,
+    dto: UpdateBaggagePolicyDto,
+  ): Promise<BaggagePolicyResponseDto> {
+    const airline = await this.airlineModel
+      .findByIdAndUpdate(
+        id,
+        { $set: { baggagePolicy: dto } },
+        { returnDocument: 'after', runValidators: true },
+      )
+      .lean()
+      .exec();
+    if (!airline) throw new NotFoundException('Airline not found');
+    return {
+      pricePerExtraBag: dto.pricePerExtraBag,
+      maxExtraBagsPerPassenger: dto.maxExtraBagsPerPassenger,
+    };
   }
 
   private rejectDirectLogoUrl(logoUrl: string | undefined): void {
