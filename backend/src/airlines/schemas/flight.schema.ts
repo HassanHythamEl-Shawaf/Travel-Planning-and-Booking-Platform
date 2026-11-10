@@ -31,6 +31,12 @@ export class Cabin {
 
   @Prop({ required: true, min: 0 })
   maxWeightPerBagKg: number;
+
+  @Prop({ required: true, min: 0, default: 0 })
+  seatsBooked?: number;
+
+  @Prop({ required: true, min: 0, default: 0 })
+  seatsHeld?: number;
 }
 
 export const CabinSchema = SchemaFactory.createForClass(Cabin);
