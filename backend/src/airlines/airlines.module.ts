@@ -9,6 +9,7 @@ import { ReferenceDataModule } from '../reference-data/reference-data.module';
 import { AIRLINE_LOGO_STORE } from './airline-logo-store';
 import { AirlinesController } from './airlines.controller';
 import { AirlinesService } from './airlines.service';
+import { FlightsController } from './flights.controller';
 import { Airline, AirlineSchema } from './schemas/airline.schema';
 import { Flight, FlightSchema } from './schemas/flight.schema';
 
@@ -25,7 +26,7 @@ import { Flight, FlightSchema } from './schemas/flight.schema';
     // AuthGuard and ProviderOwnershipGuard are instantiated in this module.
     JwtModule.register({}),
   ],
-  controllers: [AirlinesController],
+  controllers: [AirlinesController, FlightsController],
   providers: [
     AirlinesService,
     // TODO(Person 8): replace this null binding with the shared image-upload adapter.

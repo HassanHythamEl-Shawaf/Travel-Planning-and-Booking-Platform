@@ -360,3 +360,18 @@ Added embedded fixed-category cabin documents with seat, price and baggage
 validation, assigned-moderator cabin create/update endpoints, focused tests and
 README documentation. Booking-dependent seat floors remain deferred.
 ================================================
+
+================================================
+Date: 2026-11-10
+Student: Yahia Mohamed
+Tool: GitHub Copilot (VS Code)
+Related Requirement: FLT-08
+Prompt:
+Implement only the FLT-08 airline extra-baggage policy endpoint with positive
+pricing, non-negative per-passenger limits, ownership protection, tests and
+documentation.
+How the output was used:
+Added the embedded airline baggage policy, validated DTOs, assigned-moderator
+PUT endpoint, focused service coverage and README documentation. Cabin-specific
+maximum bag weight remains represented by the cabin policy for later booking use.
+================================================

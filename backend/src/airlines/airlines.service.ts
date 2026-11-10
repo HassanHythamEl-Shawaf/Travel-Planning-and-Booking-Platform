@@ -26,6 +26,10 @@ import {
   UpdateAirlineDto,
 } from './dto/airline.dto';
 import { AirportResponseDto } from './dto/airport.dto';
+import {
+  BaggagePolicyResponseDto,
+  UpdateBaggagePolicyDto,
+} from './dto/baggage-policy.dto';
 import { CreateFlightDto, FlightResponseDto } from './dto/flight.dto';
 import {
   CabinResponseDto,
@@ -249,8 +253,28 @@ export class AirlinesService {
       if (isDuplicateKeyError(error)) {
         throw new ConflictException('An airline with this code already exists');
       }
+
       throw error;
     }
+  }
+
+  async updateBaggagePolicy(
+    id: string,
+    dto: UpdateBaggagePolicyDto,
+  ): Promise<BaggagePolicyResponseDto> {
+    const airline = await this.airlineModel
+      .findByIdAndUpdate(
+        id,
+        { $set: { baggagePolicy: dto } },
+        { returnDocument: 'after', runValidators: true },
+      )
+      .lean()
+      .exec();
+    if (!airline) throw new NotFoundException('Airline not found');
+    return {
+      pricePerExtraBag: dto.pricePerExtraBag,
+      maxExtraBagsPerPassenger: dto.maxExtraBagsPerPassenger,
+    };
   }
 
   private rejectDirectLogoUrl(logoUrl: string | undefined): void {
