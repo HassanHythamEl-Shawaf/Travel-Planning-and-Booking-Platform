@@ -12,8 +12,8 @@ import { Model } from 'mongoose';
 
 import {
   PROVIDER_ASSIGNMENT_READER,
-  ProviderAssignmentReader,
 } from '../auth/provider-assignment.reader';
+import type { ProviderAssignmentReader } from '../auth/provider-assignment.reader';
 import { ReferenceDataService } from '../reference-data/reference-data.service';
 import {
   AIRLINE_LOGO_STORE,

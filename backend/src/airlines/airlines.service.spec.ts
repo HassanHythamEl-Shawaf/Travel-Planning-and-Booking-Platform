@@ -46,6 +46,25 @@ describe('AirlinesService', () => {
       }),
     };
     referenceData = {
+      findAirport: jest.fn().mockImplementation((code: string) =>
+        Promise.resolve(
+          code === 'CAI'
+            ? {
+                _id: 'CAI',
+                name: 'Cairo International Airport',
+                cityId: 'cairo',
+                countryCode: 'EG',
+                timeZone: 'Africa/Cairo',
+              }
+            : {
+                _id: 'DXB',
+                name: 'Dubai International Airport',
+                cityId: 'dubai',
+                countryCode: 'AE',
+                timeZone: 'Asia/Dubai',
+              },
+        ),
+      ),
       listAirports: jest.fn().mockResolvedValue({
         items: [
           {

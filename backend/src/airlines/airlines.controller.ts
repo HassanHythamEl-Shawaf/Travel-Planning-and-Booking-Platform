@@ -23,9 +23,9 @@ import {
 
 import { ProviderOwnership } from '../auth/decorators/provider-ownership.decorator';
 import {
-  AuthenticatedUser,
   CurrentUser,
 } from '../auth/decorators/current-user.decorator';
+import type { AuthenticatedUser } from '../auth/decorators/current-user.decorator';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { AuthGuard } from '../auth/guards/auth.guard';
 import { ProviderOwnershipGuard } from '../auth/guards/provider-ownership.guard';
