@@ -52,6 +52,10 @@ import {
 import { CreateFlightDto, FlightResponseDto } from './dto/flight.dto';
 import { FlightStatusResponseDto } from './dto/flight-status.dto';
 import {
+  FlightUpdateResponseDto,
+  UpdateFlightScheduleDto,
+} from './dto/flight-update.dto';
+import {
   FlightSearchResponseDto,
   SearchFlightsDto,
 } from './dto/flight-search.dto';
@@ -145,6 +149,27 @@ export class AirlinesController {
     @Param('id', ParseObjectIdPipe) id: string,
   ): Promise<FlightDetailsResponseDto> {
     return this.airlines.getFlightDetails(id);
+  }
+
+  @Patch('flights/:id')
+  @UseGuards(AuthGuard, RolesGuard)
+  @Roles(UserRole.MODERATOR)
+  @ApiCookieAuth('access_token')
+  @ApiOperation({
+    summary: 'Update a scheduled flight time (FLT-05)',
+    description:
+      'The assigned airline moderator may change local departure and arrival times on Scheduled flights only.',
+  })
+  @ApiParam({ name: 'id', example: '6650f1c2a1b2c3d4e5f60719' })
+  @ApiOkResponse({ type: FlightUpdateResponseDto })
+  @ApiBadRequestResponse({ description: 'Invalid local schedule' })
+  @ApiConflictResponse({ description: 'Flight is not Scheduled or schedule is invalid' })
+  updateFlightSchedule(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id', ParseObjectIdPipe) id: string,
+    @Body() dto: UpdateFlightScheduleDto,
+  ): Promise<FlightUpdateResponseDto> {
+    return this.airlines.updateFlightSchedule(user.sub, id, dto);
   }
 
   @Post()
