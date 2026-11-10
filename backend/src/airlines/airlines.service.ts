@@ -139,6 +139,10 @@ export class AirlinesService {
     if (arrivalLocal.toMillis() <= departureLocal.toMillis()) {
       throw new ConflictException('Arrival must be after departure');
     }
+    const departureLocalDate = departureLocal.toISODate();
+    if (!departureLocalDate) {
+      throw new ConflictException('Departure date is invalid');
+    }
 
     try {
       const flight = await this.flightModel.create({
@@ -150,7 +154,7 @@ export class AirlinesService {
         arrivalAt: arrivalLocal.toUTC().toJSDate(),
         departureTimeZone: departureAirport.timeZone,
         arrivalTimeZone: arrivalAirport.timeZone,
-        departureLocalDate: departureLocal.toISODate(),
+        departureLocalDate,
       });
       return this.toFlightResponse(flight);
     } catch (error) {
