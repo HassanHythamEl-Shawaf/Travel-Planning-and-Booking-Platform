@@ -63,12 +63,20 @@ import {
   FLIGHT_INVENTORY,
 } from './flight-inventory';
 import type { FlightInventoryReader } from './flight-inventory';
+import { FLIGHT_BOOKING_READER } from './flight-booking-reader';
+import type {
+  FlightBookingReader,
+} from './flight-booking-reader';
 import {
   FlightSearchResponseDto,
   FlightSearchResultDto,
   SearchFlightsDto,
 } from './dto/flight-search.dto';
 import { FlightDetailsResponseDto } from './dto/flight-details.dto';
+import {
+  FlightBookingItemDto,
+  FlightBookingsResponseDto,
+} from './dto/flight-booking.dto';
 
 function isDuplicateKeyError(error: unknown): boolean {
   return (
@@ -76,6 +84,11 @@ function isDuplicateKeyError(error: unknown): boolean {
     error !== null &&
     (error as { code?: unknown }).code === 11000
   );
+}
+
+function csvValue(value: string | number): string {
+  const text = String(value);
+  return /[",\r\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
 }
 
 @Injectable()
@@ -102,6 +115,9 @@ export class AirlinesService {
     @Optional()
     @Inject(FLIGHT_INVENTORY)
     private readonly inventory?: FlightInventoryReader,
+    @Optional()
+    @Inject(FLIGHT_BOOKING_READER)
+    private readonly flightBookings?: FlightBookingReader,
   ) {}
 
   async create(dto: CreateAirlineDto): Promise<AirlineResponseDto> {
@@ -238,6 +254,65 @@ export class AirlinesService {
           ? FlightStatus.DEPARTED
           : FlightStatus.SCHEDULED,
     };
+  }
+
+  async listFlightBookings(
+    moderatorId: string,
+    flightId: string,
+  ): Promise<FlightBookingsResponseDto> {
+    const flight = await this.getOwnedFlight(moderatorId, flightId);
+    if (!this.flightBookings) {
+      throw new NotImplementedException(
+        'Flight booking integration is not configured',
+      );
+    }
+
+    const bookings = await this.flightBookings.listByFlightId(flightId);
+    const items = bookings.map((booking) => {
+      const cabin = flight.cabins.find(
+        (candidate) => candidate.category === booking.cabin,
+      );
+      if (!cabin) {
+        throw new NotFoundException(
+          `Cabin "${booking.cabin}" is not configured for this flight`,
+        );
+      }
+
+      return {
+        id: booking.id,
+        bookingReference: booking.bookingReference,
+        passengers: booking.passengers,
+        cabin: booking.cabin,
+        seats: booking.seats,
+        status: booking.status,
+        remainingSeats:
+          cabin.seatCount -
+          (cabin.seatsBooked ?? 0) -
+          (cabin.seatsHeld ?? 0),
+      } satisfies FlightBookingItemDto;
+    });
+
+    return { flightId, items };
+  }
+
+  async exportFlightBookings(
+    moderatorId: string,
+    flightId: string,
+  ): Promise<string> {
+    const result = await this.listFlightBookings(moderatorId, flightId);
+    const rows = result.items.map((item) => [
+      item.bookingReference,
+      item.passengers.map((passenger) => passenger.name).join('; '),
+      item.cabin,
+      item.seats,
+      item.status,
+      item.remainingSeats,
+    ]);
+
+    return [
+      'bookingReference,passengers,cabin,seats,status,remainingSeats',
+      ...rows.map((row) => row.map(csvValue).join(',')),
+    ].join('\r\n');
   }
 
   async searchFlights(
