@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { forwardRef, Module } from '@nestjs/common';
 import { JwtModule } from '@nestjs/jwt';
 import { MongooseModule } from '@nestjs/mongoose';
 
@@ -21,6 +21,9 @@ import { FLIGHT_PASSENGER_READER } from './flight-passenger-reader';
 import { FLIGHT_BOOKING_CANCELLER } from './flight-booking-canceller';
 import { FLIGHT_BOOKING_READER } from './flight-booking-reader';
 import { NotificationsModule } from '../notifications/notifications.module';
+import { FlightBookingCancellationService } from '../flight-bookings/flight-booking-cancellation.service';
+import { FlightBookingReaders } from '../flight-bookings/flight-booking-readers';
+import { FlightBookingsModule } from '../flight-bookings/flight-bookings.module';
 
 @Module({
   imports: [
@@ -36,18 +39,20 @@ import { NotificationsModule } from '../notifications/notifications.module';
     // AuthGuard and ProviderOwnershipGuard are instantiated in this module.
     JwtModule.register({}),
     NotificationsModule,
+    // Person 4's booking adapters; FlightBookingsModule imports this module too.
+    forwardRef(() => FlightBookingsModule),
   ],
   controllers: [AirlinesController, FlightsController],
   providers: [
     AirlinesService,
     FlightInventoryService,
     { provide: FLIGHT_INVENTORY, useExisting: FlightInventoryService },
-    // TODO(Person 4): bind FLIGHT_PASSENGER_READER to the booking adapter.
-    { provide: FLIGHT_PASSENGER_READER, useValue: null },
-    // TODO(Person 4): bind FLIGHT_BOOKING_CANCELLER to the booking adapter.
-    { provide: FLIGHT_BOOKING_CANCELLER, useValue: null },
-    // TODO(Person 4): bind FLIGHT_BOOKING_READER to the flight booking adapter.
-    { provide: FLIGHT_BOOKING_READER, useValue: null },
+    { provide: FLIGHT_PASSENGER_READER, useExisting: FlightBookingReaders },
+    {
+      provide: FLIGHT_BOOKING_CANCELLER,
+      useExisting: FlightBookingCancellationService,
+    },
+    { provide: FLIGHT_BOOKING_READER, useExisting: FlightBookingReaders },
     // TODO(Person 8): replace this null binding with the shared image-upload adapter.
     { provide: AIRLINE_LOGO_STORE, useValue: null },
   ],
