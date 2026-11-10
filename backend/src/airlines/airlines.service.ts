@@ -41,7 +41,8 @@ import {
   UpdateCabinDto,
 } from './dto/cabin.dto';
 import { Airline } from './schemas/airline.schema';
-import { CabinCategory, Flight } from './schemas/flight.schema';
+import { CabinCategory, Flight, FlightStatus } from './schemas/flight.schema';
+import { FlightStatusResponseDto } from './dto/flight-status.dto';
 
 function isDuplicateKeyError(error: unknown): boolean {
   return (
@@ -182,6 +183,23 @@ export class AirlinesService {
       }
       throw error;
     }
+  }
+
+  async getFlightStatus(
+    flightId: string,
+    now = new Date(),
+  ): Promise<FlightStatusResponseDto> {
+    const flight = await this.flightModel.findById(flightId).lean().exec();
+    if (!flight) throw new NotFoundException('Flight not found');
+    if (flight.status === FlightStatus.CANCELLED) {
+      return { status: FlightStatus.CANCELLED };
+    }
+    return {
+      status:
+        new Date(flight.departureAt).getTime() <= now.getTime()
+          ? FlightStatus.DEPARTED
+          : FlightStatus.SCHEDULED,
+    };
   }
 
   async addCabin(
@@ -381,6 +399,7 @@ export class AirlinesService {
     departureTimeZone: string;
     arrivalTimeZone: string;
     departureLocalDate: string;
+    status?: FlightStatus;
   }): FlightResponseDto {
     return {
       id: String(flight._id),
@@ -393,6 +412,12 @@ export class AirlinesService {
       departureTimeZone: flight.departureTimeZone,
       arrivalTimeZone: flight.arrivalTimeZone,
       departureLocalDate: flight.departureLocalDate,
+      status:
+        flight.status === FlightStatus.CANCELLED
+          ? FlightStatus.CANCELLED
+          : new Date(flight.departureAt).getTime() <= Date.now()
+            ? FlightStatus.DEPARTED
+            : FlightStatus.SCHEDULED,
     };
   }
 
