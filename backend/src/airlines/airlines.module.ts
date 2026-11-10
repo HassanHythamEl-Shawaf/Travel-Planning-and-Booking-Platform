@@ -5,6 +5,7 @@ import { MongooseModule } from '@nestjs/mongoose';
 import { AuthModule } from '../auth/auth.module';
 import { ModeratorAssignmentsModule } from '../moderator-assignments/moderator-assignments.module';
 import { UsersModule } from '../users/users.module';
+import { ReferenceDataModule } from '../reference-data/reference-data.module';
 import { AIRLINE_LOGO_STORE } from './airline-logo-store';
 import { AirlinesController } from './airlines.controller';
 import { AirlinesService } from './airlines.service';
@@ -15,6 +16,7 @@ import { Airline, AirlineSchema } from './schemas/airline.schema';
     MongooseModule.forFeature([{ name: Airline.name, schema: AirlineSchema }]),
     AuthModule,
     UsersModule,
+    ReferenceDataModule,
     ModeratorAssignmentsModule,
     // AuthGuard and ProviderOwnershipGuard are instantiated in this module.
     JwtModule.register({}),
