@@ -3,7 +3,7 @@ import { Types } from 'mongoose';
 
 import { AirlinesService } from './airlines.service';
 import { CreateAirlineDto, UpdateAirlineDto } from './dto/airline.dto';
-import { CabinCategory } from './schemas/flight.schema';
+import { CabinCategory, FlightStatus } from './schemas/flight.schema';
 
 const exec = (value: unknown) => ({ exec: () => Promise.resolve(value) });
 const leanExec = (value: unknown) => ({ lean: () => exec(value) });
@@ -228,5 +228,46 @@ describe('AirlinesService', () => {
         { daysBeforeDeparture: 0, refundPercentage: 0 },
       ],
     });
+  });
+
+  it('derives scheduled, departed and cancelled flight status', async () => {
+      flightModel.findById.mockReturnValue(
+        leanExec({
+          status: FlightStatus.SCHEDULED,
+          departureAt: new Date('2026-11-11T10:00:00.000Z'),
+        }),
+      );
+      await expect(
+        service.getFlightStatus(
+          id.toString(),
+          new Date('2026-11-10T10:00:00.000Z'),
+        ),
+      ).resolves.toEqual({ status: FlightStatus.SCHEDULED });
+
+      flightModel.findById.mockReturnValue(
+        leanExec({
+          status: FlightStatus.SCHEDULED,
+          departureAt: new Date('2026-11-09T10:00:00.000Z'),
+        }),
+      );
+      await expect(
+        service.getFlightStatus(
+          id.toString(),
+          new Date('2026-11-10T10:00:00.000Z'),
+        ),
+      ).resolves.toEqual({ status: FlightStatus.DEPARTED });
+
+    flightModel.findById.mockReturnValue(
+      leanExec({
+        status: FlightStatus.CANCELLED,
+        departureAt: new Date('2026-11-09T10:00:00.000Z'),
+      }),
+    );
+    await expect(
+      service.getFlightStatus(
+        id.toString(),
+        new Date('2026-11-10T10:00:00.000Z'),
+      ),
+    ).resolves.toEqual({ status: FlightStatus.CANCELLED });
   });
 });
