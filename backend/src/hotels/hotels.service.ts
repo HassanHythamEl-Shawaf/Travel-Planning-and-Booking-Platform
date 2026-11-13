@@ -17,6 +17,7 @@ import { CreateRoomDto } from './dto/create-room.dto';
 import { UpdateRoomDto } from './dto/update-room.dto';
 import { BlockRoomDto } from './dto/block-room.dto';
 import { UpdateHotelPoliciesDto } from './dto/update-hotel-policies.dto';
+import { SearchHotelsDto } from './dto/search-hotels.dto';
 
 @Injectable()
 export class HotelsService {
@@ -33,7 +34,184 @@ export class HotelsService {
   }
 
   async findAllHotels(): Promise<Hotel[]> {
-    return this.hotelModel.find({ isActive: true }).exec();
+    return this.hotelModel.find({ isActive: { $ne: false } }).exec();
+  }
+
+  async searchHotels(searchDto: SearchHotelsDto) {
+    const {
+      destination,
+      startDate,
+      endDate,
+      amenities,
+      sortBy = 'rating_desc',
+    } = searchDto;
+
+    const adults = searchDto.adults ? Number(searchDto.adults) : undefined;
+    const children =
+      searchDto.children !== undefined ? Number(searchDto.children) : undefined;
+    const minPrice =
+      searchDto.minPrice !== undefined ? Number(searchDto.minPrice) : undefined;
+    const maxPrice =
+      searchDto.maxPrice !== undefined ? Number(searchDto.maxPrice) : undefined;
+    const minRating =
+      searchDto.minRating !== undefined
+        ? Number(searchDto.minRating)
+        : undefined;
+    const page = searchDto.page ? Math.max(1, Number(searchDto.page)) : 1;
+    const limit = searchDto.limit ? Math.max(1, Number(searchDto.limit)) : 10;
+
+    if ((startDate && !endDate) || (!startDate && endDate)) {
+      throw new BadRequestException(
+        'Both startDate and endDate must be provided together.',
+      );
+    }
+
+    let parsedDates: { start: Date; end: Date } | null = null;
+    if (startDate && endDate) {
+      parsedDates = this.parseAndValidateDates(startDate, endDate);
+    }
+
+    // 1. Filter active hotels by destination and minimum rating
+    const hotelFilter: Record<string, any> = { isActive: { $ne: false } };
+
+    if (destination && destination.trim()) {
+      const escaped = destination.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const regex = new RegExp(escaped, 'i');
+      hotelFilter.$or = [{ city: regex }, { country: regex }, { name: regex }];
+    }
+
+    if (minRating !== undefined && !isNaN(minRating)) {
+      hotelFilter.averageRating = { $gte: minRating };
+    }
+
+    const hotels = await this.hotelModel.find(hotelFilter).lean().exec();
+    if (hotels.length === 0) {
+      return {
+        data: [],
+        total: 0,
+        page,
+        limit,
+        totalPages: 0,
+      };
+    }
+
+    const hotelIdStrings = hotels.map((h) => String(h._id));
+
+    // 2. Find unavailable room IDs if dates are provided
+    const unavailableRoomIds = new Set<string>();
+    if (parsedDates) {
+      const conflicts = await this.roomAvailabilityModel
+        .find({
+          startDate: { $lt: parsedDates.end },
+          endDate: { $gt: parsedDates.start },
+        })
+        .select('roomId')
+        .lean()
+        .exec();
+
+      for (const entry of conflicts) {
+        unavailableRoomIds.add(String(entry.roomId));
+      }
+    }
+
+    // 3. Query active rooms matching guest count, price, and amenities
+    const roomFilter: Record<string, any> = {
+      isActive: { $ne: false },
+      $expr: { $in: [{ $toString: '$hotelId' }, hotelIdStrings] },
+    };
+
+    if (adults !== undefined && !isNaN(adults)) {
+      roomFilter['occupancy.maxAdults'] = { $gte: adults };
+    }
+
+    if (children !== undefined && !isNaN(children)) {
+      roomFilter['occupancy.maxChildren'] = { $gte: children };
+    }
+
+    if (
+      (minPrice !== undefined && !isNaN(minPrice)) ||
+      (maxPrice !== undefined && !isNaN(maxPrice))
+    ) {
+      roomFilter.pricePerNight = {};
+      if (minPrice !== undefined && !isNaN(minPrice)) {
+        roomFilter.pricePerNight.$gte = minPrice;
+      }
+      if (maxPrice !== undefined && !isNaN(maxPrice)) {
+        roomFilter.pricePerNight.$lte = maxPrice;
+      }
+    }
+
+    if (amenities && amenities.trim()) {
+      const amenityList = amenities
+        .split(',')
+        .map((a) => a.trim())
+        .filter(Boolean);
+      if (amenityList.length > 0) {
+        roomFilter.amenities = { $all: amenityList };
+      }
+    }
+
+    const matchingRooms = await this.roomModel.find(roomFilter).lean().exec();
+
+    // 4. Group available matching rooms by hotel
+    const roomsByHotel = new Map<string, any[]>();
+    for (const room of matchingRooms) {
+      if (unavailableRoomIds.has(String(room._id))) {
+        continue;
+      }
+      const hId = String(room.hotelId);
+      const list = roomsByHotel.get(hId) ?? [];
+      list.push(room);
+      roomsByHotel.set(hId, list);
+    }
+
+    // 5. Build result items (only hotels with >= 1 available matching room)
+    const results = hotels
+      .filter((hotel) => roomsByHotel.has(String(hotel._id)))
+      .map((hotel) => {
+        const availableRooms = roomsByHotel.get(String(hotel._id))!;
+        const startingPrice = Math.min(
+          ...availableRooms.map((r) => r.pricePerNight),
+        );
+        return {
+          ...hotel,
+          startingPrice,
+          availableRoomsCount: availableRooms.length,
+          availableRooms,
+        };
+      });
+
+    // 6. Sort results
+    results.sort((a, b) => {
+      switch (sortBy) {
+        case 'price_asc':
+          return a.startingPrice - b.startingPrice;
+        case 'price_desc':
+          return b.startingPrice - a.startingPrice;
+        case 'newest':
+          return (
+            new Date((b as any).createdAt ?? 0).getTime() -
+            new Date((a as any).createdAt ?? 0).getTime()
+          );
+        case 'rating_desc':
+        default:
+          return (b.averageRating ?? 0) - (a.averageRating ?? 0);
+      }
+    });
+
+    // 7. Paginate
+    const total = results.length;
+    const totalPages = Math.ceil(total / limit);
+    const startIndex = (page - 1) * limit;
+    const paginatedData = results.slice(startIndex, startIndex + limit);
+
+    return {
+      data: paginatedData,
+      total,
+      page,
+      limit,
+      totalPages,
+    };
   }
 
   async findHotelById(hotelId: string): Promise<Hotel> {
@@ -169,7 +347,7 @@ export class HotelsService {
     }
 
     const hotel = await this.hotelModel.findById(room.hotelId).exec();
-    if (!hotel || !hotel.isActive || !room.isActive) {
+    if (!hotel || hotel.isActive === false || room.isActive === false) {
       return false;
     }
 

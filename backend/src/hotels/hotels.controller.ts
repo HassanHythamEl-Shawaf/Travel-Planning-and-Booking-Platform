@@ -15,6 +15,7 @@ import { CreateRoomDto } from './dto/create-room.dto';
 import { UpdateRoomDto } from './dto/update-room.dto';
 import { BlockRoomDto } from './dto/block-room.dto';
 import { UpdateHotelPoliciesDto } from './dto/update-hotel-policies.dto';
+import { SearchHotelsDto } from './dto/search-hotels.dto';
 
 @Controller('hotels')
 export class HotelsController {
@@ -28,6 +29,11 @@ export class HotelsController {
   @Get()
   async findAll() {
     return this.hotelsService.findAllHotels();
+  }
+
+  @Get('search')
+  async search(@Query() searchHotelsDto: SearchHotelsDto) {
+    return this.hotelsService.searchHotels(searchHotelsDto);
   }
 
   // --- ROOM ENDPOINTS ---
