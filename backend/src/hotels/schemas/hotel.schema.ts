@@ -21,20 +21,43 @@ export class Hotel {
   country: string;
 
   @Prop({ type: [String], default: [] })
-  photos: string[]; // Reusable upload module integration (Hammad / Person 8)
+  photos: string[];
 
   @Prop({ default: true })
-  isActive: boolean; // Admin deactivation flag (Wael / Person 2)
+  isActive: boolean;
 
   @Prop({ default: 0 })
-  averageRating: number; // Updated by reviews (Seif / Person 6)
+  averageRating: number;
 
-  @Prop({ type: Object, default: {} })
-  policies: {
-    cancellationPolicy?: string;
-    checkInTime?: string;
-    checkOutTime?: string;
+  @Prop({ default: '14:00' })
+  checkInTime: string;
+
+  @Prop({ default: '12:00' })
+  checkOutTime: string;
+
+  @Prop({
+    type: {
+      freeCancellationHours: { type: Number, default: 24 },
+      refundPercentageAfterDeadline: { type: Number, default: 0 },
+      description: {
+        type: String,
+        default: 'Free cancellation up to 24 hours before check-in.',
+      },
+    },
+    default: () => ({
+      freeCancellationHours: 24,
+      refundPercentageAfterDeadline: 0,
+      description: 'Free cancellation up to 24 hours before check-in.',
+    }),
+  })
+  cancellationPolicy: {
+    freeCancellationHours: number;
+    refundPercentageAfterDeadline: number;
+    description: string;
   };
+
+  @Prop({ type: [String], default: [] })
+  houseRules: string[];
 }
 
 export const HotelSchema = SchemaFactory.createForClass(Hotel);

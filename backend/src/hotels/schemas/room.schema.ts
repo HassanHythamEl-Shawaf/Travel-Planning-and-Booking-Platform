@@ -6,10 +6,10 @@ export type RoomDocument = Room & Document;
 @Schema({ timestamps: true })
 export class Room {
   @Prop({ type: Types.ObjectId, ref: 'Hotel', required: true })
-  hotelId: Types.ObjectId; // Links this room to the specific hotel
+  hotelId: Types.ObjectId;
 
   @Prop({ required: true, trim: true })
-  name: string; // e.g., "Deluxe Ocean View", "Standard Twin"
+  name: string;
 
   @Prop({ required: true })
   pricePerNight: number;
@@ -18,13 +18,13 @@ export class Room {
   occupancy: {
     maxAdults: number;
     maxChildren: number;
-  }; // Seif (Person 6) needs this to validate guest counts for bookings
+  };
 
   @Prop({ type: [String], default: [] })
   amenities: string[];
 
-  // We will handle availability dates and blocked dates in a separate RoomAvailability schema 
-  // or via methods to keep this clean, as requested by the architecture.
+  @Prop({ default: true })
+  isActive: boolean;
 }
 
 export const RoomSchema = SchemaFactory.createForClass(Room);

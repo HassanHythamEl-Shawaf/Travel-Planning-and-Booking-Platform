@@ -1,8 +1,20 @@
-import { Controller, Get, Post, Body, Param } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Put,
+  Patch,
+  Delete,
+  Body,
+  Param,
+  Query,
+} from '@nestjs/common';
 import { HotelsService } from './hotels.service';
 import { CreateHotelDto } from './dto/create-hotel.dto';
 import { CreateRoomDto } from './dto/create-room.dto';
+import { UpdateRoomDto } from './dto/update-room.dto';
 import { BlockRoomDto } from './dto/block-room.dto';
+import { UpdateHotelPoliciesDto } from './dto/update-hotel-policies.dto';
 
 @Controller('hotels')
 export class HotelsController {
@@ -25,12 +37,37 @@ export class HotelsController {
     return this.hotelsService.createRoom(createRoomDto);
   }
 
-  @Get(':hotelId/rooms')
-  async findRoomsByHotel(@Param('hotelId') hotelId: string) {
-    return this.hotelsService.findRoomsByHotel(hotelId);
+  @Patch('rooms/:roomId')
+  async updateRoom(
+    @Param('roomId') roomId: string,
+    @Body() updateRoomDto: UpdateRoomDto,
+  ) {
+    return this.hotelsService.updateRoom(roomId, updateRoomDto);
   }
 
-  // --- AVAILABILITY ENDPOINTS ---
+  @Delete('rooms/:roomId')
+  async deleteRoom(@Param('roomId') roomId: string) {
+    return this.hotelsService.deleteRoom(roomId);
+  }
+
+  @Get('rooms/:roomId/availability')
+  async checkRoomAvailability(
+    @Param('roomId') roomId: string,
+    @Query('startDate') startDate: string,
+    @Query('endDate') endDate: string,
+  ) {
+    const isAvailable = await this.hotelsService.checkAvailability(
+      roomId,
+      startDate,
+      endDate,
+    );
+    return {
+      roomId,
+      startDate,
+      endDate,
+      isAvailable,
+    };
+  }
 
   @Post('rooms/:roomId/block')
   async blockRoom(
@@ -38,5 +75,25 @@ export class HotelsController {
     @Body() blockRoomDto: BlockRoomDto,
   ) {
     return this.hotelsService.blockRoom(roomId, blockRoomDto);
+  }
+
+  @Get(':hotelId/rooms')
+  async findRoomsByHotel(@Param('hotelId') hotelId: string) {
+    return this.hotelsService.findRoomsByHotel(hotelId);
+  }
+
+  // --- HOTEL DETAILS & POLICIES ---
+
+  @Get(':id')
+  async findOne(@Param('id') id: string) {
+    return this.hotelsService.findHotelById(id);
+  }
+
+  @Put(':id/policies')
+  async updatePolicies(
+    @Param('id') id: string,
+    @Body() updateHotelPoliciesDto: UpdateHotelPoliciesDto,
+  ) {
+    return this.hotelsService.updateHotelPolicies(id, updateHotelPoliciesDto);
   }
 }
