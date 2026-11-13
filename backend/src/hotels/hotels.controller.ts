@@ -2,6 +2,7 @@ import { Controller, Get, Post, Body, Param } from '@nestjs/common';
 import { HotelsService } from './hotels.service';
 import { CreateHotelDto } from './dto/create-hotel.dto';
 import { CreateRoomDto } from './dto/create-room.dto';
+import { BlockRoomDto } from './dto/block-room.dto';
 
 @Controller('hotels')
 export class HotelsController {
@@ -17,7 +18,7 @@ export class HotelsController {
     return this.hotelsService.findAllHotels();
   }
 
-  // --- NEW ROOM ENDPOINTS ---
+  // --- ROOM ENDPOINTS ---
 
   @Post('rooms')
   async createRoom(@Body() createRoomDto: CreateRoomDto) {
@@ -27,5 +28,15 @@ export class HotelsController {
   @Get(':hotelId/rooms')
   async findRoomsByHotel(@Param('hotelId') hotelId: string) {
     return this.hotelsService.findRoomsByHotel(hotelId);
+  }
+
+  // --- AVAILABILITY ENDPOINTS ---
+
+  @Post('rooms/:roomId/block')
+  async blockRoom(
+    @Param('roomId') roomId: string,
+    @Body() blockRoomDto: BlockRoomDto,
+  ) {
+    return this.hotelsService.blockRoom(roomId, blockRoomDto);
   }
 }
