@@ -248,6 +248,31 @@ tests and README section. I reviewed the code, ran the unit tests, the
 reports and admin e2e suites (in-memory MongoDB, not Atlas), lint and build.
 ================================================
 
+Date: 2026-11-14
+Student: Moaz Abozaid
+Tool: GitHub Copilot (VS Code)
+Related Requirement: PAY-01, PAY-02, PAY-03, PAY-04, GEN-11, GEN-01
+Prompt:
+Implement the required payment, refund and expiry lifecycle for both booking
+modules: policies must be fetchable and accepted with a timestamp, Stripe test
+mode must create and retry PaymentIntents until the hold expires, a verified
+webhook confirms only after the PaymentIntent succeeds, failed payment leaves
+the booking in Pending Payment, and expired holds cancel the PaymentIntent and
+release inventory. Add the refund schema and Stripe Refunds flow with status
+Pending, Refunded or Failed, refund preview and provider-based calculation
+including 100% for provider-initiated cancellations. Use a single platform
+currency, no raw card data persistence, and one shared ExpiryService cron
+that releases holds and marks confirmed bookings as Completed once departure
+or check-out has passed. Include notification calls for payment success,
+payment failure and refunds.
+How the output was used:
+Mapped the design to the existing NestJS booking schema and lifecycle service,
+confirmed the payment contract and the held booking fields in the codebase,
+and prepared a requirements-aligned plan for the Stripe adapter, verified
+webhook flow, refund lifecycle and shared expiry service without changing
+source files yet.
+================================================
+
 ================================================
 Date: 2026-11-05
 Student: Wael (Person 2)
