@@ -6,7 +6,7 @@ import { AirlinesModule } from '../airlines/airlines.module';
 import { AuthModule } from '../auth/auth.module';
 import { NotificationsModule } from '../notifications/notifications.module';
 import { UsersModule } from '../users/users.module';
-import { AirlineTierRefunds } from './airline-tier-refunds';
+import { ConfigModule } from '@nestjs/config';
 import { FlightBookingCancellationService } from './flight-booking-cancellation.service';
 import { FlightBookingReaders } from './flight-booking-readers';
 import { FLIGHT_BOOKING_PAYMENTS } from './flight-booking-payments.contract';
@@ -14,6 +14,7 @@ import { FLIGHT_REFUNDS } from './flight-refunds.contract';
 import { FlightBookingLifecycleService } from './flight-booking-lifecycle.service';
 import { FlightBookingsController } from './flight-bookings.controller';
 import { FlightBookingsService } from './flight-bookings.service';
+import { StripeRefundsService } from './stripe-refunds.service';
 import {
   FlightBooking,
   FlightBookingSchema,
@@ -37,6 +38,7 @@ import {
     UsersModule,
     JwtModule.register({}),
     NotificationsModule,
+    ConfigModule,
   ],
   controllers: [FlightBookingsController],
   providers: [
@@ -44,9 +46,7 @@ import {
     FlightBookingLifecycleService,
     FlightBookingCancellationService,
     FlightBookingReaders,
-    // TODO(Person 7): bind FLIGHT_REFUNDS to the payments refund service.
-    // Until then refunds are calculated from airline tiers but not issued.
-    { provide: FLIGHT_REFUNDS, useClass: AirlineTierRefunds },
+    { provide: FLIGHT_REFUNDS, useClass: StripeRefundsService },
     // Person 7 (payments, ExpiryService) depends on this token only.
     {
       provide: FLIGHT_BOOKING_PAYMENTS,
