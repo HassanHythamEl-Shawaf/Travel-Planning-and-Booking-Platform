@@ -313,6 +313,27 @@ describe('toItineraryView', () => {
 });
 
 describe('applyConversion (ITN-18)', () => {
+  it('converts nothing if one currency has no rate', () => {
+    const d1 = day('cairo', {
+      budgetEntries: [
+        { _id: id(), category: 'food', amount: 5, currency: 'USD', note: '' },
+        { _id: id(), category: 'food', amount: 5, currency: 'JOD', note: '' },
+      ],
+    });
+    const view = toItineraryView(itinerary([d1]), context);
+    const converter = makeConverter(
+      { rateDate: '2026-11-16', rates: { USD: 1, EGP: 50 } },
+      'USD',
+      false,
+    );
+
+    expect(() => applyConversion(view, converter)).toThrow('JOD');
+    expect(view.budget.total.converted).toBeUndefined();
+    expect(view.budget.byCategory.food.converted).toBeUndefined();
+    expect(view.days[0].budgetEntries[0].convertedAmount).toBeUndefined();
+    expect(view.budget.conversion).toBeUndefined();
+  });
+
   it('adds converted amounts next to every original amount', () => {
     const d1 = day('cairo', {
       budgetEntries: [

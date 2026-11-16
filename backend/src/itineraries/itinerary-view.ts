@@ -450,8 +450,13 @@ export function applyConversion(
   view: ItineraryView,
   converter: Converter,
 ): ItineraryView {
+  // First compute every value, then write them all. If a currency has no
+  // rate, convert() throws before anything is written, so the view is never
+  // left half converted.
+  const writes: (() => void)[] = [];
   const convertTotals = (totals: Totals) => {
-    totals.converted = converter.convertSum(totals.amounts);
+    const value = converter.convertSum(totals.amounts);
+    writes.push(() => (totals.converted = value));
   };
 
   const { budget } = view;
@@ -462,19 +467,23 @@ export function applyConversion(
 
   for (const day of view.days) {
     for (const entry of day.budgetEntries) {
-      entry.convertedAmount = converter.convert(entry.amount, entry.currency);
+      const value = converter.convert(entry.amount, entry.currency);
+      writes.push(() => (entry.convertedAmount = value));
     }
     for (const activity of day.activities) {
-      activity.convertedCost =
+      const value =
         activity.cost !== null && activity.currency
           ? converter.convert(activity.cost, activity.currency)
           : null;
+      writes.push(() => (activity.convertedCost = value));
     }
   }
   for (const entry of view.transportEntries) {
-    entry.convertedAmount = converter.convert(entry.amount, entry.currency);
+    const value = converter.convert(entry.amount, entry.currency);
+    writes.push(() => (entry.convertedAmount = value));
   }
 
+  for (const write of writes) write();
   budget.conversion = {
     currency: converter.currency,
     rateDate: converter.rateDate,
