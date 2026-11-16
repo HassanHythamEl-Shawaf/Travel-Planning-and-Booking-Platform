@@ -422,6 +422,22 @@ export class UpdateTransportEntryDto {
   note?: string;
 }
 
+// ------------------------------------------------------------ conversion
+
+/** ITN-18: optional display currency for converted amounts. */
+export class CurrencyQueryDto {
+  @ApiPropertyOptional({
+    example: 'EGP',
+    description:
+      'Supported currency to convert to. Default: your preferred currency, else USD.',
+  })
+  @IsOptional()
+  @Matches(CURRENCY_PATTERN, {
+    message: 'currency must be a 3-letter code like EGP',
+  })
+  currency?: string;
+}
+
 // ---------------------------------------------------------------- search
 
 /** ITN-21 public search. */

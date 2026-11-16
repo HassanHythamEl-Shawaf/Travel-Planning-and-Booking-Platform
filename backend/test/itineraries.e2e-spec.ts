@@ -18,9 +18,19 @@ import request from 'supertest';
 import type TestAgent from 'supertest/lib/agent';
 
 import { HttpExceptionFilter } from '../src/common/filters/http-exception.filter';
+import { FxApiError } from '../src/fx-rates/fx-rates.client';
+import { FX_RATES_CLIENT } from '../src/fx-rates/fx-rates.constants';
 import { JPEG_BYTES } from './fixtures/images';
 
 jest.setTimeout(240_000);
+
+/** Fake FXRatesAPI: 1 USD = 40 EGP = 0.7 JOD. */
+const FAKE_RATES = {
+  base: 'USD',
+  rateDate: '2026-11-16',
+  rates: { USD: 1, EGP: 40, JOD: 0.7 },
+};
+const fakeFx = { fetchLatest: jest.fn().mockResolvedValue(FAKE_RATES) };
 
 interface DayBody {
   id: string;
@@ -69,14 +79,12 @@ describe('Itineraries (e2e)', () => {
   };
 
   const create = (agent: TestAgent, body: Record<string, unknown> = {}) =>
-    agent
-      .post('/api/itineraries')
-      .send({
-        title: 'Ten days in Egypt',
-        countries: ['EG'],
-        startDate: '2026-12-30',
-        ...body,
-      });
+    agent.post('/api/itineraries').send({
+      title: 'Ten days in Egypt',
+      countries: ['EG'],
+      startDate: '2026-12-30',
+      ...body,
+    });
 
   const days = (body: { days: DayBody[] }) =>
     body.days.map((d) => [d.dayNumber, d.date, d.cityId]);
@@ -91,9 +99,13 @@ describe('Itineraries (e2e)', () => {
     process.env.UPLOAD_DIR = uploadDir;
 
     const { AppModule } = await import('../src/app.module');
+    // Never call the real exchange-rate API in tests (ITN-18).
     const moduleRef = await Test.createTestingModule({
       imports: [AppModule],
-    }).compile();
+    })
+      .overrideProvider(FX_RATES_CLIENT)
+      .useValue(fakeFx)
+      .compile();
     app = moduleRef.createNestApplication();
     app.setGlobalPrefix('api');
     app.use(cookieParser());
@@ -352,7 +364,7 @@ describe('Itineraries (e2e)', () => {
 
       const res = await alice.get(base).expect(200);
       detail = res.body;
-      expect(res.body.budget.byCategory).toEqual({
+      expect(res.body.budget.byCategory).toMatchObject({
         food: { amounts: [{ currency: 'EGP', amount: 100.25 }] },
         accommodation: { amounts: [{ currency: 'USD', amount: 80 }] },
         in_city_transport: { amounts: [] },
@@ -539,6 +551,94 @@ describe('Itineraries (e2e)', () => {
         .expect(200);
       expect(removed.body.days[1].activities[0].images).toHaveLength(4);
       await guest().get(images[4].url).expect(404);
+    });
+  });
+
+  describe('budget conversion (ITN-18, ACC-09)', () => {
+    // Budget at this point: EGP 100.25 and USD 110 (see above).
+    // Fake rates: 1 USD = 40 EGP = 0.7 JOD.
+
+    it('converts every total to USD when the user has no preferred currency', async () => {
+      const res = await alice.get(`/api/itineraries/${tripId}`).expect(200);
+      expect(res.body.budget.conversion).toEqual({
+        currency: 'USD',
+        rateDate: '2026-11-16',
+        usingCachedRates: false,
+      });
+      expect(res.body.budget.total.converted).toBe(112.51); // 100.25/40 + 110
+      expect(res.body.budget.byCategory.food.converted).toBe(2.51);
+      expect(res.body.days[1].budgetEntries[0].convertedAmount).toBe(2.51);
+      expect(fakeFx.fetchLatest).toHaveBeenCalledTimes(1); // once per day
+    });
+
+    it("uses ?currency=, else the user's preferred currency", async () => {
+      const egp = await alice
+        .get(`/api/itineraries/${tripId}/budget`)
+        .query({ currency: 'EGP' })
+        .expect(200);
+      expect(egp.body.total.converted).toBe(4500.25); // 100.25 + 110*40
+      expect(egp.body.conversion.currency).toBe('EGP');
+
+      await connection
+        .collection('users')
+        .updateOne({ _id: aliceId }, { $set: { preferredCurrency: 'JOD' } });
+      const jod = await alice
+        .get(`/api/itineraries/${tripId}/budget`)
+        .expect(200);
+      expect(jod.body.conversion.currency).toBe('JOD');
+      expect(jod.body.total.converted).toBe(78.75); // 112.50625 * 0.7
+
+      await alice
+        .get(`/api/itineraries/${tripId}`)
+        .query({ currency: 'XYZ' })
+        .expect(400);
+      await alice
+        .get(`/api/itineraries/${tripId}/budget`)
+        .query({ currency: 'usd' })
+        .expect(400);
+      await bob.get(`/api/itineraries/${tripId}/budget`).expect(404); // private
+      await connection
+        .collection('users')
+        .updateOne({ _id: aliceId }, { $unset: { preferredCurrency: '' } });
+    });
+
+    it('falls back to cached rates, and answers 503 only when nothing is cached', async () => {
+      await connection.collection('fx_rate_snapshots').deleteMany({});
+      fakeFx.fetchLatest.mockRejectedValue(
+        new FxApiError('FX API unreachable'),
+      );
+
+      // Nothing cached: the itinerary still loads, without conversion.
+      const detail = await alice.get(`/api/itineraries/${tripId}`).expect(200);
+      expect(detail.body.budget.conversion).toBeNull();
+      expect(detail.body.budget.conversionError).toMatch(/unavailable/);
+      await alice.get(`/api/itineraries/${tripId}/budget`).expect(503);
+
+      // An older snapshot exists: it is used, and the response says so.
+      await connection.collection('fx_rate_snapshots').insertOne({
+        day: '2026-11-01',
+        base: 'USD',
+        rateDate: '2026-11-01',
+        rates: { USD: 1, EGP: 50, JOD: 0.7 },
+        fetchedAt: new Date(),
+      });
+      const cached = await alice
+        .get(`/api/itineraries/${tripId}/budget`)
+        .expect(200);
+      expect(cached.body.conversion).toEqual({
+        currency: 'USD',
+        rateDate: '2026-11-01',
+        usingCachedRates: true,
+      });
+      expect(cached.body.total.converted).toBe(112.01); // 100.25/50 + 110
+
+      // Back to normal for the rest of the suite.
+      fakeFx.fetchLatest.mockResolvedValue(FAKE_RATES);
+      await connection.collection('fx_rate_snapshots').insertOne({
+        day: new Date().toISOString().slice(0, 10),
+        ...FAKE_RATES,
+        fetchedAt: new Date(),
+      });
     });
   });
 

@@ -7,12 +7,15 @@ import {
   Injectable,
   Logger,
   NotFoundException,
+  Optional,
+  ServiceUnavailableException,
 } from '@nestjs/common';
 import { InjectConnection, InjectModel } from '@nestjs/mongoose';
 import { ClientSession, Connection, Model, Types } from 'mongoose';
 
 import type { AuthenticatedUser } from '../auth/decorators/current-user.decorator';
 import { getPagination, type Paginated } from '../common/pagination';
+import { FxRatesService } from '../fx-rates/fx-rates.service';
 import { City } from '../reference-data/schemas/city.schema';
 import { Country } from '../reference-data/schemas/country.schema';
 import { Currency } from '../reference-data/schemas/currency.schema';
@@ -32,6 +35,8 @@ import type {
 } from './dto/itinerary-responses.dto';
 import { canViewItinerary, isOwnerOf, type Viewer } from './itinerary-access';
 import {
+  applyConversion,
+  type BudgetSummary,
   cityIdsOf,
   imageIdsOf,
   type ItineraryView,
@@ -76,6 +81,8 @@ export class ItinerariesService {
     @InjectModel(Report.name) private readonly reportModel: Model<Report>,
     @InjectConnection() private readonly connection: Connection,
     private readonly uploads: UploadsService,
+    // ITN-18 conversion; optional so unit tests can leave it out.
+    @Optional() private readonly fx?: FxRatesService,
   ) {}
 
   // ------------------------------------------------------------ itinerary
@@ -138,9 +145,13 @@ export class ItinerariesService {
   }
 
   /** ITN-03 / ITN-21: one itinerary, if the viewer may see it (404 otherwise). */
-  async findOne(id: string, viewer: Viewer): Promise<ItineraryView> {
+  async findOne(
+    id: string,
+    viewer: Viewer,
+    currency?: string,
+  ): Promise<ItineraryView> {
     const { itinerary } = await this.loadViewable(id, viewer);
-    return this.present(itinerary, viewer);
+    return this.present(itinerary, viewer, currency);
   }
 
   /** ITN-01: edit title, countries and start date (days follow the new date). */
@@ -340,8 +351,50 @@ export class ItinerariesService {
 
   // ------------------------------------------------------------- present
 
-  /** Builds the full view, looking up names in a few queries. */
+  /**
+   * The full view with amounts converted to the display currency (ITN-18).
+   * If no rates can be had, the view is still returned, with
+   * `budget.conversion: null` and the reason in `budget.conversionError`;
+   * an unsupported `currency` is a 400.
+   */
   async present(
+    itinerary: LeanItinerary,
+    viewer: Viewer,
+    currency?: string,
+  ): Promise<ItineraryView> {
+    const view = await this.buildView(itinerary, viewer);
+    if (!this.fx) return view;
+    try {
+      return applyConversion(view, await this.fx.converter(viewer, currency));
+    } catch (error) {
+      if (!(error instanceof ServiceUnavailableException)) throw error;
+      view.budget.conversion = null;
+      view.budget.conversionError = error.message;
+      return view;
+    }
+  }
+
+  /**
+   * ITN-18 budget only, converted. Unlike `present`, a missing rate is an
+   * error here (503), because conversion is the whole point of the call.
+   */
+  async budget(
+    id: string,
+    viewer: Viewer,
+    currency?: string,
+  ): Promise<BudgetSummary> {
+    const { itinerary } = await this.loadViewable(id, viewer);
+    const view = await this.buildView(itinerary, viewer);
+    if (!this.fx)
+      throw new ServiceUnavailableException(
+        'Exchange rates are not configured',
+      );
+    return applyConversion(view, await this.fx.converter(viewer, currency))
+      .budget;
+  }
+
+  /** Builds the view, looking up names in a few queries. */
+  private async buildView(
     itinerary: LeanItinerary,
     viewer: Viewer,
   ): Promise<ItineraryView> {
@@ -366,7 +419,7 @@ export class ItinerariesService {
             deactivated: owner.status === AccountStatus.DEACTIVATED,
           }
         : null,
-      // The name stored at clone time is used if the account no longer exists.
+      // A missing or deactivated original author is shown as "Deleted user".
       cloneAuthor: itinerary.clonedFrom
         ? cloneAuthor
           ? {

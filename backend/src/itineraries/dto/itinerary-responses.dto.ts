@@ -1,4 +1,10 @@
-import { ApiProperty } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+
+const CONVERTED = {
+  example: 9.2,
+  nullable: true,
+  description: 'ITN-18: in budget.conversion.currency.',
+};
 
 import { PaginatedResponseDto } from '../../common/dto/paginated-response.dto';
 import {
@@ -28,6 +34,32 @@ export class TotalsDto {
     description: 'One amount per currency, sorted by currency code.',
   })
   amounts: MoneyDto[];
+
+  @ApiPropertyOptional({
+    example: 61.42,
+    nullable: true,
+    description:
+      'ITN-18: the same total in budget.conversion.currency (rounded to 2 decimals).',
+  })
+  converted?: number | null;
+}
+
+export class BudgetConversionDto {
+  @ApiProperty({ example: 'USD', description: 'The display currency.' })
+  currency: string;
+
+  @ApiProperty({
+    example: '2026-11-16',
+    description: "The provider's rate date.",
+  })
+  rateDate: string;
+
+  @ApiProperty({
+    example: false,
+    description:
+      'true if the API was unavailable and older cached rates were used.',
+  })
+  usingCachedRates: boolean;
 }
 
 export class BudgetByCategoryDto {
@@ -73,6 +105,17 @@ export class BudgetSummaryDto {
 
   @ApiProperty({ type: TotalsDto })
   total: TotalsDto;
+
+  @ApiPropertyOptional({ type: BudgetConversionDto, nullable: true })
+  conversion?: BudgetConversionDto | null;
+
+  @ApiPropertyOptional({
+    nullable: true,
+    example: null,
+    description:
+      'Why nothing was converted (e.g. no exchange rates available).',
+  })
+  conversionError?: string | null;
 }
 
 export class CityGroupDto {
@@ -130,6 +173,9 @@ export class ActivityDto {
   @ApiProperty({ example: 'EGP', nullable: true })
   currency: string | null;
 
+  @ApiPropertyOptional(CONVERTED)
+  convertedCost?: number | null;
+
   @ApiProperty({ type: [ActivityImageDto] })
   images: ActivityImageDto[];
 }
@@ -146,6 +192,9 @@ export class BudgetEntryDto {
 
   @ApiProperty({ example: 'EGP' })
   currency: string;
+
+  @ApiPropertyOptional(CONVERTED)
+  convertedAmount?: number | null;
 
   @ApiProperty({ example: 'Dinner on the Nile' })
   note: string;
@@ -217,6 +266,9 @@ export class TransportEntryDto {
 
   @ApiProperty({ example: 'EGP' })
   currency: string;
+
+  @ApiPropertyOptional(CONVERTED)
+  convertedAmount?: number | null;
 
   @ApiProperty({ example: 'Sleeper train' })
   note: string;

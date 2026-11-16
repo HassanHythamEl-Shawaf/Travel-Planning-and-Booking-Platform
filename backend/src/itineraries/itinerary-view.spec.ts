@@ -1,7 +1,9 @@
 import { Types } from 'mongoose';
 
+import { makeConverter } from '../fx-rates/fx-rates.service';
 import {
   addDays,
+  applyConversion,
   buildBudgetSummary,
   buildCityGroups,
   MoneyBag,
@@ -307,5 +309,70 @@ describe('toItineraryView', () => {
       isHidden: false,
       days: [],
     });
+  });
+});
+
+describe('applyConversion (ITN-18)', () => {
+  it('adds converted amounts next to every original amount', () => {
+    const d1 = day('cairo', {
+      budgetEntries: [
+        { _id: id(), category: 'food', amount: 500, currency: 'EGP', note: '' },
+      ],
+      activities: [
+        {
+          _id: id(),
+          name: 'Tour',
+          description: '',
+          time: null,
+          cost: 10,
+          currency: 'USD',
+          images: [],
+        },
+        {
+          _id: id(),
+          name: 'Walk',
+          description: '',
+          time: null,
+          cost: null,
+          currency: null,
+          images: [],
+        },
+      ],
+    });
+    const view = toItineraryView(
+      itinerary([d1], [transport(d1._id, 1000)]),
+      context,
+    );
+    const converter = makeConverter(
+      { rateDate: '2026-11-16', rates: { USD: 1, EGP: 50, EUR: 0.8 } },
+      'USD',
+      true,
+    );
+
+    applyConversion(view, converter);
+
+    expect(view.budget.conversion).toEqual({
+      currency: 'USD',
+      rateDate: '2026-11-16',
+      usingCachedRates: true,
+    });
+    expect(view.budget.byCategory.food.converted).toBe(10);
+    expect(view.budget.byCategory.activities.converted).toBe(10);
+    expect(view.budget.byCategory.intercity_transport.converted).toBe(20);
+    expect(view.budget.byCategory.accommodation.converted).toBe(0);
+    expect(view.budget.byDay[0].total.converted).toBe(40);
+    expect(view.budget.total.converted).toBe(40);
+    expect(view.cityGroups[0].subtotal.converted).toBe(40);
+    expect(view.days[0].budgetEntries[0].convertedAmount).toBe(10);
+    expect(view.days[0].activities.map((a) => a.convertedCost)).toEqual([
+      10,
+      null,
+    ]);
+    expect(view.transportEntries[0].convertedAmount).toBe(20);
+    // The original amounts are unchanged.
+    expect(view.budget.total.amounts).toEqual([
+      { currency: 'EGP', amount: 1500 },
+      { currency: 'USD', amount: 10 },
+    ]);
   });
 });

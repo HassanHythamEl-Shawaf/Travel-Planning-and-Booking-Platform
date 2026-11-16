@@ -19,6 +19,7 @@ import {
   ApiOkResponse,
   ApiOperation,
   ApiParam,
+  ApiServiceUnavailableResponse,
   ApiTags,
   ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
@@ -40,16 +41,18 @@ import { UserRole } from '../users/schemas/user.schema';
 import {
   ConfirmDto,
   CreateItineraryDto,
+  CurrencyQueryDto,
   SearchItinerariesQueryDto,
   UpdateItineraryDto,
   VisibilityDto,
 } from './dto/itinerary-requests.dto';
 import {
+  BudgetSummaryDto,
   ItineraryDeletedDto,
   ItineraryDetailDto,
   ItineraryListDto,
 } from './dto/itinerary-responses.dto';
-import type { ItineraryView } from './itinerary-view';
+import type { BudgetSummary, ItineraryView } from './itinerary-view';
 import {
   ItinerariesService,
   NOT_FOUND,
@@ -133,17 +136,41 @@ export class ItinerariesController {
   @ApiOperation({
     summary: 'View an itinerary (ITN-03, ITN-21)',
     description:
-      'Full details: days (numbered, dated), activities, budget entries, city groups, transport entries and budget totals. Public itineraries are visible to everyone, read-only (isOwner: false).',
+      'Full details: days (numbered, dated), activities, budget entries, city groups, transport entries and budget totals. Public itineraries are visible to everyone, read-only (isOwner: false). Amounts are also converted (ITN-18) to `currency`, or your preferred currency, or USD; budget.conversion shows the currency and rate date. If no rates are available, conversion is null and conversionError says why.',
   })
   @ApiParam(ITINERARY_ID_PARAM)
   @ApiOkResponse({ type: ItineraryDetailDto })
-  @ApiBadRequestResponse({ description: 'Invalid id' })
+  @ApiBadRequestResponse({ description: 'Invalid id, or unsupported currency' })
   @ApiNotFoundResponse({ description: NOT_VISIBLE })
   findOne(
     @Param('id', ParseObjectIdPipe) id: string,
     @OptionalCurrentUser() viewer: AuthenticatedUser | undefined,
+    @Query() query: CurrencyQueryDto,
   ): Promise<ItineraryView> {
-    return this.itineraries.findOne(id, viewer);
+    return this.itineraries.findOne(id, viewer, query.currency);
+  }
+
+  @Get(':id/budget')
+  @UseGuards(OptionalAuthGuard)
+  @ApiOperation({
+    summary: 'Budget converted to one currency (ITN-14, ITN-18)',
+    description:
+      'Totals by category, by day and overall, in their original currencies and converted to `currency`, or your preferred currency (ACC-09), or USD. Rates come from FXRatesAPI, fetched once a day and cached; if the API is down the last cached rates are used (usingCachedRates: true). Booking prices are never converted (PAY-04).',
+  })
+  @ApiParam(ITINERARY_ID_PARAM)
+  @ApiOkResponse({ type: BudgetSummaryDto })
+  @ApiBadRequestResponse({ description: 'Invalid id, or unsupported currency' })
+  @ApiNotFoundResponse({ description: NOT_VISIBLE })
+  @ApiServiceUnavailableResponse({
+    description:
+      'No exchange rates available (API down and nothing cached), or no rate for a currency used',
+  })
+  budget(
+    @Param('id', ParseObjectIdPipe) id: string,
+    @OptionalCurrentUser() viewer: AuthenticatedUser | undefined,
+    @Query() query: CurrencyQueryDto,
+  ): Promise<BudgetSummary> {
+    return this.itineraries.budget(id, viewer, query.currency);
   }
 
   @Patch(':id')

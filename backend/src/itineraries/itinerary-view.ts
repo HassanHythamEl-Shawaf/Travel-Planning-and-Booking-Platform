@@ -1,5 +1,6 @@
 import type { Types } from 'mongoose';
 
+import type { Converter } from '../fx-rates/fx-rates.service';
 import {
   BUDGET_CATEGORIES,
   type BudgetCategory,
@@ -61,6 +62,8 @@ export interface Money {
  */
 export interface Totals {
   amounts: Money[];
+  /** ITN-18: the same total in the display currency (budget.conversion). */
+  converted?: number | null;
 }
 
 /**
@@ -109,10 +112,20 @@ export interface DayTotal {
   total: Totals;
 }
 
+/** ITN-18: which currency and rates the `converted` amounts use. */
+export interface BudgetConversion {
+  currency: string;
+  rateDate: string;
+  usingCachedRates: boolean;
+}
+
 export interface BudgetSummary {
   byCategory: Record<BudgetLine, Totals>;
   byDay: DayTotal[];
   total: Totals;
+  /** null when no conversion was made (then conversionError says why). */
+  conversion?: BudgetConversion | null;
+  conversionError?: string | null;
 }
 
 /**
@@ -258,6 +271,8 @@ export interface ActivityView {
   time: string | null;
   cost: number | null;
   currency: string | null;
+  /** ITN-18: cost in the display currency, if converted. */
+  convertedCost?: number | null;
   images: { imageId: string; url: string }[];
 }
 
@@ -266,6 +281,8 @@ export interface BudgetEntryView {
   category: BudgetCategory;
   amount: number;
   currency: string;
+  /** ITN-18: amount in the display currency, if converted. */
+  convertedAmount?: number | null;
   note: string;
 }
 
@@ -291,6 +308,8 @@ export interface TransportEntryView {
   toCityName: string | null;
   amount: number;
   currency: string;
+  /** ITN-18: amount in the display currency, if converted. */
+  convertedAmount?: number | null;
   note: string;
 }
 
@@ -416,6 +435,53 @@ export function toItineraryView(
     createdAt: itinerary.createdAt ?? null,
     updatedAt: itinerary.updatedAt ?? null,
   };
+}
+
+// ------------------------------------------------------ ITN-18 conversion
+
+/**
+ * Adds amounts in one display currency next to the original ones (ITN-18):
+ * every total gets `converted`, every entry `convertedAmount` (activities:
+ * `convertedCost`), and `budget.conversion` says which currency and rate
+ * date were used and whether cached rates were used. Throws if a currency
+ * has no rate; the caller decides what to do then.
+ */
+export function applyConversion(
+  view: ItineraryView,
+  converter: Converter,
+): ItineraryView {
+  const convertTotals = (totals: Totals) => {
+    totals.converted = converter.convertSum(totals.amounts);
+  };
+
+  const { budget } = view;
+  for (const line of BUDGET_LINES) convertTotals(budget.byCategory[line]);
+  for (const day of budget.byDay) convertTotals(day.total);
+  convertTotals(budget.total);
+  for (const group of view.cityGroups) convertTotals(group.subtotal);
+
+  for (const day of view.days) {
+    for (const entry of day.budgetEntries) {
+      entry.convertedAmount = converter.convert(entry.amount, entry.currency);
+    }
+    for (const activity of day.activities) {
+      activity.convertedCost =
+        activity.cost !== null && activity.currency
+          ? converter.convert(activity.cost, activity.currency)
+          : null;
+    }
+  }
+  for (const entry of view.transportEntries) {
+    entry.convertedAmount = converter.convert(entry.amount, entry.currency);
+  }
+
+  budget.conversion = {
+    currency: converter.currency,
+    rateDate: converter.rateDate,
+    usingCachedRates: converter.usingCachedRates,
+  };
+  budget.conversionError = null;
+  return view;
 }
 
 /** Every city id an itinerary mentions (days and transport entries). */

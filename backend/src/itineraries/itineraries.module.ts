@@ -4,6 +4,7 @@ import { MongooseModule } from '@nestjs/mongoose';
 
 import { AuthModule } from '../auth/auth.module';
 import { OptionalAuthGuard } from '../blog/optional-auth.guard';
+import { FxRatesModule } from '../fx-rates/fx-rates.module';
 import { ModerationModule } from '../moderation/moderation.module';
 import { ReferenceDataModule } from '../reference-data/reference-data.module';
 import { Report, ReportSchema } from '../reports/schemas/report.schema';
@@ -32,6 +33,7 @@ import { Itinerary, ItinerarySchema } from './schemas/itinerary.schema';
     ReferenceDataModule,
     ModerationModule,
     UploadsModule,
+    FxRatesModule,
   ],
   controllers: [ItinerariesController, ItineraryItemsController],
   providers: [
