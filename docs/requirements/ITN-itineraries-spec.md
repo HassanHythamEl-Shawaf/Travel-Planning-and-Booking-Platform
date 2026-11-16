@@ -64,6 +64,20 @@
 | D27 | ITN-25 calls `HotelsService.searchHotels` (Seif) with the city's **name** (hotels store the city as free text) and the dates, **without** guest counts, because that search filters by per-room occupancy. It reads every page (50 per page, up to 20 pages), so availability, active hotels and blocked rooms come from that search. Then it keeps hotels whose city equals the name (case-insensitive) and that have at least `rooms` free rooms whose combined maximum occupancy (`maxAdults + maxChildren`) covers `guests`: the N biggest rooms are checked, which is the best possible combination. Results are paginated by 10 here. Gap noted for Seif: the hotel search has no number-of-rooms parameter. |
 | D28 | ITN-26 ("to **any** airport in the city of the first day"): `GET /flights/airports` lists the airports of day 1's city (`getAirportsInCity`). `GET /flights` searches **every** one of them with Yahia's `searchFlights` (all pages), merges the outbound and return lists, sorts them like FLT-15 (`sort` = price, duration or departure, default departure time) and paginates by 10. `to` is an optional filter to a single airport of that city (400 otherwise). Defaults: `tripType` one-way, `departureDate` = start date, `returnDate` = last day's date (round trips), 1 adult. Errors from the flight search itself (409s) are passed through. |
 
+### PDF export (ITN-28, optional bonus)
+
+| ID | Rule (sheet, Bonus section) |
+|---|---|
+| ITN-28 | The system shall allow a user to export or print an itinerary as PDF. (Depends on ITN-03.) |
+
+This is an optional bonus row of the official sheet, listed in Person 8's brief as optional. It was built after every mandatory row above was done and tested.
+
+| # | Decision |
+|---|---|
+| D29 | `GET /api/itineraries/:id/pdf` renders exactly the view of `GET /api/itineraries/:id` (same `findOne`), so it has the same visibility rules (D5): guests can export a public itinerary; a private one is 404 for everyone but its owner, admins too. "Print" is the same PDF, printed by the browser or viewer. |
+| D30 | Content: title, dates, day count, visibility, countries, author and clone credit; the route (city groups with subtotals); each day with its date, city, notes, activities (time, name, cost, description) and budget entries; intercity transport; the budget by category and total. Totals also show the converted amount (ITN-18) with the rate date, in `?currency=`, else the preferred currency, else USD. If no rates are available the PDF is still produced, without conversion, and says why (the soft conversion of `GET :id`, not the 503 of `GET :id/budget`). |
+| D31 | The download is named `itinerary-<id>.pdf`, never after the title, so user text never goes into a response header. It is rendered by a pure function (`itinerary-pdf.ts`, pdfkit, as in the FLT-23 e-ticket). The built-in Helvetica fonts only cover Western European text, so characters they cannot draw (e.g. Arabic) are shown as "?" instead of wrong letters. Known limit: embedding a Unicode font would lift it. |
+
 ## 3. Endpoints
 
 | Method | Path | Req | Who |
@@ -87,6 +101,7 @@
 | GET | `/api/itineraries/:id/hotels?group=&guests=&rooms=&page=` | ITN-25 | owner |
 | GET | `/api/itineraries/:id/flights/airports` | ITN-26 | owner |
 | GET | `/api/itineraries/:id/flights?from=&to=&tripType=&departureDate=&returnDate=&adults=&children=&infants=&cabinClass=&sort=&page=` | ITN-26 | owner |
+| GET | `/api/itineraries/:id/pdf?currency=` | ITN-28 (bonus) | anyone who can see it |
 
 ## 4. Tests
 
@@ -104,4 +119,6 @@
   - **Hotels:** group dates; hotels with too few free rooms, a booked room, another city or an inactive hotel are excluded; one room for 4 guests; bad group, rooms > guests, past dates, other users and guests are rejected.
   - **Hotels:** `rooms` defaults to 1.
   - **Flights:** airports of day 1's city; one-way on the start date; round trip returning on the last day; a city with two airports gets both searched and merged (sorted by departure or price), `to` narrows to one and must be in that city; no days; other users.
+- `src/itineraries/itinerary-pdf.spec.ts` (ITN-28): a valid PDF titled with the itinerary; days, activities, budget, transport, converted totals and rate date are drawn; still produced without rates; clone credit; Arabic text doesn't crash and shows as "?"; compressed by default; file name from the id.
+- `test/itineraries.e2e-spec.ts` (ITN-28): the download is `application/pdf` named `itinerary-<id>.pdf`; a public itinerary exports for guests; a private one is 404 for guests, other users and admins; invalid id 400; unsupported currency 400.
 - `test/itineraries.e2e-spec.ts` also sets the preferred currency through `PATCH /api/users/me` (ACC-09) and checks that an unsupported preference falls back to USD.

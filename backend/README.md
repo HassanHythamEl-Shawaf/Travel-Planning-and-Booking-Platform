@@ -294,6 +294,10 @@ Swagger tags **Itineraries** and **Itinerary days, activities and budget**. Full
   `GET .../flights?from=&to=&tripType=` (ITN-26): flights to any airport in day 1's city (or only
   `to`), through `AirlinesService.searchFlights` for each airport, merged, sorted and paginated;
   dates default to the first and last day. `rooms` defaults to 1.
+- **PDF export** (ITN-28, optional bonus) — `GET /api/itineraries/:id/pdf?currency=`: the same
+  content as `GET /api/itineraries/:id` as a printable A4 PDF (`itinerary-<id>.pdf`), with the
+  same visibility rules and converted totals. Non-Western-European characters show as "?"
+  (built-in fonts).
 
 Who sees what: the owner always; a private itinerary nobody else (404, admins too); a public one
 everyone, read-only (other users get 403 on writes); hidden (GEN-10) only the owner and admins;
