@@ -246,11 +246,18 @@ Swagger tag **Uploads**. Full rules: `docs/requirements/GEN-08-uploads-spec.md`.
 - Use `@UseInterceptors(ImageFileInterceptor('file'))` on upload routes. It stops reading a file
   at 5 MB and answers 400 instead of multer's 413.
 - Delete files only after your database change is committed. Deletes are idempotent.
-- Bound so far: `BLOG_IMAGE_STORE`. `AirlineLogoUploadAdapter` and `HOTEL_PHOTO_STORE` exist;
-  the airline token must be bound in the same commit as a logo upload endpoint.
+- Bound: `BLOG_IMAGE_STORE` (Blog), `AIRLINE_LOGO_STORE` (Airlines) and `HOTEL_PHOTO_STORE`
+  (Hotels). Routes using them:
+  - Blog: `POST /api/posts/:id/images`, `DELETE /api/posts/:id/images/:imageId`, post author
+    only, 5 per post.
+  - Airlines: `PUT /api/airlines/:id/logo` (upload or replace) and `DELETE /api/airlines/:id/logo`,
+    assigned airline moderator only. One logo per airline: a new upload replaces the old one and
+    deletes its file. A direct `logoUrl` in create/update is rejected with 400.
+  - Hotels: `POST /api/hotels/:id/photos`, `DELETE /api/hotels/:id/photos/:fileName`, assigned
+    hotel moderator only (`ProviderOwnershipGuard`), 5 per hotel.
 
-Tests: `npm test -- src/uploads` and `npm run test:e2e -- uploads` (in-memory MongoDB, temporary
-folder).
+Tests: `npm test -- src/uploads` and `npm run test:e2e -- uploads provider-images` (in-memory
+MongoDB, temporary folder).
 
 ## Blog (BLG-01 – BLG-12)
 
@@ -303,10 +310,11 @@ Airline profiles are exposed through Swagger under the **Airlines** tag:
 
 The `isActive` flag is owned by the profile for the separate administrator
 deactivate/reactivate endpoints. Existing confirmed bookings are unaffected by
-that flag. Airline logos are intentionally not accepted as direct URLs; the
-profile has a `logoUrl` field and the module exposes an
-`AIRLINE_LOGO_STORE` boundary for Person 8's shared JPG/PNG upload integration.
-Until that integration is merged, sending `logoUrl` returns `501`.
+that flag. Airline logos are intentionally not accepted as direct URLs (sending
+`logoUrl` returns `400`). The assigned airline moderator uploads the logo with
+`PUT /api/airlines/:id/logo` (multipart `file`, JPG/PNG, 5 MB) and removes it
+with `DELETE /api/airlines/:id/logo`, through Person 8's shared upload module
+bound to `AIRLINE_LOGO_STORE` (see "Image uploads (GEN-08)").
 
 Targeted validation:
 

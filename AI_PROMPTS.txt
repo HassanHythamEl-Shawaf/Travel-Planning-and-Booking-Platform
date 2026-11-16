@@ -743,3 +743,21 @@ upload/delete and a parallel 5-image-limit test, added unit and e2e tests,
 the GEN-08 spec and a README section. Airline and hotel adapters exist but
 their endpoints wait for Yahia's and Seif's agreement.
 ================================================
+
+Date: 2026-11-16
+Student: Hammad
+Tool: Claude Code (Claude Opus 5.5)
+Related Requirement: GEN-08, FLT-01, HTL-01, BLG-10
+Prompt:
+With Yahia's, Seif's and Wael's agreement, connect the upload module to
+their modules: an airline logo upload endpoint (one logo per airline,
+direct URLs still rejected), hotel photo endpoints limited to the hotel's
+moderator (5 per hotel), and the 5 MB multer cap on Blog's image route.
+Test it over HTTP.
+How the output was used:
+Added PUT/DELETE /api/airlines/:id/logo and bound AIRLINE_LOGO_STORE,
+changed the direct-logoUrl check from 501 to 400 and updated Yahia's
+spec, added POST/DELETE /api/hotels/:id/photos with ProviderOwnershipGuard
+and a conditional push, switched Blog's route to ImageFileInterceptor, and
+added an e2e suite for logos and photos including parallel uploads.
+================================================
