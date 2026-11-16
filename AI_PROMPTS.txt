@@ -710,3 +710,36 @@ confirm it is stable, checked the Swagger UI of the built app against an
 in-memory database, and added a Flight bookings section to the README
 while updating notes that said the booking adapters were still missing.
 ================================================
+
+Date: 2026-11-16
+Student: Hammad
+Tool: Claude (claude.ai)
+Related Requirement: GEN-08, ITN-01 to ITN-26
+Prompt:
+Read the team's work split, the official requirements sheet and the repo,
+and write a handoff brief for Claude Code covering my whole Milestone 1
+scope (upload module, itineraries, budgets, FX rates, public itineraries,
+hotel and flight lookups), the integration points teammates left for me,
+and the team's ground rules.
+How the output was used:
+Used as the handoff file for Claude Code. It guided the implementation
+plan, the branch and PR split, and the decisions recorded in the specs.
+================================================
+
+Date: 2026-11-16
+Student: Hammad
+Tool: Claude Code (Claude Opus 5.5)
+Related Requirement: GEN-08, BLG-10
+Prompt:
+Build the shared image upload module from the handoff brief: JPG/PNG
+checked by magic bytes, 5 MB enforced in multer and in the service,
+per-item limits that hold under parallel uploads, random file names,
+files served by URL, and adapters for blog, airline logo and hotel photos.
+Bind it to Blog, update Blog's 501 test, test and document it.
+How the output was used:
+Added src/uploads (service, schema, serving controller, image interceptor,
+adapters), bound BLOG_IMAGE_STORE, replaced Blog's 501 e2e test with real
+upload/delete and a parallel 5-image-limit test, added unit and e2e tests,
+the GEN-08 spec and a README section. Airline and hotel adapters exist but
+their endpoints wait for Yahia's and Seif's agreement.
+================================================
