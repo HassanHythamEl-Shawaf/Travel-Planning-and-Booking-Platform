@@ -1,7 +1,9 @@
 import {
+  BadRequestException,
   ConflictException,
   Inject,
   Injectable,
+  Logger,
   NotFoundException,
   NotImplementedException,
   Optional,
@@ -93,6 +95,8 @@ function csvValue(value: string | number): string {
 
 @Injectable()
 export class AirlinesService {
+  private readonly logger = new Logger(AirlinesService.name);
+
   constructor(
     @InjectModel(Airline.name)
     private readonly airlineModel: Model<Airline>,
@@ -698,14 +702,66 @@ export class AirlinesService {
     return { tiers };
   }
 
-  private rejectDirectLogoUrl(logoUrl: string | undefined): void {
-    if (logoUrl === undefined) return;
+  /**
+   * FLT-01 / GEN-08 (Person 8): replaces the airline's logo with an uploaded
+   * image. One logo per airline: the new URL is swapped in atomically and the
+   * old file is deleted afterwards.
+   */
+  async uploadLogo(id: string, file: unknown): Promise<AirlineResponseDto> {
+    const store = this.requireLogoStore();
+    const exists = await this.airlineModel.exists({ _id: id }).exec();
+    if (!exists) throw new NotFoundException('Airline not found');
+
+    // Validates JPG/PNG and 5 MB (400 otherwise).
+    const newUrl = await store.upload(file, id);
+    const before = await this.airlineModel
+      .findByIdAndUpdate(id, { $set: { logoUrl: newUrl } })
+      .lean()
+      .exec();
+    if (!before) {
+      await this.removeLogoFile(newUrl);
+      throw new NotFoundException('Airline not found');
+    }
+    if (before.logoUrl) await this.removeLogoFile(before.logoUrl);
+    return this.findOne(id);
+  }
+
+  /** FLT-01 / GEN-08 (Person 8): removes the airline's logo and its file. */
+  async removeLogo(id: string): Promise<AirlineResponseDto> {
+    this.requireLogoStore();
+    const before = await this.airlineModel
+      .findByIdAndUpdate(id, { $set: { logoUrl: null } })
+      .lean()
+      .exec();
+    if (!before) throw new NotFoundException('Airline not found');
+    if (before.logoUrl) await this.removeLogoFile(before.logoUrl);
+    return this.findOne(id);
+  }
+
+  private requireLogoStore(): AirlineLogoStore {
     if (!this.logoStore) {
       throw new NotImplementedException(
         'Airline logos require Person 8 image-upload integration',
       );
     }
+    return this.logoStore;
+  }
 
+  /** Best effort, after the database change: a failure is only logged. */
+  private async removeLogoFile(logoUrl: string): Promise<void> {
+    try {
+      await this.logoStore?.remove(logoUrl);
+    } catch {
+      this.logger.warn(`Could not delete airline logo ${logoUrl}`);
+    }
+  }
+
+  /** Logos are only set by uploading a file (PUT /airlines/:id/logo). */
+  private rejectDirectLogoUrl(logoUrl: string | undefined): void {
+    if (logoUrl === undefined) return;
+    throw new BadRequestException(
+      'logoUrl cannot be set directly; upload the logo with PUT /api/airlines/:id/logo',
+    );
   }
 
   private parseLocalDateTime(value: string, zone: string): DateTime {

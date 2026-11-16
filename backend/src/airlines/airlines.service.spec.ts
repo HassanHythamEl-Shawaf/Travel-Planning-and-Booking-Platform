@@ -1,4 +1,9 @@
-import { ConflictException, NotImplementedException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  NotFoundException,
+  NotImplementedException,
+} from '@nestjs/common';
 import { Types } from 'mongoose';
 
 import { AirlinesService } from './airlines.service';
@@ -101,7 +106,7 @@ describe('AirlinesService', () => {
     );
   });
 
-  it('creates an active airline with a null logo until upload integration exists', async () => {
+  it('creates an active airline with a null logo (logos are uploaded separately)', async () => {
     const dto: CreateAirlineDto = { name: 'Cairo Air', code: 'CA' };
 
     await expect(service.create(dto)).resolves.toMatchObject({
@@ -147,15 +152,92 @@ describe('AirlinesService', () => {
     ).rejects.toBeInstanceOf(ConflictException);
   });
 
-  it('does not accept a direct logo URL before Person 8 integration', async () => {
+  // Was 501 before the upload module existed (Person 8). A direct URL is now
+  // a 400: logos are only set by uploading a file.
+  it('does not accept a direct logo URL', async () => {
     await expect(
       service.create({
         name: 'Cairo Air',
         code: 'CA',
         logoUrl: 'https://example.com/logo.png',
       }),
-    ).rejects.toBeInstanceOf(NotImplementedException);
+    ).rejects.toBeInstanceOf(BadRequestException);
+    await expect(
+      service.update(id.toString(), { logoUrl: 'https://example.com/logo.png' }),
+    ).rejects.toBeInstanceOf(BadRequestException);
     expect(model.create).not.toHaveBeenCalled();
+    expect(model.findByIdAndUpdate).not.toHaveBeenCalled();
+  });
+
+  describe('logo upload (FLT-01, GEN-08)', () => {
+    let store: { upload: jest.Mock; remove: jest.Mock };
+    const file = { buffer: Buffer.from([0xff, 0xd8, 0xff]) };
+    const withStore = () =>
+      new AirlinesService(
+        model as never,
+        flightModel as never,
+        store as never,
+        referenceData as never,
+        assignments as never,
+      );
+
+    beforeEach(() => {
+      store = {
+        upload: jest.fn().mockResolvedValue('/api/uploads/new.jpg'),
+        remove: jest.fn().mockResolvedValue(undefined),
+      };
+      model.exists = jest.fn().mockReturnValue(exec({ _id: id }));
+      model.findByIdAndUpdate = jest
+        .fn()
+        .mockReturnValue(leanExec({ ...stored, logoUrl: '/api/uploads/old.jpg' }));
+      model.findById = jest
+        .fn()
+        .mockReturnValue(leanExec({ ...stored, logoUrl: '/api/uploads/new.jpg' }));
+    });
+
+    it('answers 501 while no upload store is bound', async () => {
+      await expect(service.uploadLogo(id.toString(), file)).rejects.toBeInstanceOf(
+        NotImplementedException,
+      );
+    });
+
+    it('replaces the logo and deletes the old file (1 logo per airline)', async () => {
+      const result = await withStore().uploadLogo(id.toString(), file);
+
+      expect(store.upload).toHaveBeenCalledWith(file, id.toString());
+      expect(model.findByIdAndUpdate).toHaveBeenCalledWith(id.toString(), {
+        $set: { logoUrl: '/api/uploads/new.jpg' },
+      });
+      expect(store.remove).toHaveBeenCalledWith('/api/uploads/old.jpg');
+      expect(result.logoUrl).toBe('/api/uploads/new.jpg');
+    });
+
+    it('stores nothing for an unknown airline', async () => {
+      model.exists.mockReturnValue(exec(null));
+      await expect(
+        withStore().uploadLogo(id.toString(), file),
+      ).rejects.toBeInstanceOf(NotFoundException);
+      expect(store.upload).not.toHaveBeenCalled();
+    });
+
+    it('deletes the new file if the airline disappears during the upload', async () => {
+      model.findByIdAndUpdate.mockReturnValue(leanExec(null));
+      await expect(
+        withStore().uploadLogo(id.toString(), file),
+      ).rejects.toBeInstanceOf(NotFoundException);
+      expect(store.remove).toHaveBeenCalledWith('/api/uploads/new.jpg');
+    });
+
+    it('removes the logo and its file', async () => {
+      model.findById.mockReturnValue(leanExec({ ...stored, logoUrl: null }));
+      const result = await withStore().removeLogo(id.toString());
+
+      expect(model.findByIdAndUpdate).toHaveBeenCalledWith(id.toString(), {
+        $set: { logoUrl: null },
+      });
+      expect(store.remove).toHaveBeenCalledWith('/api/uploads/old.jpg');
+      expect(result.logoUrl).toBeNull();
+    });
   });
 
   it('maps seeded airports to the public airport contract', async () => {
