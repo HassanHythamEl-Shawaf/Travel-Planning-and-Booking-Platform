@@ -164,17 +164,25 @@ describe('UploadsService (GEN-08)', () => {
         type: 'airline',
         id: 'airline-1',
       });
-      await service.deleteByUrl(stored.url);
+      await service.deleteByUrl(stored.url, { type: 'airline', id: 'airline-1' });
       expect(await model.countDocuments()).toBe(0);
       expect(filesOnDisk()).toEqual([]);
+    });
+
+    it('never deletes another item\'s file by URL', async () => {
+      const stored = await service.upload(file(JPEG_BYTES), post);
+      await service.deleteByUrl(stored.url, { type: 'hotel', id: 'hotel-1' });
+      await service.deleteByUrl(stored.url, { type: 'post', id: 'other-post' });
+      expect(await model.countDocuments()).toBe(1);
+      expect(filesOnDisk()).toEqual([stored.fileName]);
     });
 
     it('ignores unknown ids and foreign URLs', async () => {
       const stored = await service.upload(file(JPEG_BYTES), post);
       await service.delete(new Types.ObjectId().toString());
       await service.delete('not-an-id');
-      await service.deleteByUrl('https://example.com/logo.png');
-      await service.deleteByUrl(`/elsewhere/${stored.fileName}`);
+      await service.deleteByUrl('https://example.com/logo.png', post);
+      await service.deleteByUrl(`/elsewhere/${stored.fileName}`, post);
       expect(await model.countDocuments()).toBe(1);
       expect(filesOnDisk()).toEqual([stored.fileName]);
     });

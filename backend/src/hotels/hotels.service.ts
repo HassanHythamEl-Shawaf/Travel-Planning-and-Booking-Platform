@@ -297,7 +297,7 @@ export class HotelsService {
       .lean()
       .exec();
     if (!updated) {
-      await this.removePhotoFile(url);
+      await this.removePhotoFile(url, hotelId);
       const exists = await this.hotelModel.exists({ _id: hotelId }).exec();
       if (!exists) throw new NotFoundException('Hotel not found');
       throw new BadRequestException(
@@ -324,7 +324,7 @@ export class HotelsService {
       .lean()
       .exec();
     if (!updated) throw new NotFoundException('Photo not found on this hotel');
-    await this.removePhotoFile(url);
+    await this.removePhotoFile(url, hotelId);
     return { photos: updated.photos };
   }
 
@@ -335,10 +335,13 @@ export class HotelsService {
     return this.photoStore;
   }
 
-  /** Best effort, after the database change: a failure is only logged. */
-  private async removePhotoFile(url: string): Promise<void> {
+  /**
+   * Best effort, after the database change: a failure is only logged. Only
+   * files uploaded for this hotel are deleted.
+   */
+  private async removePhotoFile(url: string, hotelId: string): Promise<void> {
     try {
-      await this.photoStore?.remove(url);
+      await this.photoStore?.remove(url, hotelId);
     } catch {
       this.logger.warn(`Could not delete hotel photo ${url}`);
     }

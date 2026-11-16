@@ -7,9 +7,6 @@ import { UploadsService } from '../uploads.service';
  * Airlines' AIRLINE_LOGO_STORE (FLT-01). One logo per airline: the airline
  * document has a single logoUrl, so uploading a new logo replaces the old
  * one and the airline service removes the old file.
- *
- * Not bound yet: binding it must happen in the same commit as a real logo
- * upload endpoint (see the uploads spec, D7).
  */
 @Injectable()
 export class AirlineLogoUploadAdapter implements AirlineLogoStore {
@@ -23,7 +20,7 @@ export class AirlineLogoUploadAdapter implements AirlineLogoStore {
     return stored.url;
   }
 
-  remove(logoUrl: string): Promise<void> {
-    return this.uploads.deleteByUrl(logoUrl);
+  remove(logoUrl: string, airlineId: string): Promise<void> {
+    return this.uploads.deleteByUrl(logoUrl, { type: 'airline', id: airlineId });
   }
 }

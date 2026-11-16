@@ -208,7 +208,10 @@ describe('AirlinesService', () => {
       expect(model.findByIdAndUpdate).toHaveBeenCalledWith(id.toString(), {
         $set: { logoUrl: '/api/uploads/new.jpg' },
       });
-      expect(store.remove).toHaveBeenCalledWith('/api/uploads/old.jpg');
+      expect(store.remove).toHaveBeenCalledWith(
+        '/api/uploads/old.jpg',
+        id.toString(),
+      );
       expect(result.logoUrl).toBe('/api/uploads/new.jpg');
     });
 
@@ -225,7 +228,10 @@ describe('AirlinesService', () => {
       await expect(
         withStore().uploadLogo(id.toString(), file),
       ).rejects.toBeInstanceOf(NotFoundException);
-      expect(store.remove).toHaveBeenCalledWith('/api/uploads/new.jpg');
+      expect(store.remove).toHaveBeenCalledWith(
+        '/api/uploads/new.jpg',
+        id.toString(),
+      );
     });
 
     it('removes the logo and its file', async () => {
@@ -235,7 +241,10 @@ describe('AirlinesService', () => {
       expect(model.findByIdAndUpdate).toHaveBeenCalledWith(id.toString(), {
         $set: { logoUrl: null },
       });
-      expect(store.remove).toHaveBeenCalledWith('/api/uploads/old.jpg');
+      expect(store.remove).toHaveBeenCalledWith(
+        '/api/uploads/old.jpg',
+        id.toString(),
+      );
       expect(result.logoUrl).toBeNull();
     });
   });

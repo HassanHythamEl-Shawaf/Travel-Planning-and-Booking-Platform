@@ -13,8 +13,8 @@ export const HOTEL_PHOTO_STORE = Symbol('HOTEL_PHOTO_STORE');
 export interface HotelPhotoStore {
   /** Validates and stores the photo; returns its URL. */
   upload(file: unknown, hotelId: string): Promise<string>;
-  /** Deletes the stored file behind a photo URL. */
-  remove(photoUrl: string): Promise<void>;
+  /** Deletes the photo file, only if it was uploaded for this hotel. */
+  remove(photoUrl: string, hotelId: string): Promise<void>;
 }
 
 @Injectable()
@@ -29,7 +29,7 @@ export class HotelPhotoUploadAdapter implements HotelPhotoStore {
     return stored.url;
   }
 
-  remove(photoUrl: string): Promise<void> {
-    return this.uploads.deleteByUrl(photoUrl);
+  remove(photoUrl: string, hotelId: string): Promise<void> {
+    return this.uploads.deleteByUrl(photoUrl, { type: 'hotel', id: hotelId });
   }
 }

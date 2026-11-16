@@ -121,12 +121,20 @@ export class UploadsService {
     if (record) await this.removeFile(record.fileName);
   }
 
-  /** Deletes an image by its URL. Does nothing if it is not one of ours. */
-  async deleteByUrl(url: string): Promise<void> {
+  /**
+   * Deletes an image by its URL, only if it belongs to the given item. Does
+   * nothing for URLs that are not ours or belong to another item, so a URL
+   * copied into one item can never delete another item's file.
+   */
+  async deleteByUrl(url: string, owner: UploadOwner): Promise<void> {
     const fileName = this.fileNameFromUrl(url);
     if (!fileName) return;
     const record = await this.uploads
-      .findOneAndDelete({ fileName })
+      .findOneAndDelete({
+        fileName,
+        ownerType: owner.type,
+        ownerId: owner.id,
+      })
       .lean()
       .exec();
     if (record) await this.removeFile(record.fileName);

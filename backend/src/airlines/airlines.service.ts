@@ -719,10 +719,10 @@ export class AirlinesService {
       .lean()
       .exec();
     if (!before) {
-      await this.removeLogoFile(newUrl);
+      await this.removeLogoFile(newUrl, id);
       throw new NotFoundException('Airline not found');
     }
-    if (before.logoUrl) await this.removeLogoFile(before.logoUrl);
+    if (before.logoUrl) await this.removeLogoFile(before.logoUrl, id);
     return this.findOne(id);
   }
 
@@ -734,7 +734,7 @@ export class AirlinesService {
       .lean()
       .exec();
     if (!before) throw new NotFoundException('Airline not found');
-    if (before.logoUrl) await this.removeLogoFile(before.logoUrl);
+    if (before.logoUrl) await this.removeLogoFile(before.logoUrl, id);
     return this.findOne(id);
   }
 
@@ -748,9 +748,9 @@ export class AirlinesService {
   }
 
   /** Best effort, after the database change: a failure is only logged. */
-  private async removeLogoFile(logoUrl: string): Promise<void> {
+  private async removeLogoFile(logoUrl: string, airlineId: string): Promise<void> {
     try {
-      await this.logoStore?.remove(logoUrl);
+      await this.logoStore?.remove(logoUrl, airlineId);
     } catch {
       this.logger.warn(`Could not delete airline logo ${logoUrl}`);
     }

@@ -272,6 +272,26 @@ describe('Airline logo and hotel photos (e2e, GEN-08)', () => {
       await hotelModerator.delete(`${photos()}/${fileName}`).expect(404);
     });
 
+    it("never deletes another item's file through a copied URL", async () => {
+      // POST /api/hotels accepts photo URL strings, so a hotel could list an
+      // image that belongs to something else (here: the airline's logo).
+      const logo = await airlineModerator
+        .put(`/api/airlines/${airlineId}/logo`)
+        .attach('file', JPEG_BYTES, 'logo.jpg')
+        .expect(200);
+      await connection
+        .collection('hotels')
+        .updateOne({}, { $push: { photos: logo.body.logoUrl } });
+
+      const fileName = (logo.body.logoUrl as string).split('/').pop();
+      await hotelModerator.delete(`${photos()}/${fileName}`).expect(200);
+      // The reference is gone from the hotel, but the airline's file stays.
+      await request(server).get(logo.body.logoUrl).expect(200);
+      expect(await uploadsFor('airline', airlineId)).toBe(1);
+
+      await airlineModerator.delete(`/api/airlines/${airlineId}/logo`).expect(200);
+    });
+
     it('allows only the assigned hotel moderator', async () => {
       await request(server)
         .post(photos())
