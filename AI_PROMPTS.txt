@@ -799,3 +799,21 @@ retry wait, conversion maths), converted amounts in the itinerary view
 and a GET /itineraries/:id/budget endpoint, unit and e2e tests, the
 ITN-18 spec and a README section.
 ================================================
+
+Date: 2026-11-16
+Student: Hammad
+Tool: Claude Code (Claude Opus 5.5)
+Related Requirement: ITN-25, ITN-26, HTL-11, FLT-11, FLT-12
+Prompt:
+Add the itinerary hotel and flight lookups from the handoff brief,
+reusing Seif's hotel search and Yahia's flight search instead of copying
+their logic: hotels for a city group's dates with N rooms covering the
+guests, and flights from an origin to the city of day 1 with dates
+defaulting to the first and last day.
+How the output was used:
+Added ItinerarySearchService and controller (hotels, arrival airports,
+flights), the "N biggest rooms cover the guests" rule on top of the hotel
+search's availability, an e2e suite with real hotels, rooms, a booked
+room and flights, and spec and README notes, including the gaps noted for
+Seif (no room-count parameter, no past check-in check).
+================================================

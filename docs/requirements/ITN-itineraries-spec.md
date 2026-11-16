@@ -1,6 +1,6 @@
 # Spec: Itineraries (days, activities, budget, public itineraries)
 
-**Requirements:** ITN-01, ITN-03, ITN-05, ITN-07, ITN-08, ITN-09, ITN-10, ITN-12, ITN-14, ITN-16, ITN-20, ITN-21. Related: ACC-11, ACC-12, GEN-03, GEN-05, GEN-08, GEN-09, GEN-10, BLG-12. ITN-18 (FX) and ITN-25 / ITN-26 (hotel and flight lookups) have their own sections in later specs.
+**Requirements:** ITN-01, ITN-03, ITN-05, ITN-07, ITN-08, ITN-09, ITN-10, ITN-12, ITN-14, ITN-16, ITN-20, ITN-21, ITN-25, ITN-26. Related: ACC-11, ACC-12, GEN-03, GEN-05, GEN-08, GEN-09, GEN-10, BLG-12, HTL-11, FLT-11, FLT-12. ITN-18 (exchange rates) is in `ITN-18-fx-rates-spec.md`.
 **Owner:** Hammad (Person 8)
 **Authority:** the official requirements sheet wins over this spec.
 
@@ -50,6 +50,20 @@
 | D23 | Moderation (GEN-09 / GEN-10): an `itinerary` handler replaces the raw default. `find` tolerates documents with only the contract fields; `publiclyVisible = isPublic && !isHidden`; snapshot excerpt = title; `assets` = activity image ids, deleted in `afterDelete`. `setHidden` is conditional on the current state. |
 | D24 | Activity images (ITN-12): the file is stored once (outside the save loop), then attached with the 5-per-activity check inside the loop. If attaching fails (limit reached by a parallel upload, activity deleted meanwhile, 409), the stored file is deleted. Removing an image deletes its file after the save. |
 
+### Hotel and flight lookups (ITN-25, ITN-26)
+
+| ID | Rule (sheet) |
+|---|---|
+| ITN-25 | Pick a city group and view hotels available for its dates (check-in = the group's first day, check-out = the day after its last day) for a guest count and number of rooms, reusing hotel search (HTL-11). |
+| ITN-26 | Search one-way or round-trip flights from a chosen origin airport to any airport in the city of the itinerary's first day. Outbound defaults to the start date, return to the last day's date; reuses FLT-11 and FLT-12. |
+
+| # | Decision |
+|---|---|
+| D25 | Lookups are for the itinerary's owner (logged in; 404 / 403 as for other owner actions). |
+| D26 | ITN-25 picks a city group by its number (`group`, 1 = the first of `cityGroups`), with `guests` (1–50) and `rooms` (1–20, not more than guests). The check-in must not be in the past (HTL-11; the hotel search itself doesn't check this). |
+| D27 | ITN-25 calls `HotelsService.searchHotels` (Seif) with the city's **name** (hotels store the city as free text) and the dates, **without** guest counts, because that search filters by per-room occupancy. It reads every page (50 per page, up to 20 pages), so availability, active hotels and blocked rooms come from that search. Then it keeps hotels whose city equals the name (case-insensitive) and that have at least `rooms` free rooms whose combined maximum occupancy (`maxAdults + maxChildren`) covers `guests`: the N biggest rooms are checked, which is the best possible combination. Results are paginated by 10 here. Gap noted for Seif: the hotel search has no number-of-rooms parameter. |
+| D28 | ITN-26: `GET /flights/airports` lists the airports of day 1's city (`getAirportsInCity`). `GET /flights` searches one airport, `to`, which may be left out when the city has exactly one. This keeps Yahia's search and paging unchanged, instead of merging several searches. Defaults: `tripType` one-way, `departureDate` = start date, `returnDate` = last day's date (round trips), 1 adult. Errors from the flight search itself (409s) are passed through. |
+
 ## 3. Endpoints
 
 | Method | Path | Req | Who |
@@ -70,6 +84,9 @@
 | POST, DELETE | `/api/itineraries/:id/days/:dayId/activities/:activityId/images[/:imageId]` | ITN-12 | owner |
 | POST, PATCH, DELETE | `/api/itineraries/:id/days/:dayId/budget-entries[/:entryId]` | ITN-14 | owner |
 | POST, PATCH, DELETE | `/api/itineraries/:id/transport-entries[/:entryId]` | ITN-16 | owner |
+| GET | `/api/itineraries/:id/hotels?group=&guests=&rooms=&page=` | ITN-25 | owner |
+| GET | `/api/itineraries/:id/flights/airports` | ITN-26 | owner |
+| GET | `/api/itineraries/:id/flights?from=&to=&tripType=&departureDate=&returnDate=&adults=&children=&infants=&cabinClass=&sort=&page=` | ITN-26 | owner |
 
 ## 4. Tests
 
@@ -82,3 +99,7 @@
   - **Parallel requests:** 10 day adds never lose or duplicate a day; 6 adds against 58 days give exactly 60; 7 image uploads keep exactly 5.
   - **Access:** private access (admins too); public read-only and Private at once; search by title, country, city and days, with paging; hidden; deactivated owner.
   - **Clone and delete:** clone independence and credit; owner delete closes reports and keeps the clone; admin delete through moderation, files removed.
+- `src/itineraries/itinerary-search.service.spec.ts`: the "N rooms cover the guests" rule.
+- `test/itinerary-search.e2e-spec.ts` (real hotel and flight searches):
+  - **Hotels:** group dates; hotels with too few free rooms, a booked room, another city or an inactive hotel are excluded; one room for 4 guests; bad group, rooms > guests, past dates, other users and guests are rejected.
+  - **Flights:** airports of day 1's city; one-way on the start date without `to`; round trip returning on the last day; `to` required (and checked) when the city has two airports; no days; other users.

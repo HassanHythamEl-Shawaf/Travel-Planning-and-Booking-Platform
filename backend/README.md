@@ -287,6 +287,12 @@ Swagger tags **Itineraries** and **Itinerary days, activities and budget**. Full
   `q` matches title, country name/code or city name; newest first; 10 per page) and
   `POST /api/itineraries/:id/clone` (user accounts): a private, independent copy with its own
   image files and `clonedFrom` crediting the original author.
+- **Hotels and flights** (owner) — `GET /api/itineraries/:id/hotels?group=&guests=&rooms=`
+  (ITN-25): hotels in a city group's city for its dates (check-out = the day after the group's
+  last day) with at least `rooms` free rooms whose combined occupancy covers `guests`, through
+  `HotelsService.searchHotels`. `GET .../flights/airports` and
+  `GET .../flights?from=&to=&tripType=` (ITN-26): flights to an airport in day 1's city, through
+  `AirlinesService.searchFlights`; dates default to the first and last day.
 
 Who sees what: the owner always; a private itinerary nobody else (404, admins too); a public one
 everyone, read-only (other users get 403 on writes); hidden (GEN-10) only the owner and admins;
