@@ -225,6 +225,33 @@ other reporters.
 
 Tests: `npm run test:e2e -- reports` (in-memory replica set, never Atlas).
 
+## Image uploads (GEN-08)
+
+Swagger tag **Uploads**. Full rules: `docs/requirements/GEN-08-uploads-spec.md`.
+
+- **Limits** — JPG or PNG only, at most 5 MB each. The type is checked from the file's first
+  bytes, not from the name or the mimetype the client sends. Anything else gets a 400.
+  Per-item maximums (`MAX_IMAGES_PER_ITEM`): 5 per post, activity or hotel, 1 logo per airline.
+- **Storage** — files go to `UPLOAD_DIR` (optional; default `backend/uploads/`, git-ignored)
+  under a random name `<uuid>.jpg|png`, with a record in the `uploads` collection.
+- **Serving** — `GET /api/uploads/:fileName` is public and returns the image with its stored
+  content type. Every upload returns its `url` in this form, relative to the API host.
+
+**For teammates:**
+- Import `UploadsModule`, then bind your token to an adapter, e.g.
+  `{ provide: BLOG_IMAGE_STORE, useExisting: BlogImageUploadAdapter }`, or call
+  `UploadsService.upload(file, { type, id })` / `delete(id)` / `deleteByUrl(url)` directly.
+- Enforce the per-item maximum on your own document with a conditional update (Blog uses
+  `'images.4': { $exists: false }`). If it fails, delete the file you just uploaded and answer 400.
+- Use `@UseInterceptors(ImageFileInterceptor('file'))` on upload routes. It stops reading a file
+  at 5 MB and answers 400 instead of multer's 413.
+- Delete files only after your database change is committed. Deletes are idempotent.
+- Bound so far: `BLOG_IMAGE_STORE`. `AirlineLogoUploadAdapter` and `HOTEL_PHOTO_STORE` exist;
+  the airline token must be bound in the same commit as a logo upload endpoint.
+
+Tests: `npm test -- src/uploads` and `npm run test:e2e -- uploads` (in-memory MongoDB, temporary
+folder).
+
 ## Blog (BLG-01 – BLG-12)
 
 Swagger tag **Blog**. Full rules: `docs/requirements/BLG-blog-spec.md`.
@@ -249,8 +276,8 @@ Swagger tag **Blog**. Full rules: `docs/requirements/BLG-blog-spec.md`.
   same transaction as the like or comment (hidden comments are not counted).
 - **Images** — `POST /api/posts/:id/images` (multipart `file`) and
   `DELETE /api/posts/:id/images/:imageId`. They go through the shared upload module (JPG/PNG,
-  5 MB, max 5 per post; the first image is the cover). Until that module is bound to
-  `BLOG_IMAGE_STORE` in `BlogModule`, both answer **501**.
+  5 MB, max 5 per post; the first image is the cover). `BlogModule` binds
+  `BLOG_IMAGE_STORE` to the upload module's `BlogImageUploadAdapter`.
 - **Author page** — `GET /api/authors/:id` returns name, join date, published posts (paginated)
   and up to 10 public itineraries (read from `itineraries` via
   `ITINERARY_FIELDS` in `teammate-contracts.ts`).
