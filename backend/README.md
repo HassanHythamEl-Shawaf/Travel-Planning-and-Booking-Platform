@@ -291,8 +291,9 @@ Swagger tags **Itineraries** and **Itinerary days, activities and budget**. Full
   (ITN-25): hotels in a city group's city for its dates (check-out = the day after the group's
   last day) with at least `rooms` free rooms whose combined occupancy covers `guests`, through
   `HotelsService.searchHotels`. `GET .../flights/airports` and
-  `GET .../flights?from=&to=&tripType=` (ITN-26): flights to an airport in day 1's city, through
-  `AirlinesService.searchFlights`; dates default to the first and last day.
+  `GET .../flights?from=&to=&tripType=` (ITN-26): flights to any airport in day 1's city (or only
+  `to`), through `AirlinesService.searchFlights` for each airport, merged, sorted and paginated;
+  dates default to the first and last day. `rooms` defaults to 1.
 
 Who sees what: the owner always; a private itinerary nobody else (404, admins too); a public one
 everyone, read-only (other users get 403 on writes); hidden (GEN-10) only the owner and admins;

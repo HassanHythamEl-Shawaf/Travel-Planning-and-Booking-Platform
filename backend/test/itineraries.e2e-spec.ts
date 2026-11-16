@@ -579,9 +579,11 @@ describe('Itineraries (e2e)', () => {
       expect(egp.body.total.converted).toBe(4500.25); // 100.25 + 110*40
       expect(egp.body.conversion.currency).toBe('EGP');
 
-      await connection
-        .collection('users')
-        .updateOne({ _id: aliceId }, { $set: { preferredCurrency: 'JOD' } });
+      // ACC-09: the user sets a preferred currency on their profile.
+      await alice
+        .patch('/api/users/me')
+        .send({ preferredCurrency: 'JOD' })
+        .expect(200);
       const jod = await alice
         .get(`/api/itineraries/${tripId}/budget`)
         .expect(200);
@@ -597,6 +599,17 @@ describe('Itineraries (e2e)', () => {
         .query({ currency: 'usd' })
         .expect(400);
       await bob.get(`/api/itineraries/${tripId}/budget`).expect(404); // private
+
+      // The profile accepts any 3 letters (ACC-09 is Person 1's); an
+      // unsupported preference falls back to USD instead of failing.
+      await alice
+        .patch('/api/users/me')
+        .send({ preferredCurrency: 'XYZ' })
+        .expect(200);
+      const fallback = await alice
+        .get(`/api/itineraries/${tripId}/budget`)
+        .expect(200);
+      expect(fallback.body.conversion.currency).toBe('USD');
       await connection
         .collection('users')
         .updateOne({ _id: aliceId }, { $unset: { preferredCurrency: '' } });

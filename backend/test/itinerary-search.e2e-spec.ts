@@ -216,23 +216,32 @@ describe('Itinerary hotel and flight search (e2e, ITN-25, ITN-26)', () => {
     await room(closed._id, 'Big', 4, 4);
 
     // Flights LHR -> CAI on the start date, and back on the last day.
-    const airline = await connection
-      .collection('airlines')
-      .insertOne({
-        name: 'Nile Air',
-        code: 'NA',
-        isActive: true,
-        logoUrl: null,
-      });
+    const airline = await connection.collection('airlines').insertOne({
+      name: 'Nile Air',
+      code: 'NA',
+      isActive: true,
+      logoUrl: null,
+    });
     const flights = app.get<Model<Flight>>(getModelToken(Flight.name));
-    const flight = (number: string, from: string, to: string, date: string) =>
+    const flight = (
+      number: string,
+      from: string,
+      to: string,
+      date: string,
+      hour = 8,
+      price = 300,
+    ) =>
       flights.create({
         airlineId: airline.insertedId,
         flightNumber: number,
         departureAirportCode: from,
         arrivalAirportCode: to,
-        departureAt: new Date(`${date}T08:00:00Z`),
-        arrivalAt: new Date(`${date}T13:00:00Z`),
+        departureAt: new Date(
+          `${date}T${String(hour).padStart(2, '0')}:00:00Z`,
+        ),
+        arrivalAt: new Date(
+          `${date}T${String(hour + 5).padStart(2, '0')}:00:00Z`,
+        ),
         departureTimeZone: 'UTC',
         arrivalTimeZone: 'UTC',
         departureLocalDate: date,
@@ -241,7 +250,7 @@ describe('Itinerary hotel and flight search (e2e, ITN-25, ITN-26)', () => {
           {
             category: CabinCategory.ECONOMY,
             seatCount: 50,
-            price: 300,
+            price,
             freeBaggageAllowance: 1,
             maxWeightPerBagKg: 23,
           },
@@ -249,6 +258,9 @@ describe('Itinerary hotel and flight search (e2e, ITN-25, ITN-26)', () => {
       });
     await flight('NA1', 'LHR', 'CAI', START);
     await flight('NA2', 'CAI', 'LHR', plusDays(33));
+    // London has two airports: one flight to each, the Gatwick one earlier but dearer.
+    await flight('NA3', 'CAI', 'LHR', START, 10, 250);
+    await flight('NA4', 'CAI', 'LGW', START, 6, 400);
 
     await insertUser('alice@s.test', 'Alice');
     await insertUser('bob@s.test', 'Bob');
@@ -298,6 +310,11 @@ describe('Itinerary hotel and flight search (e2e, ITN-25, ITN-26)', () => {
       expect(
         res.body.items[0].rooms.map((r: { name: string }) => r.name),
       ).toEqual(['Suite A']);
+
+      // HTL-11: the number of rooms defaults to 1.
+      const byDefault = await hotels({ group: 2, guests: 4 }).expect(200);
+      expect(byDefault.body.stay.rooms).toBe(1);
+      expect(byDefault.body.items).toEqual(res.body.items);
     });
 
     it('rejects bad groups, more rooms than guests, past dates and other users', async () => {
@@ -333,14 +350,14 @@ describe('Itinerary hotel and flight search (e2e, ITN-25, ITN-26)', () => {
       });
     });
 
-    it('searches one-way on the start date by default (one airport, so no `to` needed)', async () => {
+    it('searches one-way on the start date by default', async () => {
       const res = await alice
         .get(`/api/itineraries/${tripId}/flights`)
         .query({ from: 'lhr' })
         .expect(200);
       expect(res.body.search).toEqual({
         from: 'LHR',
-        to: 'CAI',
+        to: ['CAI'],
         tripType: 'one-way',
         departureDate: START,
         returnDate: null,
@@ -374,21 +391,36 @@ describe('Itinerary hotel and flight search (e2e, ITN-25, ITN-26)', () => {
       expect(other.body.items).toEqual([]);
     });
 
-    it('needs `to` when the city has several airports, and it must be one of them', async () => {
+    it('searches every airport in the city, merged and sorted; `to` narrows it to one', async () => {
       const london = await trip(START, ['london']);
-      const res = await alice
+      const numbers = (res: request.Response) =>
+        res.body.items.map((f: { flightNumber: string }) => f.flightNumber);
+
+      const all = await alice
         .get(`/api/itineraries/${london}/flights`)
         .query({ from: 'CAI' })
-        .expect(400);
-      expect(res.body.message).toContain('LGW, LHR');
-      await alice
+        .expect(200);
+      expect(all.body.search.to).toEqual(['LGW', 'LHR']);
+      expect(numbers(all)).toEqual(['NA4', 'NA3']); // by departure time
+      expect(all.body).toMatchObject({ total: 2, page: 1, totalPages: 1 });
+
+      const byPrice = await alice
+        .get(`/api/itineraries/${london}/flights`)
+        .query({ from: 'CAI', sort: 'price' })
+        .expect(200);
+      expect(numbers(byPrice)).toEqual(['NA3', 'NA4']);
+
+      const gatwick = await alice
+        .get(`/api/itineraries/${london}/flights`)
+        .query({ from: 'CAI', to: 'LGW' })
+        .expect(200);
+      expect(numbers(gatwick)).toEqual(['NA4']);
+
+      const wrong = await alice
         .get(`/api/itineraries/${london}/flights`)
         .query({ from: 'CAI', to: 'CAI' })
         .expect(400);
-      await alice
-        .get(`/api/itineraries/${london}/flights`)
-        .query({ from: 'CAI', to: 'LHR' })
-        .expect(200);
+      expect(wrong.body.message).toContain('LGW, LHR');
 
       const empty = (
         await alice

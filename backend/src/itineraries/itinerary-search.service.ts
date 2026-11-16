@@ -1,7 +1,10 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 
 import { AirlinesService } from '../airlines/airlines.service';
-import type { FlightSearchResponseDto } from '../airlines/dto/flight-search.dto';
+import type {
+  FlightSearchResponseDto,
+  FlightSearchResultDto,
+} from '../airlines/dto/flight-search.dto';
 import type { AuthenticatedUser } from '../auth/decorators/current-user.decorator';
 import { getPagination, type Paginated } from '../common/pagination';
 import { HotelsService } from '../hotels/hotels.service';
@@ -21,6 +24,8 @@ import { ItinerariesService } from './itineraries.service';
 /** Seif's search returns at most 50 hotels per page; we read up to this many pages. */
 const HOTEL_PAGE_SIZE = 50;
 const MAX_HOTEL_PAGES = 20;
+/** Flight search pages read per arrival airport (10 flights each). */
+const MAX_FLIGHT_PAGES = 20;
 
 interface AvailableRoom {
   _id: unknown;
@@ -118,7 +123,8 @@ export class ItinerarySearchService {
     query: ItineraryHotelQueryDto,
   ): Promise<Paginated<ItineraryHotel> & { stay: HotelStay }> {
     const { page, limit, skip } = getPagination(query.page ?? 1);
-    if (query.rooms > query.guests) {
+    const rooms = query.rooms ?? 1; // HTL-11: number of rooms defaults to 1
+    if (rooms > query.guests) {
       throw new BadRequestException('rooms cannot be more than guests');
     }
 
@@ -162,7 +168,7 @@ export class ItinerarySearchService {
     const matching = found.filter(
       (hotel) =>
         hotel.city?.trim().toLowerCase() === cityName.toLowerCase() &&
-        hasRoomsFor(hotel.availableRooms, query.rooms, query.guests),
+        hasRoomsFor(hotel.availableRooms, rooms, query.guests),
     );
 
     const items = matching.slice(skip, skip + limit).map((hotel) => ({
@@ -193,7 +199,7 @@ export class ItinerarySearchService {
         checkOut,
         nights: group.dayCount,
         guests: query.guests,
-        rooms: query.rooms,
+        rooms,
       },
       items,
       page,
@@ -231,10 +237,11 @@ export class ItinerarySearchService {
   }
 
   /**
-   * ITN-26: one-way or round-trip flights from `from` to an airport in the
-   * city of day 1. The outbound date defaults to the start date and the
-   * return date to the last day's date. `to` may be left out when that city
-   * has exactly one airport. The search itself is Yahia's (FLT-11, FLT-12).
+   * ITN-26: one-way or round-trip flights from `from` to **any** airport in
+   * the city of day 1 (or only `to`, if given). The outbound date defaults
+   * to the start date and the return date to the last day's date. Each
+   * airport is searched with Yahia's search (FLT-11, FLT-12); the results
+   * are merged, sorted and paginated by 10 here.
    */
   async flights(
     id: string,
@@ -244,7 +251,7 @@ export class ItinerarySearchService {
     FlightSearchResponseDto & {
       search: {
         from: string;
-        to: string;
+        to: string[];
         tripType: 'one-way' | 'round-trip';
         departureDate: string;
         returnDate: string | null;
@@ -257,19 +264,12 @@ export class ItinerarySearchService {
     if (codes.length === 0) {
       throw new BadRequestException(`There is no airport in ${cityName}`);
     }
-    let to = query.to;
-    if (!to) {
-      if (codes.length > 1) {
-        throw new BadRequestException(
-          `Choose an arrival airport in ${cityName} (to): ${codes.join(', ')}`,
-        );
-      }
-      to = codes[0];
-    } else if (!codes.includes(to)) {
+    if (query.to && !codes.includes(query.to)) {
       throw new BadRequestException(
         `to must be an airport in ${cityName}: ${codes.join(', ')}`,
       );
     }
+    const targets = query.to ? [query.to] : codes;
 
     const itinerary = await this.itineraries.loadOwned(id, viewer);
     const lastIndex = (itinerary.days?.length ?? 1) - 1;
@@ -281,24 +281,76 @@ export class ItinerarySearchService {
         ? (query.returnDate ?? dayDate(itinerary.startDate, lastIndex)!)
         : null;
 
-    const result = await this.airlines.searchFlights({
-      departureAirportCode: query.from,
-      arrivalAirportCode: to,
-      departureDate,
-      ...(returnDate ? { returnDate } : {}),
-      tripType,
-      adults: query.adults ?? 1,
-      children: query.children ?? 0,
-      infants: query.infants ?? 0,
-      ...(query.cabinClass ? { cabinClass: query.cabinClass } : {}),
-      ...(query.sort ? { sort: query.sort } : {}),
-      page: query.page ?? 1,
-    });
+    // Every result of Yahia's search for each arrival airport (it pages by
+    // 10, outbound and return lists together, so read until both run out).
+    const items: FlightSearchResultDto[] = [];
+    const returnItems: FlightSearchResultDto[] = [];
+    for (const to of targets) {
+      for (let page = 1; page <= MAX_FLIGHT_PAGES; page++) {
+        const result = await this.airlines.searchFlights({
+          departureAirportCode: query.from,
+          arrivalAirportCode: to,
+          departureDate,
+          ...(returnDate ? { returnDate } : {}),
+          tripType,
+          adults: query.adults ?? 1,
+          children: query.children ?? 0,
+          infants: query.infants ?? 0,
+          ...(query.cabinClass ? { cabinClass: query.cabinClass } : {}),
+          ...(query.sort ? { sort: query.sort } : {}),
+          page,
+        });
+        items.push(...result.items);
+        returnItems.push(...(result.returnItems ?? []));
+        const size = result.limit ?? 10;
+        if (
+          result.items.length < size &&
+          (result.returnItems?.length ?? 0) < size
+        ) {
+          break;
+        }
+      }
+    }
+
+    const sorted = (list: FlightSearchResultDto[]) =>
+      [...list].sort(flightOrder(query.sort));
+    const { page, limit, skip } = getPagination(query.page ?? 1);
+    const total = items.length;
+    const found =
+      items.length > 0 && (returnDate === null || returnItems.length > 0);
 
     return {
-      search: { from: query.from, to, tripType, departureDate, returnDate },
+      search: {
+        from: query.from,
+        to: targets,
+        tripType,
+        departureDate,
+        returnDate,
+      },
       arrivalAirports: airports,
-      ...result,
+      items: sorted(items).slice(skip, skip + limit),
+      ...(returnDate
+        ? { returnItems: sorted(returnItems).slice(skip, skip + limit) }
+        : {}),
+      page,
+      limit,
+      total,
+      totalPages: Math.ceil(total / limit),
+      message: found ? 'Flights found' : 'No flights found',
     };
   }
+}
+
+/** Same orders as the flight search: price, duration, or departure time (default). */
+function flightOrder(sort?: 'price' | 'duration' | 'departure') {
+  const time = (value: Date | string) => new Date(value).getTime();
+  const cheapest = (f: FlightSearchResultDto) =>
+    Math.min(...f.cabins.map((c) => c.price));
+  const duration = (f: FlightSearchResultDto) =>
+    time(f.arrivalAt) - time(f.departureAt);
+  return (a: FlightSearchResultDto, b: FlightSearchResultDto) => {
+    if (sort === 'price') return cheapest(a) - cheapest(b);
+    if (sort === 'duration') return duration(a) - duration(b);
+    return time(a.departureAt) - time(b.departureAt);
+  };
 }

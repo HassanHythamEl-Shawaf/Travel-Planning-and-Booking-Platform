@@ -817,3 +817,19 @@ search's availability, an e2e suite with real hotels, rooms, a booked
 room and flights, and spec and README notes, including the gaps noted for
 Seif (no room-count parameter, no past check-in check).
 ================================================
+
+Date: 2026-11-16
+Student: Hammad
+Tool: Claude Code (Claude Opus 5.5)
+Related Requirement: ITN-25, ITN-26, ITN-18, ACC-09, HTL-11
+Prompt:
+Cross-check all my work against the team's work-split document and the
+official requirements sheet, and implement or test anything still
+missing before the final pull request.
+How the output was used:
+ITN-26 now searches every airport in the city of day 1 (merged, sorted,
+paginated) as the sheet says "any airport", with `to` as an optional
+filter; ITN-25 rooms default to 1 as in HTL-11; the e2e test sets the
+preferred currency through PATCH /api/users/me (ACC-09); spec and README
+updated.
+================================================

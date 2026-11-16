@@ -45,7 +45,7 @@ export class ItinerarySearchController {
   @ApiOperation({
     summary: 'Hotels for a city group of my itinerary (ITN-25)',
     description:
-      "Check-in = the group's first day, check-out = the day after its last day. Lists active hotels in that city with at least `rooms` rooms free for the whole stay whose combined maximum occupancy (adults + children) covers `guests`. Reuses the hotel search (HTL-11); 10 per page.",
+      "Check-in = the group's first day, check-out = the day after its last day. Lists active hotels in that city with at least `rooms` (default 1) rooms free for the whole stay whose combined maximum occupancy (adults + children) covers `guests`. Reuses the hotel search (HTL-11); 10 per page.",
   })
   @ApiParam(ITINERARY_ID_PARAM)
   @ApiOkResponse({ type: ItineraryHotelSearchDto })
@@ -83,13 +83,13 @@ export class ItinerarySearchController {
   @ApiOperation({
     summary: 'Flights to the city of day 1 (ITN-26)',
     description:
-      "One-way or round-trip from `from` to an airport in the city of the first day. The outbound date defaults to the start date and the return date to the last day's date. `to` can be left out if that city has one airport. Reuses the flight search (FLT-11, FLT-12).",
+      "One-way or round-trip from `from` to any airport in the city of the first day (or only `to`). The outbound date defaults to the start date and the return date to the last day's date. Each airport is searched with the flight search (FLT-11, FLT-12); the results are merged, sorted (price, duration or departure time) and paginated by 10.",
   })
   @ApiParam(ITINERARY_ID_PARAM)
   @ApiOkResponse({ type: ItineraryFlightSearchDto })
   @ApiBadRequestResponse({
     description:
-      'Invalid id or query, no days, no airport in that city, or `to` missing / not in that city',
+      'Invalid id or query, no days, no airport in that city, or `to` not in that city',
   })
   @ApiConflictResponse({
     description:

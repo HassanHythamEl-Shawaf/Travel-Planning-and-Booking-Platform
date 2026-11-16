@@ -60,9 +60,9 @@
 | # | Decision |
 |---|---|
 | D25 | Lookups are for the itinerary's owner (logged in; 404 / 403 as for other owner actions). |
-| D26 | ITN-25 picks a city group by its number (`group`, 1 = the first of `cityGroups`), with `guests` (1–50) and `rooms` (1–20, not more than guests). The check-in must not be in the past (HTL-11; the hotel search itself doesn't check this). |
+| D26 | ITN-25 picks a city group by its number (`group`, 1 = the first of `cityGroups`), with `guests` (1–50) and `rooms` (1–20, not more than guests, default 1 as in HTL-11). The check-in must not be in the past (HTL-11; the hotel search itself doesn't check this). |
 | D27 | ITN-25 calls `HotelsService.searchHotels` (Seif) with the city's **name** (hotels store the city as free text) and the dates, **without** guest counts, because that search filters by per-room occupancy. It reads every page (50 per page, up to 20 pages), so availability, active hotels and blocked rooms come from that search. Then it keeps hotels whose city equals the name (case-insensitive) and that have at least `rooms` free rooms whose combined maximum occupancy (`maxAdults + maxChildren`) covers `guests`: the N biggest rooms are checked, which is the best possible combination. Results are paginated by 10 here. Gap noted for Seif: the hotel search has no number-of-rooms parameter. |
-| D28 | ITN-26: `GET /flights/airports` lists the airports of day 1's city (`getAirportsInCity`). `GET /flights` searches one airport, `to`, which may be left out when the city has exactly one. This keeps Yahia's search and paging unchanged, instead of merging several searches. Defaults: `tripType` one-way, `departureDate` = start date, `returnDate` = last day's date (round trips), 1 adult. Errors from the flight search itself (409s) are passed through. |
+| D28 | ITN-26 ("to **any** airport in the city of the first day"): `GET /flights/airports` lists the airports of day 1's city (`getAirportsInCity`). `GET /flights` searches **every** one of them with Yahia's `searchFlights` (all pages), merges the outbound and return lists, sorts them like FLT-15 (`sort` = price, duration or departure, default departure time) and paginates by 10. `to` is an optional filter to a single airport of that city (400 otherwise). Defaults: `tripType` one-way, `departureDate` = start date, `returnDate` = last day's date (round trips), 1 adult. Errors from the flight search itself (409s) are passed through. |
 
 ## 3. Endpoints
 
@@ -102,4 +102,6 @@
 - `src/itineraries/itinerary-search.service.spec.ts`: the "N rooms cover the guests" rule.
 - `test/itinerary-search.e2e-spec.ts` (real hotel and flight searches):
   - **Hotels:** group dates; hotels with too few free rooms, a booked room, another city or an inactive hotel are excluded; one room for 4 guests; bad group, rooms > guests, past dates, other users and guests are rejected.
-  - **Flights:** airports of day 1's city; one-way on the start date without `to`; round trip returning on the last day; `to` required (and checked) when the city has two airports; no days; other users.
+  - **Hotels:** `rooms` defaults to 1.
+  - **Flights:** airports of day 1's city; one-way on the start date; round trip returning on the last day; a city with two airports gets both searched and merged (sorted by departure or price), `to` narrows to one and must be in that city; no days; other users.
+- `test/itineraries.e2e-spec.ts` also sets the preferred currency through `PATCH /api/users/me` (ACC-09) and checks that an unsupported preference falls back to USD.

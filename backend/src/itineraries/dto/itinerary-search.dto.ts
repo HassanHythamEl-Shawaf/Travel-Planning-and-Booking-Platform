@@ -42,12 +42,17 @@ export class ItineraryHotelQueryDto extends PageQueryDto {
   @Max(50)
   guests: number;
 
-  @ApiProperty({ example: 2, description: 'Number of rooms.' })
+  @ApiPropertyOptional({
+    example: 2,
+    default: 1,
+    description: 'Number of rooms (default 1, as in HTL-11).',
+  })
+  @IsOptional()
   @Type(() => Number)
   @IsInt()
   @Min(1)
   @Max(20)
-  rooms: number;
+  rooms?: number;
 }
 
 /** ITN-26 */
@@ -60,7 +65,7 @@ export class ItineraryFlightQueryDto extends PageQueryDto {
   @ApiPropertyOptional({
     example: 'CAI',
     description:
-      'Arrival airport in the city of day 1 (see /flights/airports). Optional if that city has one airport.',
+      'Only this arrival airport (must be in the city of day 1, see /flights/airports). Default: every airport in that city.',
   })
   @IsOptional()
   @Transform(upper)
@@ -243,8 +248,11 @@ export class FlightSearchUsedDto {
   @ApiProperty({ example: 'LHR' })
   from: string;
 
-  @ApiProperty({ example: 'CAI' })
-  to: string;
+  @ApiProperty({
+    example: ['LHR', 'LGW'],
+    description: 'The arrival airports searched.',
+  })
+  to: string[];
 
   @ApiProperty({ enum: ['one-way', 'round-trip'] })
   tripType: string;
