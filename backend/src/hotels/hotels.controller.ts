@@ -24,7 +24,6 @@ import {
   ApiOkResponse,
   ApiOperation,
   ApiParam,
-  ApiTags,
   ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
 import { ProviderOwnership } from '../auth/decorators/provider-ownership.decorator';
@@ -136,7 +135,6 @@ export class HotelsController {
   @Roles(UserRole.MODERATOR)
   @ProviderOwnership('hotel')
   @UseInterceptors(ImageFileInterceptor('file'))
-  @ApiTags('Hotels')
   @ApiCookieAuth('access_token')
   @ApiOperation({
     summary: 'Add a photo to the hotel (HTL-01, GEN-08)',
@@ -177,7 +175,6 @@ export class HotelsController {
   @UseGuards(AuthGuard, RolesGuard, ProviderOwnershipGuard)
   @Roles(UserRole.MODERATOR)
   @ProviderOwnership('hotel')
-  @ApiTags('Hotels')
   @ApiCookieAuth('access_token')
   @ApiOperation({
     summary: 'Remove a hotel photo (HTL-01, GEN-08)',
