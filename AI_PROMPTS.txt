@@ -780,3 +780,22 @@ read-modify-write, two controllers with Swagger docs, moderation handler),
 unit tests, an e2e suite with parallel-request tests, the ITN spec and a
 README section. Updated two "itineraries answer 501" texts.
 ================================================
+
+Date: 2026-11-16
+Student: Hammad
+Tool: Claude Code (Claude Opus 5.5)
+Related Requirement: ITN-18, ACC-09, ITN-14
+Prompt:
+Add the FXRatesAPI integration from the handoff brief: check the
+provider's response format first, keep the key server-side, fetch rates
+at most once per day and cache them in the database, fall back to cached
+rates when the API is down (503 with no cache), convert itinerary budget
+amounts to the preferred currency with the rate date, and test it with a
+fake client so tests never call the real API.
+How the output was used:
+Added src/fx-rates (HTTP client wrapper with response checks, daily
+snapshot schema, service with shared in-flight fetch, fallback and
+retry wait, conversion maths), converted amounts in the itinerary view
+and a GET /itineraries/:id/budget endpoint, unit and e2e tests, the
+ITN-18 spec and a README section.
+================================================

@@ -306,6 +306,30 @@ Tests: `npm test -- src/itineraries` and `npm run test:e2e -- itineraries` (in-m
 set, includes parallel day edits, the 60-day limit and 5 images per activity under parallel
 requests).
 
+## Exchange rates (ITN-18)
+
+Full rules: `docs/requirements/ITN-18-fx-rates-spec.md`.
+
+- **Source** — FXRatesAPI `GET /latest`, server-side only. Set `FXRATES_API_KEY` in `.env`; it
+  is sent as a Bearer header and never logged or returned.
+- **Once a day** — the first request of the (UTC) day fetches the rates and stores them in
+  `fx_rate_snapshots` (one per day); everything else reads that snapshot. No cron job.
+- **API down** — the latest stored snapshot is used and responses say `usingCachedRates: true`
+  with its `rateDate`. Nothing stored at all → 503. A failed fetch is retried after 10 minutes.
+- **Itinerary amounts** — `GET /api/itineraries/:id` and every itinerary write response add
+  `converted` to each budget total and `convertedAmount` / `convertedCost` to each entry, in
+  `?currency=`, else the user's `preferredCurrency` (ACC-09), else USD. `budget.conversion` shows
+  `{ currency, rateDate, usingCachedRates }`. If no rates are available the itinerary still loads
+  with `conversion: null`. `GET /api/itineraries/:id/budget?currency=` returns only the converted
+  budget (503 if it can't convert). Unsupported currency → 400. Booking prices are never converted
+  (PAY-04).
+
+**For teammates:** `FxRatesModule` exports `FxRatesService` (`converter(viewer, currency?)` gives
+`convert(amount, from)` and the rate date). In tests, override the `FX_RATES_CLIENT` token
+(see `test/itineraries.e2e-spec.ts`) so nothing calls the real API.
+
+Tests: `npm test -- src/fx-rates` and `npm run test:e2e -- itineraries` (fake provider).
+
 ## Blog (BLG-01 – BLG-12)
 
 Swagger tag **Blog**. Full rules: `docs/requirements/BLG-blog-spec.md`.
