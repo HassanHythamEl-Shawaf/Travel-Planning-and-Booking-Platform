@@ -761,3 +761,22 @@ spec, added POST/DELETE /api/hotels/:id/photos with ProviderOwnershipGuard
 and a conditional push, switched Blog's route to ImageFileInterceptor, and
 added an e2e suite for logos and photos including parallel uploads.
 ================================================
+
+Date: 2026-11-16
+Student: Hammad
+Tool: Claude Code (Claude Opus 5.5)
+Related Requirement: ITN-01, ITN-03, ITN-05, ITN-07, ITN-08, ITN-09, ITN-10, ITN-12, ITN-14, ITN-16, ITN-20, ITN-21, GEN-10
+Prompt:
+Build the itineraries module from the handoff brief: itineraries with
+days whose numbers and dates come from their position and the start date,
+city groups, activities with images, budget and transport entries with
+totals, visibility, owner-only access, admin hiding, public search, clone
+with credit, and the moderation handler. Keep parallel edits safe, test
+it and document the decisions.
+How the output was used:
+Added src/itineraries (schema, pure view functions for numbering, dates,
+groups and totals, access rules, services with a version-checked
+read-modify-write, two controllers with Swagger docs, moderation handler),
+unit tests, an e2e suite with parallel-request tests, the ITN spec and a
+README section. Updated two "itineraries answer 501" texts.
+================================================

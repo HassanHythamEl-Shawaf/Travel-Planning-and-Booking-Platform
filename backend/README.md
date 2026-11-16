@@ -216,8 +216,8 @@ other reporters.
   to its author and admins (404 for everyone else) and excluded from search, lists, counts and
   (for reviews) the hotel average rating. The moderation code only sets the flag.
 - Until you register a handler, moderation reads and writes your raw collection with the names in
-  `src/integrations/teammate-contracts.ts` (`CONTENT_COLLECTIONS`). Admin delete of reviews and
-  itineraries answers **501** until you register a handler with `delete`.
+  `src/integrations/teammate-contracts.ts` (`CONTENT_COLLECTIONS`). Admin delete of reviews
+  answers **501** until you register a handler with `delete` (itineraries register one).
 - Register in your module (which imports `ModerationModule`):
   `onModuleInit() { this.moderationRegistry.register('review', { find, setHidden, delete }) }`.
   The interface and a full example are in `src/moderation/moderation.registry.ts`. Use the
@@ -258,6 +258,53 @@ Swagger tag **Uploads**. Full rules: `docs/requirements/GEN-08-uploads-spec.md`.
 
 Tests: `npm test -- src/uploads` and `npm run test:e2e -- uploads provider-images` (in-memory
 MongoDB, temporary folder).
+
+## Itineraries (ITN-01 – ITN-21)
+
+Swagger tags **Itineraries** and **Itinerary days, activities and budget**. Full rules:
+`docs/requirements/ITN-itineraries-spec.md`.
+
+- **Itineraries** — `POST /api/itineraries` (user accounts; `title` ≤100, `countries` codes,
+  `startDate` `YYYY-MM-DD`; private by default), `GET /api/itineraries/mine` (most recently
+  updated first), `GET|PATCH /api/itineraries/:id`, `PATCH /api/itineraries/:id/visibility`
+  (`{ isPublic }`), `DELETE /api/itineraries/:id` with `{ "confirm": true }`.
+- **Days** — `POST /api/itineraries/:id/days` (`cityId` from the city list, optional `notes` and
+  `position`), `PATCH|DELETE .../days/:dayId` (delete needs `{ "confirm": true }`),
+  `PATCH .../days/:dayId/position`. At most 60 days. Day numbers and dates are never stored:
+  they come from the day's position and the start date, so they can't drift. Consecutive days in
+  the same city are returned as `cityGroups` with day count, dates and budget subtotal.
+- **Activities** — `POST|PATCH|DELETE .../days/:dayId/activities[/:activityId]` (name,
+  description, optional time `HH:mm`, optional cost + currency). Images:
+  `POST .../activities/:activityId/images` (multipart `file`, GEN-08, 5 per activity) and
+  `DELETE .../images/:imageId`.
+- **Budget** — `POST|PATCH|DELETE .../days/:dayId/budget-entries[/:entryId]` (`food`,
+  `accommodation`, `in_city_transport`, `activities`; amount ≥ 0; supported currency) and
+  `POST|PATCH|DELETE /api/itineraries/:id/transport-entries[/:entryId]` (mode, from/to city,
+  amount, currency, `dayId`). Transport entries follow their day when days move and are deleted
+  with it. `budget` in every response totals by category, by day and overall, one amount per
+  currency (activity costs count as `activities`; transport is `intercity_transport`).
+- **Public** — `GET /api/itineraries?q=&country=&cityId=&minDays=&maxDays=&page=` (guests too;
+  `q` matches title, country name/code or city name; newest first; 10 per page) and
+  `POST /api/itineraries/:id/clone` (user accounts): a private, independent copy with its own
+  image files and `clonedFrom` crediting the original author.
+
+Who sees what: the owner always; a private itinerary nobody else (404, admins too); a public one
+everyone, read-only (other users get 403 on writes); hidden (GEN-10) only the owner and admins;
+public itineraries of a deactivated owner only admins (ACC-12). Search applies the same rules.
+Every write that changes days or entries is a read-modify-write that only saves if nobody saved
+in between (a `version` field), and retries otherwise; after 12 tries it answers 409.
+
+**For teammates:**
+- Model `Itinerary`, collection `itineraries`, fields as in `ITINERARY_FIELDS` (Blog's author
+  page reads them). Older raw documents without days or a start date are tolerated.
+- Moderation: an `itinerary` handler is registered (hide, unhide, delete; delete removes the
+  activity image files after the commit). An owner's delete closes open reports as
+  `content_deleted` with the note `Deleted by owner`.
+- `ItinerariesModule` exports `ItinerariesService` (`loadViewable`, `findOne`).
+
+Tests: `npm test -- src/itineraries` and `npm run test:e2e -- itineraries` (in-memory replica
+set, includes parallel day edits, the 60-day limit and 5 images per activity under parallel
+requests).
 
 ## Blog (BLG-01 – BLG-12)
 
