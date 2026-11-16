@@ -8,6 +8,7 @@ import {
   Patch,
   Post,
   Query,
+  StreamableFile,
   UseGuards,
 } from '@nestjs/common';
 import {
@@ -19,6 +20,7 @@ import {
   ApiOkResponse,
   ApiOperation,
   ApiParam,
+  ApiProduces,
   ApiServiceUnavailableResponse,
   ApiTags,
   ApiUnauthorizedResponse,
@@ -52,6 +54,7 @@ import {
   ItineraryDetailDto,
   ItineraryListDto,
 } from './dto/itinerary-responses.dto';
+import { itineraryPdfFileName, renderItineraryPdf } from './itinerary-pdf';
 import type { BudgetSummary, ItineraryView } from './itinerary-view';
 import {
   ItinerariesService,
@@ -171,6 +174,35 @@ export class ItinerariesController {
     @Query() query: CurrencyQueryDto,
   ): Promise<BudgetSummary> {
     return this.itineraries.budget(id, viewer, query.currency);
+  }
+
+  @Get(':id/pdf')
+  @UseGuards(OptionalAuthGuard)
+  @ApiProduces('application/pdf')
+  @ApiOperation({
+    summary: 'Export or print an itinerary as a PDF (ITN-28, bonus)',
+    description:
+      'The same content as GET /api/itineraries/:id, as a printable A4 PDF: route (city groups), days with activities and budget entries, intercity transport, and the budget by category with the total. Same visibility rules as viewing it. Amounts are also shown converted (ITN-18) to `currency`, or your preferred currency, or USD; if no rates are available the PDF is still produced, without conversion. The built-in PDF fonts cover Western European text only; other characters are shown as "?".',
+  })
+  @ApiParam(ITINERARY_ID_PARAM)
+  @ApiOkResponse({
+    description: 'The itinerary PDF, as a file download',
+    schema: { type: 'string', format: 'binary' },
+  })
+  @ApiBadRequestResponse({ description: 'Invalid id, or unsupported currency' })
+  @ApiNotFoundResponse({ description: NOT_VISIBLE })
+  async pdf(
+    @Param('id', ParseObjectIdPipe) id: string,
+    @OptionalCurrentUser() viewer: AuthenticatedUser | undefined,
+    @Query() query: CurrencyQueryDto,
+  ): Promise<StreamableFile> {
+    const view = await this.itineraries.findOne(id, viewer, query.currency);
+    const pdf = await renderItineraryPdf(view);
+    return new StreamableFile(pdf, {
+      type: 'application/pdf',
+      disposition: `attachment; filename="${itineraryPdfFileName(view.id)}"`,
+      length: pdf.length,
+    });
   }
 
   @Patch(':id')

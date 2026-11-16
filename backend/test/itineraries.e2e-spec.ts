@@ -1,5 +1,5 @@
 /**
- * Itineraries e2e (ITN-01 to ITN-21, GEN-08, GEN-10, ACC-11, ACC-12). Boots
+ * Itineraries e2e (ITN-01 to ITN-21, ITN-28, GEN-08, GEN-10, ACC-11, ACC-12). Boots
  * the whole AppModule over HTTP against an in-memory MongoDB replica set
  * and a temporary upload folder. Never Atlas, never real secrets.
  */
@@ -40,6 +40,16 @@ interface DayBody {
   activities: { id: string; images: { imageId: string; url: string }[] }[];
   budgetEntries: { id: string }[];
 }
+
+/** Reads a binary (PDF) response body into a Buffer. */
+const binary = (
+  res: NodeJS.ReadableStream,
+  done: (error: Error | null, body: Buffer) => void,
+) => {
+  const chunks: Buffer[] = [];
+  res.on('data', (chunk: Buffer) => chunks.push(chunk));
+  res.on('end', () => done(null, Buffer.concat(chunks)));
+};
 
 describe('Itineraries (e2e)', () => {
   let replSet: MongoMemoryReplSet;
@@ -809,6 +819,42 @@ describe('Itineraries (e2e)', () => {
       await connection
         .collection('users')
         .updateOne({ _id: aliceId }, { $set: { status: 'active' } });
+    });
+  });
+
+  describe('PDF export (ITN-28, bonus)', () => {
+    const pdf = (agent: TestAgent | ReturnType<typeof guest>, id: string) =>
+      agent.get(`/api/itineraries/${id}/pdf`).buffer(true).parse(binary);
+
+    it('downloads the itinerary as a PDF named after its id', async () => {
+      const res = await pdf(alice, tripId).expect(200);
+      expect(res.headers['content-type']).toBe('application/pdf');
+      expect(res.headers['content-disposition']).toBe(
+        `attachment; filename="itinerary-${tripId}.pdf"`,
+      );
+      const body = res.body as Buffer;
+      expect(body.subarray(0, 5).toString('latin1')).toBe('%PDF-');
+      expect(Number(res.headers['content-length'])).toBe(body.length);
+    });
+
+    it('follows the same visibility rules as viewing it', async () => {
+      // tripId is public at this point: guests may export it read-only.
+      await pdf(guest(), tripId).expect(200);
+
+      const privateTrip = await create(alice, { title: 'Secret trip' }).expect(
+        201,
+      );
+      const id = privateTrip.body.id as string;
+      await pdf(alice, id).expect(200);
+      await pdf(guest(), id).expect(404);
+      await pdf(bob, id).expect(404);
+      await pdf(admin, id).expect(404);
+      await pdf(alice, new Types.ObjectId().toString()).expect(404);
+      await alice.get('/api/itineraries/not-an-id/pdf').expect(400);
+      await alice
+        .get(`/api/itineraries/${id}/pdf`)
+        .query({ currency: 'XYZ' })
+        .expect(400);
     });
   });
 
