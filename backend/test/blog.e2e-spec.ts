@@ -19,7 +19,7 @@ import request from 'supertest';
 import type TestAgent from 'supertest/lib/agent';
 
 import { HttpExceptionFilter } from '../src/common/filters/http-exception.filter';
-import { JPEG_BYTES } from './fixtures/images';
+import { JPEG_BYTES, jpegOfSize } from './fixtures/images';
 
 jest.setTimeout(180_000);
 
@@ -504,6 +504,11 @@ describe('Blog (e2e)', () => {
         .attach('file', Buffer.from('not an image'), 'nile.jpg')
         .expect(400);
       expect(notImage.body.message).toBe('Only JPG or PNG images are allowed');
+      const tooBig = await alice
+        .post(`/api/posts/${postId}/images`)
+        .attach('file', jpegOfSize(5 * 1024 * 1024 + 1), 'nile.jpg')
+        .expect(400);
+      expect(tooBig.body.message).toBe('Images can be at most 5 MB');
       await guest().post(`/api/posts/${postId}/images`).expect(401);
       await bob
         .post(`/api/posts/${postId}/images`)
