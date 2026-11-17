@@ -144,6 +144,7 @@ An optional bonus row of the official sheet, listed in Person 8's brief as optio
 - `test/itineraries.e2e-spec.ts` (HTTP, in-memory replica set):
   - **Create and days:** create rules (user only, validation); days and insertion; numbering and dates; city groups; my list order; start-date change.
   - **Budget:** activities, budget and transport with totals; clearing a cost; moving and deleting days (with confirmation).
+  - **Edit and delete:** a day's city and notes (unknown city 400); an activity, a budget entry (category and amount, negative 400) and a transport entry edited and deleted, with totals following; other users 404.
   - **Parallel requests:** 10 day adds never lose or duplicate a day; 6 adds against 58 days give exactly 60; 7 image uploads keep exactly 5.
   - **Access:** private access (admins too); public read-only and Private at once; search by title, country, city and days, with paging; hidden; deactivated owner.
   - **Clone and delete:** clone independence and credit; owner delete closes reports and keeps the clone; admin delete through moderation, files removed.

@@ -822,6 +822,120 @@ describe('Itineraries (e2e)', () => {
     });
   });
 
+  describe('editing and deleting items (ITN-05, ITN-10, ITN-14, ITN-16)', () => {
+    it('edits a day, and edits and deletes activities, budget and transport entries', async () => {
+      const trip = (await create(alice, { title: 'Edit trip' }).expect(201))
+        .body.id as string;
+      const base = `/api/itineraries/${trip}`;
+      await alice.post(`${base}/days`).send({ cityId: 'cairo' }).expect(200);
+      const two = await alice
+        .post(`${base}/days`)
+        .send({ cityId: 'cairo' })
+        .expect(200);
+      const [d1, d2] = two.body.days as DayBody[];
+
+      // ITN-05: edit a day's city and notes; the city must be in the list.
+      const edited = await alice
+        .patch(`${base}/days/${d2.id}`)
+        .send({ cityId: 'luxor', notes: 'Temples' })
+        .expect(200);
+      expect(edited.body.days[1]).toMatchObject({
+        cityId: 'luxor',
+        cityName: 'Luxor',
+        notes: 'Temples',
+      });
+      expect(edited.body.cityGroups).toHaveLength(2); // Cairo | Luxor
+      await alice
+        .patch(`${base}/days/${d2.id}`)
+        .send({ cityId: 'atlantis' })
+        .expect(400);
+
+      // ITN-10: an activity is edited, then deleted.
+      const withActivity = await alice
+        .post(`${base}/days/${d1.id}/activities`)
+        .send({ name: 'Museum', cost: 100, currency: 'EGP' })
+        .expect(200);
+      const activityId = withActivity.body.days[0].activities[0].id as string;
+      const renamed = await alice
+        .patch(`${base}/days/${d1.id}/activities/${activityId}`)
+        .send({ name: 'Egyptian Museum', time: '09:30' })
+        .expect(200);
+      expect(renamed.body.days[0].activities[0]).toMatchObject({
+        name: 'Egyptian Museum',
+        time: '09:30',
+        cost: 100,
+      });
+
+      // ITN-14: a budget entry is edited, then deleted; totals follow.
+      const withEntry = await alice
+        .post(`${base}/days/${d1.id}/budget-entries`)
+        .send({ category: 'food', amount: 50, currency: 'EGP' })
+        .expect(200);
+      const entryId = withEntry.body.days[0].budgetEntries[0].id as string;
+      const changed = await alice
+        .patch(`${base}/days/${d1.id}/budget-entries/${entryId}`)
+        .send({ category: 'accommodation', amount: 70 })
+        .expect(200);
+      expect(changed.body.budget.byCategory.food.amounts).toEqual([]);
+      expect(changed.body.budget.byCategory.accommodation.amounts).toEqual([
+        { currency: 'EGP', amount: 70 },
+      ]);
+      await alice
+        .patch(`${base}/days/${d1.id}/budget-entries/${entryId}`)
+        .send({ amount: -5 })
+        .expect(400);
+
+      // ITN-16: a transport entry is edited, then deleted.
+      const withTransport = await alice
+        .post(`${base}/transport-entries`)
+        .send({
+          mode: 'train',
+          fromCityId: 'cairo',
+          toCityId: 'luxor',
+          amount: 300,
+          currency: 'EGP',
+          dayId: d2.id,
+        })
+        .expect(200);
+      const transportId = withTransport.body.transportEntries[0].id as string;
+      const bus = await alice
+        .patch(`${base}/transport-entries/${transportId}`)
+        .send({ mode: 'bus', amount: 120 })
+        .expect(200);
+      expect(bus.body.transportEntries[0]).toMatchObject({
+        mode: 'bus',
+        amount: 120,
+        dayNumber: 2,
+      });
+      expect(bus.body.budget.total.amounts).toEqual([
+        { currency: 'EGP', amount: 290 }, // 100 + 70 + 120
+      ]);
+
+      // Others can't change any of it (private: 404).
+      await bob
+        .patch(`${base}/transport-entries/${transportId}`)
+        .send({ amount: 1 })
+        .expect(404);
+
+      await alice
+        .delete(`${base}/days/${d1.id}/activities/${activityId}`)
+        .expect(200);
+      await alice
+        .delete(`${base}/days/${d1.id}/budget-entries/${entryId}`)
+        .expect(200);
+      const empty = await alice
+        .delete(`${base}/transport-entries/${transportId}`)
+        .expect(200);
+      expect(empty.body.days[0].activities).toEqual([]);
+      expect(empty.body.days[0].budgetEntries).toEqual([]);
+      expect(empty.body.transportEntries).toEqual([]);
+      expect(empty.body.budget.total.amounts).toEqual([]);
+      await alice
+        .delete(`${base}/transport-entries/${transportId}`)
+        .expect(404);
+    });
+  });
+
   describe('linked bookings (ITN-27, bonus)', () => {
     // Bookings are owned by Persons 4 and 6; they are inserted here with the
     // fields agreed in integrations/teammate-contracts.ts, which is all the
