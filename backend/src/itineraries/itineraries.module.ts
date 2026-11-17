@@ -17,6 +17,7 @@ import { ItineraryItemsService } from './itinerary-items.service';
 import { ItineraryModerationRegistration } from './itinerary-moderation.handler';
 import { ItinerarySearchController } from './itinerary-search.controller';
 import { ItinerarySearchService } from './itinerary-search.service';
+import { ItineraryBookingsReader } from './itinerary-bookings';
 import { ItinerariesController } from './itineraries.controller';
 import { ItinerariesService } from './itineraries.service';
 import { PublicItinerariesService } from './public-itineraries.service';
@@ -52,6 +53,7 @@ import { Itinerary, ItinerarySchema } from './schemas/itinerary.schema';
     ItineraryItemsService,
     PublicItinerariesService,
     ItinerarySearchService,
+    ItineraryBookingsReader,
     ItineraryModerationRegistration,
     OptionalAuthGuard,
   ],

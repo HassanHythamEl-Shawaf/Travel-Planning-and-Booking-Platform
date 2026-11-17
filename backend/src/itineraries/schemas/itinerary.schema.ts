@@ -6,7 +6,9 @@ import { User } from '../../users/schemas/user.schema';
 import {
   ACTIVITY_DESCRIPTION_MAX,
   ACTIVITY_NAME_MAX,
+  BOOKING_LINK_TYPES,
   BUDGET_CATEGORIES,
+  type BookingLinkType,
   type BudgetCategory,
   DAY_NOTES_MAX,
   ENTRY_NOTE_MAX,
@@ -73,6 +75,23 @@ export class BudgetEntry {
 const BudgetEntrySchema = SchemaFactory.createForClass(BudgetEntry);
 
 /**
+ * ITN-27 (bonus): one of the owner's flight or hotel bookings, linked to a
+ * day. Only the id is stored: price and status are read live from the
+ * booking, so a later cancellation drops out of the budget (spec D33).
+ */
+@Schema()
+export class BookingLink {
+  _id: Types.ObjectId;
+
+  @Prop({ type: String, enum: BOOKING_LINK_TYPES, required: true })
+  type: BookingLinkType;
+
+  @Prop({ type: Types.ObjectId, required: true })
+  bookingId: Types.ObjectId;
+}
+const BookingLinkSchema = SchemaFactory.createForClass(BookingLink);
+
+/**
  * ITN-05: one day. Its number and date are not stored: they come from its
  * position in `days` and the itinerary's start date (spec D4).
  */
@@ -93,6 +112,10 @@ export class Day {
 
   @Prop({ type: [BudgetEntrySchema], default: [] })
   budgetEntries: BudgetEntry[];
+
+  /** ITN-27 (bonus); missing on older documents. */
+  @Prop({ type: [BookingLinkSchema], default: [] })
+  bookingLinks?: BookingLink[];
 }
 const DaySchema = SchemaFactory.createForClass(Day);
 

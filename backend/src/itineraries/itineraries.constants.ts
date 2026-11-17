@@ -24,6 +24,11 @@ export const BUDGET_CATEGORIES = [
 ] as const;
 export type BudgetCategory = (typeof BUDGET_CATEGORIES)[number];
 
+/** ITN-27 (bonus): bookings that can be linked to a day. */
+export const BOOKING_LINK_TYPES = ['flight', 'hotel'] as const;
+export type BookingLinkType = (typeof BOOKING_LINK_TYPES)[number];
+export const MAX_BOOKING_LINKS_PER_DAY = 10;
+
 /** ITN-16 intercity transport modes. */
 export const TRANSPORT_MODES = [
   'flight',

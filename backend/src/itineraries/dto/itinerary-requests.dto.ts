@@ -24,6 +24,8 @@ import { PageQueryDto } from '../../common/dto/page-query.dto';
 import {
   ACTIVITY_DESCRIPTION_MAX,
   ACTIVITY_NAME_MAX,
+  BOOKING_LINK_TYPES,
+  type BookingLinkType,
   BUDGET_CATEGORIES,
   type BudgetCategory,
   COUNTRY_CODE_PATTERN,
@@ -333,6 +335,23 @@ export class UpdateBudgetEntryDto {
   @IsString()
   @MaxLength(ENTRY_NOTE_MAX)
   note?: string;
+}
+
+// ------------------------------------------------------- linked bookings
+
+/** ITN-27 (bonus): link one of my Confirmed bookings to a day. */
+export class LinkBookingDto {
+  @ApiProperty({ enum: BOOKING_LINK_TYPES, example: 'flight' })
+  @IsIn(BOOKING_LINK_TYPES)
+  type: BookingLinkType;
+
+  @ApiProperty({
+    example: '6650f1c2a1b2c3d4e5f60740',
+    description:
+      'Id of one of your own flight bookings or hotel reservations, Confirmed or Completed.',
+  })
+  @IsMongoId()
+  bookingId: string;
 }
 
 // ------------------------------------------------------------- transport

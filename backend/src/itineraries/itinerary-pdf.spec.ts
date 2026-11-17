@@ -53,6 +53,7 @@ function view(overrides: Partial<ItineraryView> = {}): ItineraryView {
             note: 'Koshary',
           },
         ],
+        bookings: [],
       },
       {
         id: 'd2',
@@ -63,6 +64,7 @@ function view(overrides: Partial<ItineraryView> = {}): ItineraryView {
         notes: '',
         activities: [],
         budgetEntries: [],
+        bookings: [],
       },
     ],
     cityGroups: [],
@@ -91,6 +93,8 @@ function view(overrides: Partial<ItineraryView> = {}): ItineraryView {
       },
       byDay: [],
       total: egp(1500, 30),
+      bookings: { flight: none(), hotel: none(), total: none() },
+      totalWithBookings: egp(1500),
       conversion: {
         currency: 'USD',
         rateDate: '2026-11-17',
@@ -178,6 +182,70 @@ describe('itinerary PDF (ITN-28)', () => {
       await renderItineraryPdf(clone, { compress: false }),
     );
     expect(text).toContain('Cloned from an itinerary by Karim');
+  });
+
+  it('lists the owner’s linked bookings, never converted (ITN-27)', async () => {
+    const owned = view({ isOwner: true });
+    owned.days[0].bookings = [
+      {
+        id: 'l1',
+        type: 'flight',
+        bookingId: 'b1',
+        status: 'Confirmed',
+        counted: true,
+        bookingReference: 'K7QM2X',
+        providerName: 'Nile Air',
+        startsAt: '2026-12-01T06:00:00.000Z',
+        totalPrice: 250,
+        currency: 'USD',
+      },
+      {
+        id: 'l2',
+        type: 'hotel',
+        bookingId: 'b2',
+        status: 'Cancelled',
+        counted: false,
+        bookingReference: null,
+        providerName: 'Luxor Palace',
+        startsAt: null,
+        totalPrice: 300,
+        currency: 'USD',
+      },
+    ];
+    owned.budget.bookings.total = {
+      amounts: [{ currency: 'USD', amount: 250 }],
+    };
+    owned.budget.totalWithBookings = {
+      amounts: [
+        { currency: 'EGP', amount: 1500 },
+        { currency: 'USD', amount: 250 },
+      ],
+    };
+
+    const text = drawnText(
+      await renderItineraryPdf(owned, { compress: false }),
+    );
+    for (const expected of [
+      'BOOKED FLIGHTS AND HOTELS',
+      'Flight Nile Air, ref K7QM2X',
+      '(Confirmed)',
+      '250.00 USD',
+      'Hotel Luxor Palace (Cancelled)',
+      '300.00 USD (not counted)',
+      'Booked (never converted)',
+      'Total with bookings',
+      '1500.00 EGP + 250.00 USD',
+    ]) {
+      expect(text).toContain(expected);
+    }
+  });
+
+  it('has no bookings section without linked bookings', async () => {
+    const text = drawnText(
+      await renderItineraryPdf(view(), { compress: false }),
+    );
+    expect(text).not.toContain('BOOKED FLIGHTS AND HOTELS');
+    expect(text).not.toContain('Total with bookings');
   });
 
   it('does not crash on text the built-in fonts cannot draw', async () => {

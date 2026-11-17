@@ -8,6 +8,7 @@ const CONVERTED = {
 
 import { PaginatedResponseDto } from '../../common/dto/paginated-response.dto';
 import {
+  BOOKING_LINK_TYPES,
   BUDGET_CATEGORIES,
   type BudgetCategory,
   TRANSPORT_MODES,
@@ -94,6 +95,24 @@ export class DayTotalDto {
 
   @ApiProperty({ type: TotalsDto })
   total: TotalsDto;
+
+  @ApiProperty({
+    type: TotalsDto,
+    description:
+      "ITN-27 (bonus): this day's linked bookings that count (owner only). Never converted (PAY-04).",
+  })
+  bookings: TotalsDto;
+}
+
+export class BookingsBudgetDto {
+  @ApiProperty({ type: TotalsDto, description: 'Linked flight bookings.' })
+  flight: TotalsDto;
+
+  @ApiProperty({ type: TotalsDto, description: 'Linked hotel reservations.' })
+  hotel: TotalsDto;
+
+  @ApiProperty({ type: TotalsDto, description: 'Both together.' })
+  total: TotalsDto;
 }
 
 export class BudgetSummaryDto {
@@ -103,8 +122,26 @@ export class BudgetSummaryDto {
   @ApiProperty({ type: [DayTotalDto] })
   byDay: DayTotalDto[];
 
-  @ApiProperty({ type: TotalsDto })
+  @ApiProperty({
+    type: TotalsDto,
+    description:
+      'Planned costs: budget entries, activity costs and transport (ITN-14, ITN-16). Converted by ITN-18.',
+  })
   total: TotalsDto;
+
+  @ApiProperty({
+    type: BookingsBudgetDto,
+    description:
+      "ITN-27 (bonus): prices of the owner's linked Confirmed or Completed bookings. Empty for other viewers. Never converted (PAY-04).",
+  })
+  bookings: BookingsBudgetDto;
+
+  @ApiProperty({
+    type: TotalsDto,
+    description:
+      'ITN-27 (bonus): `total` plus `bookings.total`, one amount per currency. Never converted, because it may include booking prices (PAY-04).',
+  })
+  totalWithBookings: TotalsDto;
 
   @ApiPropertyOptional({ type: BudgetConversionDto, nullable: true })
   conversion?: BudgetConversionDto | null;
@@ -234,6 +271,66 @@ export class DayDto {
 
   @ApiProperty({ type: [BudgetEntryDto] })
   budgetEntries: BudgetEntryDto[];
+
+  @ApiProperty({
+    type: () => [BookingLinkDto],
+    description:
+      'ITN-27 (bonus): bookings linked to this day, read live. Only the owner sees them; empty for everyone else.',
+  })
+  bookings: BookingLinkDto[];
+}
+
+export class BookingLinkDto {
+  @ApiProperty({ example: ID, description: 'Id of the link (for unlinking).' })
+  id: string;
+
+  @ApiProperty({ enum: BOOKING_LINK_TYPES, example: 'flight' })
+  type: string;
+
+  @ApiProperty({ example: ID })
+  bookingId: string;
+
+  @ApiProperty({
+    example: 'Confirmed',
+    nullable: true,
+    description: 'Live booking status; null if the booking no longer exists.',
+  })
+  status: string | null;
+
+  @ApiProperty({
+    example: true,
+    description:
+      'Whether its price counts in the budget (only Confirmed or Completed).',
+  })
+  counted: boolean;
+
+  @ApiProperty({ example: 'K7QM2X', nullable: true })
+  bookingReference: string | null;
+
+  @ApiProperty({
+    example: 'Nile Air',
+    nullable: true,
+    description: 'Airline or hotel name.',
+  })
+  providerName: string | null;
+
+  @ApiProperty({
+    example: '2026-12-20T06:00:00.000Z',
+    nullable: true,
+    description: 'Flight: outbound departure (UTC). Hotel: check-in date.',
+  })
+  startsAt: string | null;
+
+  @ApiProperty({
+    example: 250,
+    nullable: true,
+    description:
+      'Total price in the platform currency; never converted (PAY-04).',
+  })
+  totalPrice: number | null;
+
+  @ApiProperty({ example: 'USD', nullable: true })
+  currency: string | null;
 }
 
 export class TransportEntryDto {

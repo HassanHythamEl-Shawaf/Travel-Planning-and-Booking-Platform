@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ConflictException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
@@ -13,15 +14,18 @@ import {
   CreateActivityDto,
   CreateBudgetEntryDto,
   CreateTransportEntryDto,
+  LinkBookingDto,
   MoveDayDto,
   UpdateActivityDto,
   UpdateBudgetEntryDto,
   UpdateDayDto,
   UpdateTransportEntryDto,
 } from './dto/itinerary-requests.dto';
+import { COUNTED_STATUSES, linksOf } from './itinerary-bookings';
 import { imageIdsOf, type ItineraryView } from './itinerary-view';
 import {
   MAX_ACTIVITIES_PER_DAY,
+  MAX_BOOKING_LINKS_PER_DAY,
   MAX_BUDGET_ENTRIES_PER_DAY,
   MAX_DAYS,
   MAX_TRANSPORT_ENTRIES,
@@ -455,6 +459,75 @@ export class ItineraryItemsService {
       itinerary.transportEntries = itinerary.transportEntries!.filter(
         (e) => e !== entry,
       );
+    });
+  }
+
+  // ----------------------------------------------- linked bookings (ITN-27)
+
+  /**
+   * ITN-27 (bonus): link one of the owner's own Confirmed (or Completed)
+   * flight bookings or hotel reservations to a day, so its price feeds the
+   * budget. Someone else's or an unknown booking is 404; any other status
+   * is 409; the same booking can be linked once per itinerary (409).
+   */
+  async linkBooking(
+    id: string,
+    dayId: string,
+    viewer: AuthenticatedUser,
+    dto: LinkBookingDto,
+  ): Promise<ItineraryView> {
+    // Ownership of the itinerary first, so others get the usual 404 / 403.
+    await this.itineraries.loadOwned(id, viewer);
+    const booking = await this.itineraries.findOwnBooking(
+      viewer,
+      dto.type,
+      dto.bookingId,
+    );
+    if (!booking) throw new NotFoundException('Booking not found');
+    if (!COUNTED_STATUSES.includes(booking.status)) {
+      throw new ConflictException(
+        'Only Confirmed or Completed bookings can be linked',
+      );
+    }
+    return this.saveAndPresent(id, viewer, (itinerary) => {
+      const day = findDay(itinerary, dayId);
+      const already = linksOf(itinerary).some(
+        ({ link }) =>
+          link.type === dto.type && link.bookingId.toString() === dto.bookingId,
+      );
+      if (already) {
+        throw new ConflictException(
+          'This booking is already linked to this itinerary',
+        );
+      }
+      day.bookingLinks ??= [];
+      if (day.bookingLinks.length >= MAX_BOOKING_LINKS_PER_DAY) {
+        throw new BadRequestException(
+          `A day can have at most ${MAX_BOOKING_LINKS_PER_DAY} linked bookings`,
+        );
+      }
+      day.bookingLinks.push({
+        _id: new Types.ObjectId(),
+        type: dto.type,
+        bookingId: new Types.ObjectId(dto.bookingId),
+      });
+    });
+  }
+
+  /** ITN-27: unlink a booking from a day (the booking itself is untouched). */
+  async unlinkBooking(
+    id: string,
+    dayId: string,
+    linkId: string,
+    viewer: AuthenticatedUser,
+  ): Promise<ItineraryView> {
+    return this.saveAndPresent(id, viewer, (itinerary) => {
+      const day = findDay(itinerary, dayId);
+      const links = day.bookingLinks ?? [];
+      if (!links.some((l) => l._id.toString() === linkId)) {
+        throw new NotFoundException('Linked booking not found');
+      }
+      day.bookingLinks = links.filter((l) => l._id.toString() !== linkId);
     });
   }
 

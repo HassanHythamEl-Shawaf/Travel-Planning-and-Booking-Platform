@@ -35,6 +35,12 @@ import type {
 } from './dto/itinerary-responses.dto';
 import { canViewItinerary, isOwnerOf, type Viewer } from './itinerary-access';
 import {
+  attachBookings,
+  type LinkedBooking,
+  ItineraryBookingsReader,
+  linksOf,
+} from './itinerary-bookings';
+import {
   applyConversion,
   type BudgetSummary,
   cityIdsOf,
@@ -83,7 +89,25 @@ export class ItinerariesService {
     private readonly uploads: UploadsService,
     // ITN-18 conversion; optional so unit tests can leave it out.
     @Optional() private readonly fx?: FxRatesService,
+    // ITN-27 (bonus) linked bookings; optional for the same reason.
+    @Optional() private readonly bookings?: ItineraryBookingsReader,
   ) {}
+
+  /**
+   * ITN-27: one of the viewer's own bookings, read through the team
+   * contract; null if it doesn't exist or belongs to someone else.
+   */
+  async findOwnBooking(
+    viewer: AuthenticatedUser,
+    type: 'flight' | 'hotel',
+    bookingId: string,
+  ): Promise<LinkedBooking | null> {
+    if (!this.bookings) return null;
+    const found = await this.bookings.findOwned(viewer.sub, [
+      { type, bookingId },
+    ]);
+    return found.values().next().value ?? null;
+  }
 
   // ------------------------------------------------------------ itinerary
 
@@ -410,8 +434,9 @@ export class ItinerariesService {
         .exec(),
       this.countryNames(itinerary.countries ?? []),
     ]);
-    return toItineraryView(itinerary, {
-      isOwner: isOwnerOf(itinerary, viewer),
+    const isOwner = isOwnerOf(itinerary, viewer);
+    const view = toItineraryView(itinerary, {
+      isOwner,
       author: owner
         ? {
             id: owner._id.toString(),
@@ -431,6 +456,14 @@ export class ItinerariesService {
       cityNames: new Map(cities.map((c) => [c._id, c.name])),
       countryNames: countries,
     });
+    // ITN-27: linked bookings are private to the owner (spec D34).
+    const links = linksOf(itinerary);
+    if (!isOwner || !this.bookings || links.length === 0) return view;
+    const bookings = await this.bookings.findOwned(
+      itinerary.ownerId!,
+      links.map(({ link }) => link),
+    );
+    return attachBookings(view, itinerary, bookings);
   }
 
   /** List rows: countries with names and the author. */

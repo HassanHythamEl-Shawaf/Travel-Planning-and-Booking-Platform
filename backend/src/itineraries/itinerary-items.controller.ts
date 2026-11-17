@@ -39,6 +39,7 @@ import {
   CreateActivityDto,
   CreateBudgetEntryDto,
   CreateTransportEntryDto,
+  LinkBookingDto,
   MoveDayDto,
   UpdateActivityDto,
   UpdateBudgetEntryDto,
@@ -55,6 +56,7 @@ const EXAMPLE_ID = '6650f1c2a1b2c3d4e5f60718';
 const DAY_ID = { name: 'dayId', example: EXAMPLE_ID };
 const ACTIVITY_ID = { name: 'activityId', example: EXAMPLE_ID };
 const ENTRY_ID = { name: 'entryId', example: EXAMPLE_ID };
+const LINK_ID = { name: 'linkId', example: EXAMPLE_ID };
 
 /**
  * Shared decorators for an owner-only change: logged in, the owner, and
@@ -303,6 +305,42 @@ export class ItineraryItemsController {
     @CurrentUser() user: AuthenticatedUser,
   ): Promise<ItineraryView> {
     return this.items.removeBudgetEntry(id, dayId, entryId, user);
+  }
+
+  // ------------------------------------------------ linked bookings (bonus)
+
+  @Post('days/:dayId/bookings')
+  @HttpCode(200)
+  @OwnerChange(
+    'Link one of my bookings to a day (ITN-27, bonus)',
+    "Links one of your own Confirmed (or Completed) flight bookings or hotel reservations to a day. Its price then feeds the budget: `days[].bookings`, `budget.byDay[].bookings`, `budget.bookings` (by type) and `budget.totalWithBookings`. Booking prices stay in the platform currency and are never converted (PAY-04). The price and status are read live, so a booking cancelled later no longer counts (`counted: false`). Linked bookings are shown only to you, never to other viewers of a public itinerary, and are not copied by clone. 404 if the booking isn't yours; 409 if it isn't Confirmed or Completed, or is already linked to this itinerary. At most 10 per day.",
+    'Itinerary, day or booking not found',
+  )
+  @ApiParam(DAY_ID)
+  linkBooking(
+    @Param('id', ParseObjectIdPipe) id: string,
+    @Param('dayId', ParseObjectIdPipe) dayId: string,
+    @CurrentUser() user: AuthenticatedUser,
+    @Body() dto: LinkBookingDto,
+  ): Promise<ItineraryView> {
+    return this.items.linkBooking(id, dayId, user, dto);
+  }
+
+  @Delete('days/:dayId/bookings/:linkId')
+  @OwnerChange(
+    'Unlink a booking from a day (ITN-27, bonus)',
+    'Removes the link only; the booking itself is not changed or cancelled. Totals are recalculated.',
+    'Itinerary, day or linked booking not found',
+  )
+  @ApiParam(DAY_ID)
+  @ApiParam(LINK_ID)
+  unlinkBooking(
+    @Param('id', ParseObjectIdPipe) id: string,
+    @Param('dayId', ParseObjectIdPipe) dayId: string,
+    @Param('linkId', ParseObjectIdPipe) linkId: string,
+    @CurrentUser() user: AuthenticatedUser,
+  ): Promise<ItineraryView> {
+    return this.items.unlinkBooking(id, dayId, linkId, user);
   }
 
   // ----------------------------------------------------------- transport

@@ -1,5 +1,5 @@
 /**
- * Itineraries e2e (ITN-01 to ITN-21, ITN-28, GEN-08, GEN-10, ACC-11, ACC-12). Boots
+ * Itineraries e2e (ITN-01 to ITN-21, ITN-27, ITN-28, GEN-08, GEN-10, ACC-11, ACC-12). Boots
  * the whole AppModule over HTTP against an in-memory MongoDB replica set
  * and a temporary upload folder. Never Atlas, never real secrets.
  */
@@ -819,6 +819,279 @@ describe('Itineraries (e2e)', () => {
       await connection
         .collection('users')
         .updateOne({ _id: aliceId }, { $set: { status: 'active' } });
+    });
+  });
+
+  describe('linked bookings (ITN-27, bonus)', () => {
+    // Bookings are owned by Persons 4 and 6; they are inserted here with the
+    // fields agreed in integrations/teammate-contracts.ts, which is all the
+    // itinerary reads.
+    let tripWithBookings: string;
+    let day1: string;
+    let day2: string;
+    const flightId = new Types.ObjectId();
+    const hotelId = new Types.ObjectId();
+    const pendingId = new Types.ObjectId();
+    const bobsFlightId = new Types.ObjectId();
+
+    beforeAll(async () => {
+      const bobId = (await connection
+        .collection('users')
+        .findOne({ email: 'bob@itn.test' }))!._id as Types.ObjectId;
+      const airlineId = new Types.ObjectId();
+      const hotel = new Types.ObjectId();
+      await connection
+        .collection('airlines')
+        .insertOne({ _id: airlineId, name: 'Nile Air', code: 'NA' });
+      await connection
+        .collection('hotels')
+        .insertOne({ _id: hotel, name: 'Luxor Palace' });
+      const flight = (
+        _id: Types.ObjectId,
+        userId: Types.ObjectId,
+        status: string,
+      ) => ({
+        _id,
+        userId,
+        status,
+        bookingReference:
+          status === 'Confirmed' ? `R${_id.toString().slice(-5)}` : null,
+        totalPrice: 250,
+        currency: 'USD',
+        airlineId,
+        departureAt: new Date('2027-01-05T06:00:00Z'),
+        createdAt: new Date(),
+      });
+      await connection
+        .collection('flightbookings')
+        .insertMany([
+          flight(flightId, aliceId, 'Confirmed'),
+          flight(pendingId, aliceId, 'Pending Payment'),
+          flight(bobsFlightId, bobId, 'Confirmed'),
+        ]);
+      await connection.collection('hotelbookings').insertOne({
+        _id: hotelId,
+        userId: aliceId,
+        status: 'Completed',
+        bookingReference: 'H4TL22',
+        totalPrice: 400.5,
+        currency: 'USD',
+        hotelId: hotel,
+        checkInDate: new Date('2027-01-06T00:00:00Z'),
+        createdAt: new Date(),
+      });
+
+      const created = await create(alice, {
+        title: 'Booked trip',
+        startDate: '2027-01-05',
+      }).expect(201);
+      tripWithBookings = created.body.id;
+      await alice
+        .post(`/api/itineraries/${tripWithBookings}/days`)
+        .send({ cityId: 'cairo' })
+        .expect(200);
+      const res = await alice
+        .post(`/api/itineraries/${tripWithBookings}/days`)
+        .send({ cityId: 'luxor' })
+        .expect(200);
+      day1 = res.body.days[0].id;
+      day2 = res.body.days[1].id;
+      await alice
+        .post(
+          `/api/itineraries/${tripWithBookings}/days/${day1}/budget-entries`,
+        )
+        .send({ category: 'food', amount: 400, currency: 'EGP' })
+        .expect(200);
+    });
+
+    const link = (agent: TestAgent, dayId: string, body: object) =>
+      agent
+        .post(`/api/itineraries/${tripWithBookings}/days/${dayId}/bookings`)
+        .send(body);
+
+    it('links my Confirmed flight and Completed hotel; their prices feed the budget', async () => {
+      await link(alice, day1, {
+        type: 'flight',
+        bookingId: flightId.toString(),
+      }).expect(200);
+      const res = await link(alice, day2, {
+        type: 'hotel',
+        bookingId: hotelId.toString(),
+      }).expect(200);
+
+      expect(res.body.days[0].bookings).toEqual([
+        expect.objectContaining({
+          type: 'flight',
+          bookingId: flightId.toString(),
+          status: 'Confirmed',
+          counted: true,
+          bookingReference: `R${flightId.toString().slice(-5)}`,
+          providerName: 'Nile Air',
+          startsAt: '2027-01-05T06:00:00.000Z',
+          totalPrice: 250,
+          currency: 'USD',
+        }),
+      ]);
+      expect(res.body.days[1].bookings[0]).toMatchObject({
+        type: 'hotel',
+        providerName: 'Luxor Palace',
+        status: 'Completed',
+        counted: true,
+      });
+      const { budget } = res.body;
+      expect(budget.byDay[0].bookings.amounts).toEqual([
+        { currency: 'USD', amount: 250 },
+      ]);
+      expect(budget.bookings).toEqual({
+        flight: { amounts: [{ currency: 'USD', amount: 250 }] },
+        hotel: { amounts: [{ currency: 'USD', amount: 400.5 }] },
+        total: { amounts: [{ currency: 'USD', amount: 650.5 }] },
+      });
+      // Planned costs are still converted (ITN-18); bookings never are (PAY-04).
+      expect(budget.total.amounts).toEqual([{ currency: 'EGP', amount: 400 }]);
+      expect(budget.total.converted).toBe(10); // 400 EGP / 40
+      expect(budget.totalWithBookings).toEqual({
+        amounts: [
+          { currency: 'EGP', amount: 400 },
+          { currency: 'USD', amount: 650.5 },
+        ],
+      });
+    });
+
+    it('rejects bookings that are not mine, not confirmed, unknown or already linked', async () => {
+      await link(alice, day1, {
+        type: 'flight',
+        bookingId: bobsFlightId.toString(),
+      }).expect(404);
+      await link(alice, day1, {
+        type: 'flight',
+        bookingId: new Types.ObjectId().toString(),
+      }).expect(404);
+      // A flight booking id is not a hotel reservation.
+      await link(alice, day1, {
+        type: 'hotel',
+        bookingId: flightId.toString(),
+      }).expect(404);
+      await link(alice, day1, {
+        type: 'flight',
+        bookingId: pendingId.toString(),
+      }).expect(409);
+      await link(alice, day2, {
+        type: 'flight',
+        bookingId: flightId.toString(),
+      }).expect(409);
+      await link(alice, day1, { type: 'car', bookingId: 'x' }).expect(400);
+      await link(bob, day1, {
+        type: 'flight',
+        bookingId: bobsFlightId.toString(),
+      }).expect(404); // someone else's private itinerary
+      await guest()
+        .post(`/api/itineraries/${tripWithBookings}/days/${day1}/bookings`)
+        .send({ type: 'flight', bookingId: flightId.toString() })
+        .expect(401);
+    });
+
+    it('shows linked bookings only to the owner, and clones never copy them', async () => {
+      await alice
+        .patch(`/api/itineraries/${tripWithBookings}/visibility`)
+        .send({ isPublic: true })
+        .expect(200);
+      const shared = await guest()
+        .get(`/api/itineraries/${tripWithBookings}`)
+        .expect(200);
+      expect(
+        shared.body.days.map((d: { bookings: unknown[] }) => d.bookings),
+      ).toEqual([[], []]);
+      expect(shared.body.budget.bookings.total.amounts).toEqual([]);
+      expect(shared.body.budget.totalWithBookings.amounts).toEqual([
+        { currency: 'EGP', amount: 400 },
+      ]);
+      await link(bob, day1, {
+        type: 'flight',
+        bookingId: bobsFlightId.toString(),
+      }).expect(403); // public: read-only for others
+
+      const clone = await bob
+        .post(`/api/itineraries/${tripWithBookings}/clone`)
+        .expect(201);
+      expect(
+        clone.body.days.map((d: { bookings: unknown[] }) => d.bookings),
+      ).toEqual([[], []]);
+      const stored = await connection
+        .collection('itineraries')
+        .findOne({ _id: new Types.ObjectId(clone.body.id as string) });
+      expect(
+        (stored!.days as { bookingLinks?: unknown[] }[]).flatMap(
+          (d) => d.bookingLinks ?? [],
+        ),
+      ).toEqual([]);
+    });
+
+    it('reads the booking live: a cancelled booking stops counting', async () => {
+      await connection
+        .collection('flightbookings')
+        .updateOne({ _id: flightId }, { $set: { status: 'Cancelled' } });
+      const res = await alice
+        .get(`/api/itineraries/${tripWithBookings}`)
+        .expect(200);
+      expect(res.body.days[0].bookings[0]).toMatchObject({
+        status: 'Cancelled',
+        counted: false,
+        totalPrice: 250,
+      });
+      expect(res.body.budget.bookings.total.amounts).toEqual([
+        { currency: 'USD', amount: 400.5 },
+      ]);
+      expect(res.body.budget.byDay[0].bookings.amounts).toEqual([]);
+    });
+
+    it('keeps the link on its day when days move, and drops it with the day', async () => {
+      const moved = await alice
+        .patch(`/api/itineraries/${tripWithBookings}/days/${day2}/position`)
+        .send({ position: 1 })
+        .expect(200);
+      expect(moved.body.days[0].id).toBe(day2);
+      expect(moved.body.days[0].bookings[0].type).toBe('hotel');
+      await alice
+        .patch(`/api/itineraries/${tripWithBookings}/days/${day2}/position`)
+        .send({ position: 2 })
+        .expect(200);
+    });
+
+    it('unlinks a booking without touching the booking itself', async () => {
+      const view = await alice
+        .get(`/api/itineraries/${tripWithBookings}`)
+        .expect(200);
+      const linkId = view.body.days[1].bookings[0].id as string;
+      await alice
+        .delete(
+          `/api/itineraries/${tripWithBookings}/days/${day2}/bookings/${new Types.ObjectId().toString()}`,
+        )
+        .expect(404);
+      const res = await alice
+        .delete(
+          `/api/itineraries/${tripWithBookings}/days/${day2}/bookings/${linkId}`,
+        )
+        .expect(200);
+      expect(res.body.days[1].bookings).toEqual([]);
+      expect(res.body.budget.bookings.hotel.amounts).toEqual([]);
+      expect(
+        await connection.collection('hotelbookings').countDocuments({
+          _id: hotelId,
+          status: 'Completed',
+        }),
+      ).toBe(1);
+    });
+
+    it('lists the linked bookings in the owner’s PDF', async () => {
+      const res = await alice
+        .get(`/api/itineraries/${tripWithBookings}/pdf`)
+        .buffer(true)
+        .parse(binary)
+        .expect(200);
+      expect((res.body as Buffer).subarray(0, 5).toString('latin1')).toBe(
+        '%PDF-',
+      );
     });
   });
 

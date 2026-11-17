@@ -161,6 +161,8 @@ export class PublicItinerariesService {
             currency: e.currency,
             note: e.note ?? '',
           })),
+          // ITN-27: linked bookings are the original owner's, never copied.
+          bookingLinks: [],
         });
       }
       const transportEntries: TransportEntry[] = (

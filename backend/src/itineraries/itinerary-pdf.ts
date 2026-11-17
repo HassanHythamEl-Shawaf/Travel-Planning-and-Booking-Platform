@@ -222,14 +222,39 @@ export function renderItineraryPdf(
       );
     }
   }
+
+  // Linked bookings (ITN-27): only in the owner's view, so only in their PDF.
+  const booked = view.days.flatMap((day) =>
+    day.bookings.map((booking) => ({ day, booking })),
+  );
+  if (booked.length) {
+    rule();
+    heading('Booked flights and hotels');
+    for (const { day, booking } of booked) {
+      const label = `Day ${day.dayNumber}: ${booking.type === 'flight' ? 'Flight' : 'Hotel'}${booking.providerName ? ` ${booking.providerName}` : ''}${booking.bookingReference ? `, ref ${booking.bookingReference}` : ''} (${booking.status ?? 'no longer available'})`;
+      const price =
+        booking.totalPrice !== null && booking.currency
+          ? money(booking.totalPrice, booking.currency)
+          : '-';
+      row(label, booking.counted ? price : `${price} (not counted)`);
+    }
+  }
   rule();
 
-  // Budget (ITN-14, ITN-18)
+  // Budget (ITN-14, ITN-18; bookings ITN-27)
   heading('Budget');
   for (const line of BUDGET_LINES) {
     row(LINE_LABELS[line], formatTotals(view.budget.byCategory[line], display));
   }
   row('Total', formatTotals(view.budget.total, display), true);
+  if (view.budget.bookings.total.amounts.length) {
+    row('Booked (never converted)', formatTotals(view.budget.bookings.total));
+    row(
+      'Total with bookings',
+      formatTotals(view.budget.totalWithBookings),
+      true,
+    );
+  }
   doc.moveDown(0.3);
   const conversion = view.budget.conversion;
   if (conversion) {

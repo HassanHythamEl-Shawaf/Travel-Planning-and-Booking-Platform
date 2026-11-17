@@ -3,6 +3,7 @@ import type { Types } from 'mongoose';
 import type { Converter } from '../fx-rates/fx-rates.service';
 import {
   BUDGET_CATEGORIES,
+  type BookingLinkType,
   type BudgetCategory,
   DELETED_USER_NAME,
 } from './itineraries.constants';
@@ -79,6 +80,11 @@ export class MoneyBag {
     return this;
   }
 
+  addAll(amounts: readonly Money[]): this {
+    for (const { currency, amount } of amounts) this.add(currency, amount);
+    return this;
+  }
+
   addBag(other: MoneyBag): this {
     for (const [currency, cents] of other.cents) {
       this.cents.set(currency, (this.cents.get(currency) ?? 0) + cents);
@@ -110,6 +116,8 @@ export interface DayTotal {
   dayNumber: number;
   date: string | null;
   total: Totals;
+  /** ITN-27: the day's linked booking prices (owner only; never converted). */
+  bookings: Totals;
 }
 
 /** ITN-18: which currency and rates the `converted` amounts use. */
@@ -119,10 +127,22 @@ export interface BudgetConversion {
   usingCachedRates: boolean;
 }
 
+/** ITN-27 (bonus): linked booking prices, never converted (PAY-04). */
+export interface BookingsBudget {
+  flight: Totals;
+  hotel: Totals;
+  total: Totals;
+}
+
 export interface BudgetSummary {
   byCategory: Record<BudgetLine, Totals>;
   byDay: DayTotal[];
+  /** Planned costs (ITN-14, ITN-16); converted by ITN-18. */
   total: Totals;
+  /** ITN-27: the owner's linked bookings that count (empty for others). */
+  bookings: BookingsBudget;
+  /** `total` plus `bookings.total`, per currency; never converted (PAY-04). */
+  totalWithBookings: Totals;
   /** null when no conversion was made (then conversionError says why). */
   conversion?: BudgetConversion | null;
   conversionError?: string | null;
@@ -193,6 +213,7 @@ export function buildBudgetSummary(itinerary: LeanItinerary): BudgetSummary {
       dayNumber: index + 1,
       date: dayDate(itinerary.startDate, index),
       total: dayTotal.toTotals(),
+      bookings: { amounts: [] },
     };
   });
 
@@ -202,6 +223,13 @@ export function buildBudgetSummary(itinerary: LeanItinerary): BudgetSummary {
     ) as Record<BudgetLine, Totals>,
     byDay,
     total: total.toTotals(),
+    // ITN-27: filled in for the owner by attachBookings().
+    bookings: {
+      flight: { amounts: [] },
+      hotel: { amounts: [] },
+      total: { amounts: [] },
+    },
+    totalWithBookings: total.toTotals(),
   };
 }
 
@@ -286,6 +314,23 @@ export interface BudgetEntryView {
   note: string;
 }
 
+/** ITN-27 (bonus): a linked booking as the owner sees it, read live. */
+export interface BookingLinkView {
+  id: string;
+  type: BookingLinkType;
+  bookingId: string;
+  /** Live booking status; null if the booking no longer exists. */
+  status: string | null;
+  /** True when its price counts in the budget (Confirmed or Completed). */
+  counted: boolean;
+  bookingReference: string | null;
+  providerName: string | null;
+  startsAt: string | null;
+  /** In the platform currency; never converted (PAY-04). */
+  totalPrice: number | null;
+  currency: string | null;
+}
+
 export interface DayView {
   id: string;
   dayNumber: number;
@@ -295,6 +340,8 @@ export interface DayView {
   notes: string;
   activities: ActivityView[];
   budgetEntries: BudgetEntryView[];
+  /** ITN-27: linked bookings; only the owner sees them (empty for others). */
+  bookings: BookingLinkView[];
 }
 
 export interface TransportEntryView {
@@ -416,6 +463,7 @@ export function toItineraryView(
       notes: day.notes ?? '',
       activities: (day.activities ?? []).map(toActivityView),
       budgetEntries: (day.budgetEntries ?? []).map(toBudgetEntryView),
+      bookings: [],
     })),
     cityGroups: buildCityGroups(itinerary, context.cityNames),
     transportEntries: (itinerary.transportEntries ?? []).map((t) => ({
