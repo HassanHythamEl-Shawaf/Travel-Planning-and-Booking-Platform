@@ -1,5 +1,5 @@
 /**
- * Itineraries e2e (ITN-01 to ITN-21, ITN-27, ITN-28, GEN-08, GEN-10, ACC-11, ACC-12). Boots
+ * Itineraries e2e (ITN-01 to ITN-21, ITN-27, ITN-28, BLG-13, GEN-08, GEN-10, ACC-11, ACC-12). Boots
  * the whole AppModule over HTTP against an in-memory MongoDB replica set
  * and a temporary upload folder. Never Atlas, never real secrets.
  */
@@ -1092,6 +1092,104 @@ describe('Itineraries (e2e)', () => {
       expect((res.body as Buffer).subarray(0, 5).toString('latin1')).toBe(
         '%PDF-',
       );
+    });
+  });
+
+  describe('itinerary attached to a blog post (BLG-13, bonus)', () => {
+    let blogTrip: string;
+    let postId: string;
+
+    const post = (id: string, agent: TestAgent | ReturnType<typeof guest>) =>
+      agent.get(`/api/posts/${id}`).expect(200);
+
+    beforeAll(async () => {
+      const res = await create(alice, { title: 'Blog trip' }).expect(201);
+      blogTrip = res.body.id;
+    });
+
+    it('lets an author attach only one of their own itineraries', async () => {
+      const body = { title: 'Our trip', content: 'Text', status: 'published' };
+      await bob
+        .post('/api/posts')
+        .send({ ...body, itineraryId: blogTrip })
+        .expect(400);
+      await alice
+        .post('/api/posts')
+        .send({ ...body, itineraryId: new Types.ObjectId().toString() })
+        .expect(400);
+      await alice
+        .post('/api/posts')
+        .send({ ...body, itineraryId: 'nope' })
+        .expect(400);
+
+      const res = await alice
+        .post('/api/posts')
+        .send({ ...body, itineraryId: blogTrip })
+        .expect(201);
+      postId = res.body.id;
+      // The author sees their own itinerary even while it is private.
+      expect(res.body.itinerary).toEqual({
+        id: blogTrip,
+        title: 'Blog trip',
+        countries: ['EG'],
+        isPublic: false,
+      });
+    });
+
+    it('shows it to readers only while the itinerary is public and not hidden', async () => {
+      expect((await post(postId, guest())).body.itinerary).toBeNull();
+      expect((await post(postId, bob)).body.itinerary).toBeNull();
+      expect((await post(postId, admin)).body.itinerary).toBeNull(); // private
+
+      await alice
+        .patch(`/api/itineraries/${blogTrip}/visibility`)
+        .send({ isPublic: true })
+        .expect(200);
+      expect((await post(postId, guest())).body.itinerary).toMatchObject({
+        id: blogTrip,
+        isPublic: true,
+      });
+
+      // Hidden by an admin (GEN-10): only its owner and admins see it.
+      await connection
+        .collection('itineraries')
+        .updateOne(
+          { _id: new Types.ObjectId(blogTrip) },
+          { $set: { isHidden: true } },
+        );
+      expect((await post(postId, guest())).body.itinerary).toBeNull();
+      expect((await post(postId, admin)).body.itinerary).not.toBeNull();
+      expect((await post(postId, alice)).body.itinerary).not.toBeNull();
+      await connection
+        .collection('itineraries')
+        .updateOne(
+          { _id: new Types.ObjectId(blogTrip) },
+          { $set: { isHidden: false } },
+        );
+    });
+
+    it('detaches with null, and a deleted itinerary just disappears from the post', async () => {
+      const detached = await alice
+        .patch(`/api/posts/${postId}`)
+        .send({ itineraryId: null })
+        .expect(200);
+      expect(detached.body.itinerary).toBeNull();
+      await bob
+        .patch(`/api/posts/${postId}`)
+        .send({ itineraryId: blogTrip })
+        .expect(403);
+
+      await alice
+        .patch(`/api/posts/${postId}`)
+        .send({ itineraryId: blogTrip })
+        .expect(200);
+      await alice
+        .delete(`/api/itineraries/${blogTrip}`)
+        .send({ confirm: true })
+        .expect(200);
+      const after = await post(postId, alice);
+      expect(after.body.title).toBe('Our trip');
+      expect(after.body.itinerary).toBeNull();
     });
   });
 
