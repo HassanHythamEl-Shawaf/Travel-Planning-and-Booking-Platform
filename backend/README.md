@@ -259,7 +259,7 @@ Swagger tag **Uploads**. Full rules: `docs/requirements/GEN-08-uploads-spec.md`.
 Tests: `npm test -- src/uploads` and `npm run test:e2e -- uploads provider-images` (in-memory
 MongoDB, temporary folder).
 
-## Itineraries (ITN-01 – ITN-21)
+## Itineraries (ITN-01 – ITN-28)
 
 Swagger tags **Itineraries** and **Itinerary days, activities and budget**. Full rules:
 `docs/requirements/ITN-itineraries-spec.md`.
@@ -348,7 +348,7 @@ Full rules: `docs/requirements/ITN-18-fx-rates-spec.md`.
 
 Tests: `npm test -- src/fx-rates` and `npm run test:e2e -- itineraries` (fake provider).
 
-## Blog (BLG-01 – BLG-12)
+## Blog (BLG-01 – BLG-13)
 
 Swagger tag **Blog**. Full rules: `docs/requirements/BLG-blog-spec.md`.
 
@@ -377,6 +377,11 @@ Swagger tag **Blog**. Full rules: `docs/requirements/BLG-blog-spec.md`.
 - **Author page** — `GET /api/authors/:id` returns name, join date, published posts (paginated)
   and up to 10 public itineraries (read from `itineraries` via
   `ITINERARY_FIELDS` in `teammate-contracts.ts`).
+- **Attached itinerary** (BLG-13, optional bonus, added by Person 8) — `POST` / `PATCH
+  /api/posts[/:id]` accept `itineraryId` (one of your own itineraries; `null` detaches). Post
+  details return `itinerary: { id, title, countries, isPublic }`, or `null` when the reader may
+  not see it (private, hidden or deleted). Rules: `docs/requirements/ITN-itineraries-spec.md`
+  D37–D39.
 
 Public GETs use `OptionalAuthGuard` (`src/blog/optional-auth.guard.ts`). It applies the same
 checks as `AuthGuard`, but a missing or invalid session makes the request a guest request,

@@ -866,3 +866,19 @@ from the planned costs and never converted (PAY-04); links are private to
 the owner and not cloned; unit and e2e tests; spec decisions D32-D36 and
 README section.
 ================================================
+
+Date: 2026-11-17
+Student: Hammad
+Tool: Claude Code (Claude Opus 5.5)
+Related Requirement: BLG-13 (optional bonus), ITN-20, GEN-10
+Prompt:
+The bonus items are optional items of my part, so build them and
+document them correctly.
+How the output was used:
+Added an optional itineraryId to blog posts (create, update, null to
+detach): only the author's own itinerary can be attached, and readers see
+it only under the itinerary's visibility rules (owner always; public for
+others; hidden only for admins; deleted shows as null). Additive changes
+in Wael's Blog module, read through Blog's PublicItineraryReader; e2e
+tests; spec decisions D37-D39 and a README line.
+================================================

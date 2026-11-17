@@ -94,6 +94,20 @@ An optional bonus row of the official sheet, listed in Person 8's brief as optio
 | D35 | Feeding the budget vs PAY-04 ("booking prices are not converted", ITN-18): booking prices are kept **separate from the planned costs** and stay in their own (platform) currency. `budget.total`, `byCategory`, `byDay[].total` and city-group subtotals stay the planned costs (ITN-14/16) and are converted as before. Linked bookings that count (Confirmed or Completed) go into `budget.byDay[].bookings`, `budget.bookings` (`flight`, `hotel`, `total`) and `budget.totalWithBookings` (= `total` + `bookings.total`, one amount per currency). None of these has a `converted` value. |
 | D36 | Linked bookings are **private to the owner**: other viewers of a public itinerary (and admins) get empty `bookings` and an empty `budget.bookings`, so references and prices of someone's bookings are never shown. Clone (ITN-21) never copies links, because the bookings belong to the original owner. The owner's PDF (ITN-28) lists them in a "Booked flights and hotels" section. |
 
+### Itinerary attached to a blog post (BLG-13, optional bonus)
+
+| ID | Rule (sheet, Bonus section) |
+|---|---|
+| BLG-13 | The system shall allow an author to attach an itinerary to a post. (Depends on BLG-01, ITN-03.) |
+
+An optional bonus row of the official sheet, listed in Person 8's brief as optional. The Blog module belongs to Wael (Person 2); the change there is additive only (one optional field) and listed for him in the PR.
+
+| # | Decision |
+|---|---|
+| D37 | `POST /api/posts` and `PATCH /api/posts/:id` accept an optional `itineraryId`; `null` detaches it. An author can attach only **one of their own** itineraries, of any visibility; anything else (someone else's, unknown, invalid id) is 400, so other users' itinerary ids can't be probed. Stored on the post as `itineraryId` (default null). |
+| D38 | `GET /api/posts/:id` (and the create / update responses) return `itinerary: { id, title, countries, isPublic }` or `null`, with the **itinerary's** visibility rules (D5): its owner (the author) always sees it; other readers only while it is public, and a hidden one (GEN-10) only for admins; a private one is never shown to others, admins included. Setting the itinerary Private removes it from the post at once (ITN-20). The full itinerary is at `GET /api/itineraries/:id`. |
+| D39 | A deleted itinerary just disappears from the post (`itinerary: null`); the post is not changed. Blog reads the itinerary through its existing `PublicItineraryReader` (new `findById`, contract fields of `ITINERARY_FIELDS`), so Blog still doesn't depend on the Itineraries module. List items (`GET /api/posts`) are unchanged. |
+
 ## 3. Endpoints
 
 | Method | Path | Req | Who |
@@ -120,6 +134,7 @@ An optional bonus row of the official sheet, listed in Person 8's brief as optio
 | GET | `/api/itineraries/:id/pdf?currency=` | ITN-28 (bonus) | anyone who can see it |
 | POST | `/api/itineraries/:id/days/:dayId/bookings` | ITN-27 (bonus) | owner |
 | DELETE | `/api/itineraries/:id/days/:dayId/bookings/:linkId` | ITN-27 (bonus) | owner |
+| POST, PATCH | `/api/posts[/:id]` with `itineraryId` | BLG-13 (bonus) | post author |
 
 ## 4. Tests
 
@@ -141,4 +156,5 @@ An optional bonus row of the official sheet, listed in Person 8's brief as optio
 - `test/itineraries.e2e-spec.ts` (ITN-28): the download is `application/pdf` named `itinerary-<id>.pdf`; a public itinerary exports for guests; a private one is 404 for guests, other users and admins; invalid id 400; unsupported currency 400.
 - `src/itineraries/itinerary-bookings.spec.ts` (ITN-27): only Confirmed and Completed count; a cancelled or missing booking is shown but not counted; per-day, per-type and overall booking totals in cents; planned totals unchanged; `totalWithBookings`; no converted values; empty for non-owners; older days without links.
 - `test/itineraries.e2e-spec.ts` (ITN-27): link a Confirmed flight and a Completed hotel reservation (provider names, references, dates, prices); someone else's, unknown, wrong-type, Pending Payment and already-linked bookings rejected (404 / 409), bad type 400, guests 401, other users 404 / 403; public viewers see no bookings; clones carry none; a booking cancelled later stops counting; links follow a moved day; unlink leaves the booking intact; the owner's PDF.
+- `test/itineraries.e2e-spec.ts` (BLG-13): only the author's own itinerary can be attached (someone else's, unknown and invalid ids are 400); the author sees their private one; guests, other users and admins don't while it is private; public shows it; hidden shows it only to the owner and admins; `null` detaches; other users can't change the post (403); deleting the itinerary leaves the post with `itinerary: null`. Wael's `test/blog.e2e-spec.ts` and Blog unit tests pass unchanged.
 - `test/itineraries.e2e-spec.ts` also sets the preferred currency through `PATCH /api/users/me` (ACC-09) and checks that an unsupported preference falls back to USD.
