@@ -849,3 +849,20 @@ rules as viewing it; unit and e2e tests; spec decisions D29-D31 and a
 README line. ITN-27 was held because hotel bookings (HTL-17) do not exist
 yet, and BLG-13 needs changes in the Blog module (asked first).
 ================================================
+
+Date: 2026-11-17
+Student: Hammad
+Tool: Claude Code (Claude Opus 5.5)
+Related Requirement: ITN-27 (optional bonus), PAY-04, ITN-18
+Prompt:
+The bonus items are optional items of my part, so build them and
+document them correctly.
+How the output was used:
+Added linking of the owner's own Confirmed or Completed flight bookings
+and hotel reservations to itinerary days (POST/DELETE
+.../days/:dayId/bookings). Bookings are read live through the team's
+booking contract (no teammate files changed); their prices are kept apart
+from the planned costs and never converted (PAY-04); links are private to
+the owner and not cloned; unit and e2e tests; spec decisions D32-D36 and
+README section.
+================================================

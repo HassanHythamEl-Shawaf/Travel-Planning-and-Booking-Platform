@@ -78,6 +78,22 @@ This is an optional bonus row of the official sheet, listed in Person 8's brief 
 | D30 | Content: title, dates, day count, visibility, countries, author and clone credit; the route (city groups with subtotals); each day with its date, city, notes, activities (time, name, cost, description) and budget entries; intercity transport; the budget by category and total. Totals also show the converted amount (ITN-18) with the rate date, in `?currency=`, else the preferred currency, else USD. If no rates are available the PDF is still produced, without conversion, and says why (the soft conversion of `GET :id`, not the 503 of `GET :id/budget`). |
 | D31 | The download is named `itinerary-<id>.pdf`, never after the title, so user text never goes into a response header. It is rendered by a pure function (`itinerary-pdf.ts`, pdfkit, as in the FLT-23 e-ticket). The built-in Helvetica fonts only cover Western European text, so characters they cannot draw (e.g. Arabic) are shown as "?" instead of wrong letters. Known limit: embedding a Unicode font would lift it. |
 
+### Linked bookings (ITN-27, optional bonus)
+
+| ID | Rule (sheet, Bonus section) |
+|---|---|
+| ITN-27 | The system shall allow booked flights and hotels to be linked to itinerary days, feeding the budget. (Depends on FLT-23, HTL-17, ITN-05.) |
+
+An optional bonus row of the official sheet, listed in Person 8's brief as optional; built after every mandatory row was done and tested.
+
+| # | Decision |
+|---|---|
+| D32 | `POST /api/itineraries/:id/days/:dayId/bookings` (`{ type: 'flight' \| 'hotel', bookingId }`) links one of the **owner's own** bookings to a day; `DELETE .../bookings/:linkId` unlinks it (the booking itself is never changed). Itinerary ownership is checked first (the usual 404 / 403). Someone else's or an unknown booking is 404 (ids can't be probed); a booking that isn't Confirmed or Completed is 409; the same booking can be linked once per itinerary (409); at most 10 links per day. |
+| D33 | Only `{ _id, type, bookingId }` is stored, inside the day (`days[].bookingLinks`), so links follow their day when days move and are deleted with it. Status, price, currency, reference, provider name and date are **read live** on every view, so a booking cancelled later shows `counted: false` and drops out of the budget; a booking that no longer exists shows `status: null`. |
+| D34 | Bookings are read only through the fields agreed in `integrations/teammate-contracts.ts` (collections `flightbookings` / `hotelbookings`: `_id`, `userId`, `status`, `bookingReference`, `totalPrice`, `currency`, `airlineId` + `departureAt` / `hotelId` + `checkInDate`; provider names from `airlines` / `hotels`), the same way admin booking inspection reads them. So no teammate file is changed. Flight bookings (Arafa) exist on `develop`. **Hotel reservations (Yassin, HTL-17) are not on `develop` yet**: the hotel side is tested with documents shaped like the agreed contract and works once that module stores reservations under those names. |
+| D35 | Feeding the budget vs PAY-04 ("booking prices are not converted", ITN-18): booking prices are kept **separate from the planned costs** and stay in their own (platform) currency. `budget.total`, `byCategory`, `byDay[].total` and city-group subtotals stay the planned costs (ITN-14/16) and are converted as before. Linked bookings that count (Confirmed or Completed) go into `budget.byDay[].bookings`, `budget.bookings` (`flight`, `hotel`, `total`) and `budget.totalWithBookings` (= `total` + `bookings.total`, one amount per currency). None of these has a `converted` value. |
+| D36 | Linked bookings are **private to the owner**: other viewers of a public itinerary (and admins) get empty `bookings` and an empty `budget.bookings`, so references and prices of someone's bookings are never shown. Clone (ITN-21) never copies links, because the bookings belong to the original owner. The owner's PDF (ITN-28) lists them in a "Booked flights and hotels" section. |
+
 ## 3. Endpoints
 
 | Method | Path | Req | Who |
@@ -102,6 +118,8 @@ This is an optional bonus row of the official sheet, listed in Person 8's brief 
 | GET | `/api/itineraries/:id/flights/airports` | ITN-26 | owner |
 | GET | `/api/itineraries/:id/flights?from=&to=&tripType=&departureDate=&returnDate=&adults=&children=&infants=&cabinClass=&sort=&page=` | ITN-26 | owner |
 | GET | `/api/itineraries/:id/pdf?currency=` | ITN-28 (bonus) | anyone who can see it |
+| POST | `/api/itineraries/:id/days/:dayId/bookings` | ITN-27 (bonus) | owner |
+| DELETE | `/api/itineraries/:id/days/:dayId/bookings/:linkId` | ITN-27 (bonus) | owner |
 
 ## 4. Tests
 
@@ -121,4 +139,6 @@ This is an optional bonus row of the official sheet, listed in Person 8's brief 
   - **Flights:** airports of day 1's city; one-way on the start date; round trip returning on the last day; a city with two airports gets both searched and merged (sorted by departure or price), `to` narrows to one and must be in that city; no days; other users.
 - `src/itineraries/itinerary-pdf.spec.ts` (ITN-28): a valid PDF titled with the itinerary; days, activities, budget, transport, converted totals and rate date are drawn; still produced without rates; clone credit; Arabic text doesn't crash and shows as "?"; compressed by default; file name from the id.
 - `test/itineraries.e2e-spec.ts` (ITN-28): the download is `application/pdf` named `itinerary-<id>.pdf`; a public itinerary exports for guests; a private one is 404 for guests, other users and admins; invalid id 400; unsupported currency 400.
+- `src/itineraries/itinerary-bookings.spec.ts` (ITN-27): only Confirmed and Completed count; a cancelled or missing booking is shown but not counted; per-day, per-type and overall booking totals in cents; planned totals unchanged; `totalWithBookings`; no converted values; empty for non-owners; older days without links.
+- `test/itineraries.e2e-spec.ts` (ITN-27): link a Confirmed flight and a Completed hotel reservation (provider names, references, dates, prices); someone else's, unknown, wrong-type, Pending Payment and already-linked bookings rejected (404 / 409), bad type 400, guests 401, other users 404 / 403; public viewers see no bookings; clones carry none; a booking cancelled later stops counting; links follow a moved day; unlink leaves the booking intact; the owner's PDF.
 - `test/itineraries.e2e-spec.ts` also sets the preferred currency through `PATCH /api/users/me` (ACC-09) and checks that an unsupported preference falls back to USD.

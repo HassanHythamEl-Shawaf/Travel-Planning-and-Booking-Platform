@@ -294,6 +294,13 @@ Swagger tags **Itineraries** and **Itinerary days, activities and budget**. Full
   `GET .../flights?from=&to=&tripType=` (ITN-26): flights to any airport in day 1's city (or only
   `to`), through `AirlinesService.searchFlights` for each airport, merged, sorted and paginated;
   dates default to the first and last day. `rooms` defaults to 1.
+- **Linked bookings** (ITN-27, optional bonus, owner) — `POST .../days/:dayId/bookings`
+  (`{ type: 'flight' | 'hotel', bookingId }`, your own Confirmed or Completed booking) and
+  `DELETE .../days/:dayId/bookings/:linkId`. Prices are read live and feed
+  `budget.byDay[].bookings`, `budget.bookings` and `budget.totalWithBookings`, kept apart from
+  the planned costs and never converted (PAY-04). Only the owner sees them; clones don't copy
+  them. Bookings are read through `integrations/teammate-contracts.ts`; hotel reservations
+  appear once Person 6's module stores them under those names.
 - **PDF export** (ITN-28, optional bonus) — `GET /api/itineraries/:id/pdf?currency=`: the same
   content as `GET /api/itineraries/:id` as a printable A4 PDF (`itinerary-<id>.pdf`), with the
   same visibility rules and converted totals. Non-Western-European characters show as "?"
