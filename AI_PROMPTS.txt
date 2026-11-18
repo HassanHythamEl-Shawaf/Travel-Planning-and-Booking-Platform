@@ -722,3 +722,16 @@ guests should exceed its maximum occupancy
 How the output was used:
 Added hotel-bookings folder with its own functionalities,and updated app.module.ts to account for the addition
 ================================================
+================================================
+Date: 2026-11-18
+Student: Seif Moustapha
+Tool: Claude Code (Claude Sonnet 5.5)
+Related Requirement: HTL-17
+Prompt:
+Implement HTL-17, take into consideration that a system shall set the reservation to confirmed after a successful payment,
+generate a unique booking reference,as well as send an in app notification with the reservation details
+How the output was used:
+Updated hotel-bookings.module.ts, hotel-room.reader.ts, hotel-bookings.service.spec.ts to account for the
+new functionalities and added booking-reference and lifecycle.service each with their own .spec,as well as
+adding payments.contract
+================================================
