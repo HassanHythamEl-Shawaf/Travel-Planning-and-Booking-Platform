@@ -710,3 +710,15 @@ confirm it is stable, checked the Swagger UI of the built app against an
 in-memory database, and added a Flight bookings section to the README
 while updating notes that said the booking adapters were still missing.
 ================================================
+================================================
+Date: 2026-11-18
+Student: Seif Moustapha
+Tool: Claude Code (Claude Sonnet 5.5)
+Related Requirement: HTL-16
+Prompt:
+Implement HTL-16, keep in mind that the system should allow a registered user to book on or more available rooms
+in the same hotel for the same dates in one reservation,assign adults and children(0-17) one room each.No rooms
+guests should exceed its maximum occupancy
+How the output was used:
+Added hotel-bookings folder with its own functionalities,and updated app.module.ts to account for the addition
+================================================
