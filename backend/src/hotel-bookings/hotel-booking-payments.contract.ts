@@ -35,4 +35,15 @@ export interface HotelBookingPayments {
    * payment in that case.
    */
   confirmBooking(id: string): Promise<ConfirmedHotelBooking>;
+  /**
+   * HTL-18: payment failed or was abandoned. If the booking is still Pending
+   * Payment it becomes Expired, its rooms are released and BOOKING_EXPIRED is
+   * sent. Does nothing for any other status.
+   */
+  releaseHold(id: string): Promise<void>;
+  /**
+   * HTL-18: for the expiry job. Expires every Pending Payment booking whose
+   * hold has run out and releases its rooms. Returns how many were expired.
+   */
+  releaseExpiredHolds(now?: Date): Promise<number>;
 }
