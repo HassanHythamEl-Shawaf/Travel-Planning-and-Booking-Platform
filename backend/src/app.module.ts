@@ -15,6 +15,7 @@ import { BlogModule } from './blog/blog.module';
 import { AirlinesModule } from './airlines/airlines.module';
 import { FlightBookingsModule } from './flight-bookings/flight-bookings.module';
 import { HotelsModule } from './hotels/hotels.module';
+import { HotelBookingsModule } from './hotel-bookings/hotel-bookings.module';
 import { PaymentsModule } from './payments/payments.module';
 
 @Module({
@@ -38,6 +39,7 @@ import { PaymentsModule } from './payments/payments.module';
     AirlinesModule,
     FlightBookingsModule,
     HotelsModule,
+    HotelBookingsModule,
     PaymentsModule,
   ],
   controllers: [AppController],
