@@ -1,37 +1,33 @@
-import {
-  BadRequestException,
-  ConflictException,
-  Inject,
-  Injectable,
-  NotFoundException,
-} from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
+import { InjectConnection, InjectModel } from '@nestjs/mongoose';
+import { Connection, Model, Types } from 'mongoose';
 
-import { PLATFORM_CURRENCY } from '../flight-bookings/flight-booking.constants';
 import { QuoteHotelBookingDto } from './dto/quote-hotel-booking.dto';
+import { holdExpiryFor } from './hotel-booking.constants';
+import {
+  HotelBookingLifecycleService,
+  holdKeyOf,
+} from './hotel-booking-lifecycle.service';
+import { HotelBookingStatus } from './hotel-booking-status';
 import { HOTEL_ROOM_READER } from './hotel-room.reader';
 import type { HotelRoomReader } from './hotel-room.reader';
+import { CancellationTerms, DEFAULT_CANCELLATION_TERMS } from './refund-rules';
 import {
-  countNights,
-  occupancyError,
-  parseDateOnly,
-  reservationAdultError,
-  roomSubtotal,
-  startOfUtcDay,
-  stayError,
-  sumPrices,
-} from './stay-rules';
+  HotelBookingQuoteRoom,
+  HotelBookingsService,
+} from './hotel-bookings.service';
+import { RoomInventoryService } from './room-inventory.service';
+import {
+  HotelBooking,
+  HotelBookingDocument,
+} from './schemas/hotel-booking.schema';
+import { parseDateOnly } from './stay-rules';
 
-export interface HotelBookingQuoteRoom {
-  roomId: string;
-  roomName: string;
-  adults: number;
-  childrenAges: number[];
-  pricePerNight: number;
-  nights: number;
-  subtotal: number;
-}
-
-export interface HotelBookingQuote {
+export interface HotelBookingHold {
+  id: string;
+  status: HotelBookingStatus;
+  /** Pay before this instant or the booking becomes Expired. */
+  holdExpiresAt: Date;
   hotelId: string;
   hotelName: string;
   checkIn: string;
@@ -40,95 +36,103 @@ export interface HotelBookingQuote {
   rooms: HotelBookingQuoteRoom[];
   totalPrice: number;
   currency: string;
+  /** The cancellation terms that apply to this booking. */
+  cancellationPolicy: CancellationTerms;
 }
 
 @Injectable()
-export class HotelBookingsService {
+export class HotelBookingHoldService {
   constructor(
+    private readonly quotes: HotelBookingsService,
+    private readonly lifecycle: HotelBookingLifecycleService,
+    private readonly inventory: RoomInventoryService,
+    @InjectModel(HotelBooking.name)
+    private readonly bookings: Model<HotelBookingDocument>,
+    @InjectConnection() private readonly connection: Connection,
     @Inject(HOTEL_ROOM_READER) private readonly reader: HotelRoomReader,
   ) {}
 
   /**
-   * HTL-16: validate a multi-room request and return the price summary.
-   * Saves nothing and holds nothing; the hold is added by HTL-18.
+   * HTL-18: hold every selected room together for 10 minutes as one Pending
+   * Payment reservation. The same validation as the HTL-16 quote applies
+   * (dates, guests, occupancy). If any room overlaps a Confirmed reservation,
+   * an unexpired hold or a blocked range, the whole request is rejected with
+   * 409 and nothing is held.
    */
-  async quote(
+  async hold(
+    userId: string,
     dto: QuoteHotelBookingDto,
     now: Date = new Date(),
-  ): Promise<HotelBookingQuote> {
-    const checkIn = parseDateOnly(dto.checkIn);
-    const checkOut = parseDateOnly(dto.checkOut);
-    if (!checkIn || !checkOut) {
-      throw new BadRequestException('Dates must be real YYYY-MM-DD dates');
-    }
-    const dateProblem = stayError(checkIn, checkOut, startOfUtcDay(now));
-    if (dateProblem) throw new BadRequestException(dateProblem);
+  ): Promise<HotelBookingHold> {
+    // Holds that already ran out must not block this request.
+    await this.lifecycle.releaseExpiredHolds(now);
 
-    const requested = dto.rooms.map((room) => ({
-      roomId: room.roomId,
-      adults: room.adults,
-      childrenAges: room.childrenAges ?? [],
-    }));
+    const quote = await this.quotes.quote(dto, now);
+    const bookingId = new Types.ObjectId();
+    const checkIn = parseDateOnly(quote.checkIn) as Date;
+    const checkOut = parseDateOnly(quote.checkOut) as Date;
+    const holdExpiresAt = holdExpiryFor(now);
+    const roomIds = quote.rooms.map((room) => room.roomId);
 
-    if (new Set(requested.map((r) => r.roomId)).size !== requested.length) {
-      throw new BadRequestException('A room can appear only once');
-    }
-    const adultProblem = reservationAdultError(requested);
-    if (adultProblem) throw new BadRequestException(adultProblem);
+    // HTL-21: the refund later follows the terms the guest sees now.
+    const cancellationPolicy: CancellationTerms =
+      (await this.reader.findCancellationTerms(quote.hotelId)) ??
+      DEFAULT_CANCELLATION_TERMS;
 
-    const hotel = await this.reader.findHotel(dto.hotelId);
-    if (!hotel || !hotel.isActive) {
-      throw new NotFoundException('Hotel not found');
-    }
+    await this.inventory.ensureLocks(roomIds);
 
-    const found = await this.reader.findRoomsOfHotel(hotel.id);
-    const byId = new Map(found.map((room) => [room.id, room]));
-    const nights = countNights(checkIn, checkOut);
-
-    const rooms = requested.map((guests): HotelBookingQuoteRoom => {
-      const room = byId.get(guests.roomId);
-      if (!room) {
-        throw new BadRequestException(
-          `Room ${guests.roomId} does not belong to this hotel`,
-        );
-      }
-      if (!room.isActive) {
-        throw new BadRequestException(`Room "${room.name}" is not available`);
-      }
-      const problem = occupancyError(room.name, guests, {
-        maxAdults: room.maxAdults,
-        maxChildren: room.maxChildren,
+    // One transaction: the room dates and the booking are held together or
+    // not at all. The helper retries when a concurrent hold wins a room.
+    await this.connection.transaction(async (session) => {
+      await this.inventory.hold(session, {
+        holdKey: holdKeyOf(String(bookingId)),
+        roomIds,
+        checkIn,
+        checkOut,
+        now,
       });
-      if (problem) throw new BadRequestException(problem);
-      return {
-        roomId: room.id,
-        roomName: room.name,
-        adults: guests.adults,
-        childrenAges: guests.childrenAges,
-        pricePerNight: room.pricePerNight,
-        nights,
-        subtotal: roomSubtotal(room.pricePerNight, nights),
-      };
+      await this.bookings.create(
+        [
+          {
+            _id: bookingId,
+            userId: new Types.ObjectId(userId),
+            hotelId: new Types.ObjectId(quote.hotelId),
+            hotelName: quote.hotelName,
+            checkInDate: checkIn,
+            checkOutDate: checkOut,
+            nights: quote.nights,
+            rooms: quote.rooms.map((room) => ({
+              roomId: new Types.ObjectId(room.roomId),
+              roomName: room.roomName,
+              pricePerNight: room.pricePerNight,
+              adults: room.adults,
+              childrenAges: room.childrenAges,
+              subtotal: room.subtotal,
+            })),
+            totalPrice: quote.totalPrice,
+            currency: quote.currency,
+            cancellationPolicy,
+            status: HotelBookingStatus.PENDING_PAYMENT,
+            holdExpiresAt,
+          },
+        ],
+        { session },
+      );
     });
 
-    // Advisory only: HTL-18 re-checks atomically when the rooms are held.
-    for (const line of rooms) {
-      if (!(await this.reader.isRoomAvailable(line.roomId, checkIn, checkOut))) {
-        throw new ConflictException(
-          `Room "${line.roomName}" is not available for the selected dates`,
-        );
-      }
-    }
-
     return {
-      hotelId: hotel.id,
-      hotelName: hotel.name,
-      checkIn: dto.checkIn,
-      checkOut: dto.checkOut,
-      nights,
-      rooms,
-      totalPrice: sumPrices(rooms.map((room) => room.subtotal)),
-      currency: PLATFORM_CURRENCY,
+      id: String(bookingId),
+      status: HotelBookingStatus.PENDING_PAYMENT,
+      holdExpiresAt,
+      hotelId: quote.hotelId,
+      hotelName: quote.hotelName,
+      checkIn: quote.checkIn,
+      checkOut: quote.checkOut,
+      nights: quote.nights,
+      rooms: quote.rooms,
+      totalPrice: quote.totalPrice,
+      currency: quote.currency,
+      cancellationPolicy,
     };
   }
 }

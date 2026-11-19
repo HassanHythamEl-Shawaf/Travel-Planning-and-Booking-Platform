@@ -38,6 +38,30 @@ export class HotelBookedRoom {
 export const HotelBookedRoomSchema =
   SchemaFactory.createForClass(HotelBookedRoom);
 
+/**
+ * The hotel's cancellation terms when the rooms were held, so the refund
+ * follows the policy the guest saw and accepted, not a later edit (HTL-21).
+ */
+@Schema({ _id: false })
+export class HotelCancellationPolicy {
+  @Prop({ required: true, min: 0 })
+  freeCancellationHours: number;
+
+  @Prop({ required: true, min: 0, max: 100 })
+  refundPercentageAfterDeadline: number;
+
+  /** "HH:mm" check-in time of the hotel. */
+  @Prop({ required: true, default: '14:00' })
+  checkInTime: string;
+
+  @Prop({ default: '' })
+  description: string;
+}
+
+export const HotelCancellationPolicySchema = SchemaFactory.createForClass(
+  HotelCancellationPolicy,
+);
+
 export type HotelBookingDocument = HydratedDocument<HotelBooking>;
 
 /**
@@ -87,6 +111,10 @@ export class HotelBooking {
 
   @Prop({ required: true, default: PLATFORM_CURRENCY })
   currency: string;
+
+  /** Snapshot taken at hold time (null only for bookings that predate it). */
+  @Prop({ type: HotelCancellationPolicySchema, default: null })
+  cancellationPolicy: HotelCancellationPolicy | null;
 
   @Prop({
     type: String,
