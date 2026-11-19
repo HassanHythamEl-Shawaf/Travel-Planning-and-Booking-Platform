@@ -1,10 +1,10 @@
 import { Injectable, Logger } from '@nestjs/common';
 
 /**
- * Contract from hotel bookings (Person 6) to refunds (Person 7, PAY-03),
+ * Contract from hotel bookings  to refunds ( PAY-03),
  * shaped like FLIGHT_REFUNDS. Unlike flights, the refund amount is computed
  * here from the hotel's cancellation terms (HTL-10), snapshotted on the
- * booking, so Person 7 only issues it. Until the payments module binds its own
+ * booking. Until the payments module binds its own
  * implementation to HOTEL_REFUNDS (in HotelBookingsModule), PendingHotelRefunds
  * only logs that no refund was issued.
  */

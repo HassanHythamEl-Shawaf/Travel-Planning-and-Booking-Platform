@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
 import { InjectConnection, InjectModel } from '@nestjs/mongoose';
 import { Connection, Model, Types } from 'mongoose';
 
@@ -9,6 +9,9 @@ import {
   holdKeyOf,
 } from './hotel-booking-lifecycle.service';
 import { HotelBookingStatus } from './hotel-booking-status';
+import { HOTEL_ROOM_READER } from './hotel-room.reader';
+import type { HotelRoomReader } from './hotel-room.reader';
+import { CancellationTerms, DEFAULT_CANCELLATION_TERMS } from './refund-rules';
 import {
   HotelBookingQuoteRoom,
   HotelBookingsService,
@@ -33,6 +36,8 @@ export interface HotelBookingHold {
   rooms: HotelBookingQuoteRoom[];
   totalPrice: number;
   currency: string;
+  /** The cancellation terms that apply to this booking. */
+  cancellationPolicy: CancellationTerms;
 }
 
 @Injectable()
@@ -44,6 +49,7 @@ export class HotelBookingHoldService {
     @InjectModel(HotelBooking.name)
     private readonly bookings: Model<HotelBookingDocument>,
     @InjectConnection() private readonly connection: Connection,
+    @Inject(HOTEL_ROOM_READER) private readonly reader: HotelRoomReader,
   ) {}
 
   /**
@@ -67,6 +73,11 @@ export class HotelBookingHoldService {
     const checkOut = parseDateOnly(quote.checkOut) as Date;
     const holdExpiresAt = holdExpiryFor(now);
     const roomIds = quote.rooms.map((room) => room.roomId);
+
+    // HTL-21: the refund later follows the terms the guest sees now.
+    const cancellationPolicy: CancellationTerms =
+      (await this.reader.findCancellationTerms(quote.hotelId)) ??
+      DEFAULT_CANCELLATION_TERMS;
 
     await this.inventory.ensureLocks(roomIds);
 
@@ -100,6 +111,7 @@ export class HotelBookingHoldService {
             })),
             totalPrice: quote.totalPrice,
             currency: quote.currency,
+            cancellationPolicy,
             status: HotelBookingStatus.PENDING_PAYMENT,
             holdExpiresAt,
           },
@@ -120,6 +132,7 @@ export class HotelBookingHoldService {
       rooms: quote.rooms,
       totalPrice: quote.totalPrice,
       currency: quote.currency,
+      cancellationPolicy,
     };
   }
 }

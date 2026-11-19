@@ -3,6 +3,10 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { HotelsService } from '../hotels/hotels.service';
 import type { HotelDocument } from '../hotels/schemas/hotel.schema';
 import type { RoomDocument } from '../hotels/schemas/room.schema';
+import {
+  CancellationTerms,
+  DEFAULT_CANCELLATION_TERMS,
+} from './refund-rules';
 
 /**
  * What the booking module needs to know about hotels, rooms and availability.
@@ -37,11 +41,17 @@ export interface HotelRoomReader {
   ): Promise<boolean>;
   /** HTL-17: held -> booked for every room date held under `holdKey`. */
   confirmRoomDates(holdKey: string): Promise<void>;
+  /**
+   * The hotel's current cancellation terms and check-in time (HTL-10), or null
+   * if the hotel does not exist. Works for deactivated hotels too, because
+   * their Confirmed bookings stay valid and cancellable.
+   */
+  findCancellationTerms(hotelId: string): Promise<CancellationTerms | null>;
 }
 
 export const HOTEL_ROOM_READER = Symbol('HOTEL_ROOM_READER');
 
-/** Adapter over Person 5's HotelsService (needs HotelsModule to export it). */
+/** Adapter over  HotelsService (needs HotelsModule to export it). */
 @Injectable()
 export class HotelsServiceRoomReader implements HotelRoomReader {
   constructor(private readonly hotels: HotelsService) {}
@@ -88,5 +98,30 @@ export class HotelsServiceRoomReader implements HotelRoomReader {
 
   confirmRoomDates(holdKey: string): Promise<void> {
     return this.hotels.confirmDates(holdKey);
+  }
+
+  async findCancellationTerms(
+    hotelId: string,
+  ): Promise<CancellationTerms | null> {
+    try {
+      const hotel = (await this.hotels.findHotelById(
+        hotelId,
+      )) as unknown as HotelDocument;
+      const policy = hotel.cancellationPolicy;
+      return {
+        freeCancellationHours:
+          policy?.freeCancellationHours ??
+          DEFAULT_CANCELLATION_TERMS.freeCancellationHours,
+        refundPercentageAfterDeadline:
+          policy?.refundPercentageAfterDeadline ??
+          DEFAULT_CANCELLATION_TERMS.refundPercentageAfterDeadline,
+        checkInTime: hotel.checkInTime ?? DEFAULT_CANCELLATION_TERMS.checkInTime,
+        description:
+          policy?.description ?? DEFAULT_CANCELLATION_TERMS.description,
+      };
+    } catch (error) {
+      if (error instanceof NotFoundException) return null;
+      throw error;
+    }
   }
 }

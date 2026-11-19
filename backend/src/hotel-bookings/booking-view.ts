@@ -90,7 +90,13 @@ export interface HotelBookingDetails
     childrenAges: number[];
     subtotal: number;
   }[];
-  /** Confirmed and before the check-in date (the cancel button's condition). */
+  cancellationPolicy: {
+    freeCancellationHours: number;
+    refundPercentageAfterDeadline: number;
+    checkInTime: string;
+    description: string;
+  } | null;
+  /** Confirmed and before the check-in date, so HTL-21 would accept it. */
   cancellable: boolean;
   createdAt: Date;
   confirmedAt: Date | null;
@@ -132,6 +138,7 @@ export function toDetails(
   booking: LeanHotelBooking,
   now: Date,
 ): HotelBookingDetails {
+  const policy = booking.cancellationPolicy;
   return {
     ...toSummary(booking),
     rooms: booking.rooms.map((room) => ({
@@ -142,6 +149,14 @@ export function toDetails(
       childrenAges: room.childrenAges ?? [],
       subtotal: room.subtotal,
     })),
+    cancellationPolicy: policy
+      ? {
+          freeCancellationHours: policy.freeCancellationHours,
+          refundPercentageAfterDeadline: policy.refundPercentageAfterDeadline,
+          checkInTime: policy.checkInTime,
+          description: policy.description,
+        }
+      : null,
     cancellable:
       booking.status === HotelBookingStatus.CONFIRMED &&
       now.getTime() < booking.checkInDate.getTime(),

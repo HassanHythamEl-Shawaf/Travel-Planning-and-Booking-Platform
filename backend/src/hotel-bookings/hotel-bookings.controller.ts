@@ -30,10 +30,16 @@ import { AuthGuard } from '../auth/guards/auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { ParseObjectIdPipe } from '../common/pipes/parse-object-id.pipe';
 import { UserRole } from '../users/schemas/user.schema';
+import { CancelHotelBookingDto } from './dto/cancel-hotel-booking.dto';
 import { ListHotelBookingsQueryDto } from './dto/list-hotel-bookings.dto';
 import { QuoteHotelBookingDto } from './dto/quote-hotel-booking.dto';
 import { HotelBookingHoldService } from './hotel-booking-hold.service';
 import type { HotelBookingHold } from './hotel-booking-hold.service';
+import { HotelBookingCancellationService } from './hotel-booking-cancellation.service';
+import type {
+  HotelCancellationResult,
+  HotelRefundPreview,
+} from './hotel-booking-cancellation.service';
 import { HotelBookingQueryService } from './hotel-booking-query.service';
 import type { HotelBookingList } from './hotel-booking-query.service';
 import { HotelBookingsService } from './hotel-bookings.service';
@@ -48,6 +54,7 @@ export class HotelBookingsController {
   constructor(
     private readonly bookings: HotelBookingsService,
     private readonly holds: HotelBookingHoldService,
+    private readonly cancellations: HotelBookingCancellationService,
     private readonly queries: HotelBookingQueryService,
   ) {}
 
@@ -115,6 +122,26 @@ export class HotelBookingsController {
     return this.queries.listMine(user.sub, query.group, query.page);
   }
 
+  @Get(':id/refund-preview')
+  @ApiOperation({
+    summary: 'Preview the refund for cancelling my reservation (HTL-21)',
+    description:
+      "Shows the refund the hotel's cancellation terms give today, on the full total. Nothing changes. Only Confirmed reservations before their check-in date can be cancelled.",
+  })
+  @ApiParam({ name: 'id', example: '6650f1c2a1b2c3d4e5f60740' })
+  @ApiOkResponse({ description: 'Refund percentage, amount and free-cancellation deadline' })
+  @ApiBadRequestResponse({ description: 'Invalid booking id' })
+  @ApiNotFoundResponse({ description: 'No such booking of yours' })
+  @ApiConflictResponse({ description: 'Not Confirmed, or check-in date reached' })
+  @ApiUnauthorizedResponse({ description: 'Authentication is required' })
+  @ApiForbiddenResponse({ description: 'Registered user role required' })
+  refundPreview(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id', ParseObjectIdPipe) id: string,
+  ): Promise<HotelRefundPreview> {
+    return this.cancellations.previewRefund(user.sub, id);
+  }
+
   @Get(':id')
   @ApiOperation({
     summary: 'Get my hotel reservation details (HTL-20)',
@@ -132,5 +159,29 @@ export class HotelBookingsController {
     @Param('id', ParseObjectIdPipe) id: string,
   ): Promise<HotelBookingDetails> {
     return this.queries.getMine(user.sub, id);
+  }
+
+  @Post(':id/cancel')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Cancel my reservation (HTL-21)',
+    description:
+      'Requires confirm=true after viewing the refund preview. Pass expectedRefundAmount to refuse the cancellation if the refund changed since it was shown. The whole reservation (all its rooms) becomes Cancelled, the rooms are released for those dates and a refund is requested for a positive amount (PAY-03). Partial cancellation is not supported.',
+  })
+  @ApiParam({ name: 'id', example: '6650f1c2a1b2c3d4e5f60740' })
+  @ApiOkResponse({ description: 'The cancelled booking and its refund' })
+  @ApiBadRequestResponse({ description: 'Invalid id, or confirm is not true' })
+  @ApiNotFoundResponse({ description: 'No such booking of yours' })
+  @ApiConflictResponse({
+    description: 'Not Confirmed, check-in date reached, or the refund changed',
+  })
+  @ApiUnauthorizedResponse({ description: 'Authentication is required' })
+  @ApiForbiddenResponse({ description: 'Registered user role required' })
+  cancel(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id', ParseObjectIdPipe) id: string,
+    @Body() dto: CancelHotelBookingDto,
+  ): Promise<HotelCancellationResult> {
+    return this.cancellations.cancel(user.sub, id, dto);
   }
 }

@@ -132,6 +132,10 @@ export class HotelBooking {
   @Prop({ type: String, default: null })
   bookingReference: string | null;
 
+  /** Stripe PaymentIntent that paid this booking; set at confirmation (PAY-03 refunds). */
+  @Prop({ type: String, default: null })
+  paymentIntentId: string | null;
+
   @Prop({ type: Date, default: null })
   confirmedAt: Date | null;
 

@@ -35,6 +35,7 @@ function build(
       base.filter((r) => r.hotelId === hotelId),
     isRoomAvailable: async (roomId) => !unavailable.includes(roomId),
     confirmRoomDates: async () => undefined,
+    findCancellationTerms: async () => null,
   };
   return new HotelBookingsService(reader);
 }

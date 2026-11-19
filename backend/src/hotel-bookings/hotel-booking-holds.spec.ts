@@ -29,6 +29,12 @@ const minutes = (n: number) => new Date(NOW.getTime() + n * 60_000);
 const HOTEL_ID = new Types.ObjectId().toHexString();
 const R1 = new Types.ObjectId().toHexString();
 const R2 = new Types.ObjectId().toHexString();
+const TERMS = {
+  freeCancellationHours: 24,
+  refundPercentageAfterDeadline: 50,
+  checkInTime: '14:00',
+  description: 'Free cancellation up to 24 hours before check-in.',
+};
 const room = (id: string, name: string, pricePerNight: number) => ({
   id,
   hotelId: HOTEL_ID,
@@ -84,6 +90,7 @@ describe('Hotel booking holds (HTL-18)', () => {
         room(R2, 'Suite', 150.5),
       ],
       isRoomAvailable: async () => true,
+      findCancellationTerms: async () => TERMS,
       confirmRoomDates: async (holdKey) => {
         await availability().updateMany(
           { bookingReference: holdKey },
@@ -106,6 +113,7 @@ describe('Hotel booking holds (HTL-18)', () => {
       inventory,
       bookingModel,
       connection,
+      reader,
     );
   });
 
@@ -126,6 +134,10 @@ describe('Hotel booking holds (HTL-18)', () => {
     expect(hold.status).toBe(HotelBookingStatus.PENDING_PAYMENT);
     expect(hold.holdExpiresAt).toEqual(minutes(10));
     expect(hold.totalPrice).toBe(751.5);
+    expect(hold.cancellationPolicy).toEqual(TERMS);
+    expect((await bookingModel.findById(hold.id))?.cancellationPolicy).toMatchObject(
+      TERMS,
+    );
 
     expect(await bookingModel.countDocuments()).toBe(1);
     const entries = await availability().find({}).toArray();
@@ -227,7 +239,7 @@ describe('Hotel booking holds (HTL-18)', () => {
 
   it('keeps a Confirmed reservation blocking and safe from the expiry sweep', async () => {
     const hold = await holds.hold(newUser(), dto([R1]), NOW);
-    await lifecycle.confirmBooking(hold.id, minutes(1));
+    await lifecycle.confirmBooking(hold.id, undefined, minutes(1));
 
     await expect(
       holds.hold(newUser(), dto([R1]), minutes(2)),
@@ -248,7 +260,7 @@ describe('Hotel booking holds (HTL-18)', () => {
     );
 
     const other = await holds.hold(newUser(), dto([R2]), NOW);
-    await lifecycle.confirmBooking(other.id, minutes(1));
+    await lifecycle.confirmBooking(other.id, undefined, minutes(1));
     await lifecycle.releaseHold(other.id);
     expect((await bookingModel.findById(other.id))?.status).toBe(
       HotelBookingStatus.CONFIRMED,
