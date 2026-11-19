@@ -378,16 +378,23 @@ describe('Hotel reviews and completion (HTL-23)', () => {
       expect(list).toMatchObject({ total: 1, ratingCount: 1, averageRating: 5 });
     });
 
-    it('counts every rating, with or without a comment', async () => {
-      const ana = await makeUser('Ana');
-      const ben = await makeUser('Ben');
-      await review(ana, await makeBooking(ana), 5);
-      await review(ben, await makeBooking(ben), 2, 'Noisy');
+   it('counts every rating, with or without a comment', async () => {
+  const ana = await makeUser('Ana');
+  const ben = await makeUser('Ben');
+  await review(ana, await makeBooking(ana), 5);
+  await review(ben, await makeBooking(ben), 2, 'Noisy');
 
-      const list = await service.listForHotel(String(HOTEL_ID), 1);
-      expect(list).toMatchObject({ ratingCount: 2, averageRating: 3.5 });
-      expect(list.data.map((r) => r.comment).sort()).toEqual([null, 'Noisy']);
-    });
+  const list = await service.listForHotel(String(HOTEL_ID), 1);
+  expect(list).toMatchObject({ ratingCount: 2, averageRating: 3.5 });
+
+  expect(
+    list.data.map((r) => r.comment).sort((a, b) => {
+      if (a === null) return -1;
+      if (b === null) return 1;
+      return a.localeCompare(b);
+    })
+  ).toEqual([null, 'Noisy']);
+});
 
     it('shows zeros for a hotel nobody has reviewed', async () => {
       await expect(service.listForHotel(String(HOTEL_ID), 1)).resolves.toMatchObject({
