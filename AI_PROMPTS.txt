@@ -771,11 +771,9 @@ Student: Seif Moustapha
 Tool: Claude Code (Claude Sonnet 5.5)
 Related Requirement: HTL-21
 Prompt:
-Implement HTL-20, take into account that 
- 	
-The system shall allow a registered user to cancel their own Confirmed reservation as a whole before the check-in date,
- after viewing the refund computed from the hotel's tiers (HTL-10) on the full total. The reservation becomes Cancelled,
-  all its rooms are released for those dates and a refund is created (PAY-03). Partial cancellation is not supported.
+Implement HTL-20, take into account that the system shall allow a registered user to cancel their own Confirmed reservation as a whole before the check-in date,
+after viewing the refund computed from the hotel's tiers (HTL-10) on the full total. The reservation becomes Cancelled,
+all its rooms are released for those dates and a refund is created (PAY-03). Partial cancellation is not supported.
 How the output was used:
 Updated:booking-view.spec.ts booking-view.ts hotel-booking-hold.service.ts hotel-booking-holds.spec.ts  
 hotel-booking-lifecycle.service.spec.ts hotel-booking-lifecycle.service.ts hotel-booking-payments.contract.ts
@@ -788,15 +786,25 @@ Student: Seif Moustapha
 Tool: Claude Code (Claude Sonnet 5.5)
 Related Requirement: HTL-23
 Prompt:
-Implement HTL-23, take into account that 
- 	
-A Confirmed reservation becomes Completed once its check-out date has passed. The system shall allow the user to submit
- one rating (1-5) and an optional review (max 1000 characters) per Completed reservation, regardless of the number of rooms,
-  and later edit or delete it. The hotel's average rating is recalculated accordingly.
+Implement HTL-23, take into account that a Confirmed reservation becomes Completed once its check-out date has passed. The system shall allow the user to submit
+one rating (1-5) and an optional review (max 1000 characters) per Completed reservation, regardless of the number of rooms,
+and later edit or delete it. The hotel's average rating is recalculated accordingly.
 How the output was used:
 Updated:hotel-booking-lifecycle.service.ts hotel-booking-payments.contract.ts and hotel-bookings.module.ts
 hotel-bookings.controller.ts hotel-bookings.module.ts hotel-bookings.service.spec.ts hotel-bookings.service.ts
 hotel-refunds.contract.ts hotel-room.reader.ts hotel-booking.schema.ts 
 Added create list and update review dto files as well as a review moderation,service,spec and controller.
 Also added a review schema and review rules
+================================================
+================================================
+Date: 2026-11-19
+Student: Seif Moustapha
+Tool: Claude Code (Claude Sonnet 5.5)
+Related Requirement: HTL-23
+Prompt:
+Implement HTL-24, take into account that the system shall allow a guest or registered user to view a hotel's average rating,
+number of ratings and reviews (newest first, paginated).
+How the output was used:
+Updated:hotel-booking-lifecycle.service.ts hotel-bookings.controller.ts  hotel-bookings.service.spec.ts hotel-bookings.service.ts
+hotel-refunds.contract.ts hotel-room.reader.ts hotel-booking.schema.ts list-reviews.dto 
 ================================================
