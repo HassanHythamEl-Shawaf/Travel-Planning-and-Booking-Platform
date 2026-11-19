@@ -765,3 +765,21 @@ Updated hotel-bookings.controller.ts  and hotel-bookings.module.ts to register H
 booking-view.ts booking-view.spec.ts hotel-booking-query.service.ts 
 hotel-booking-queries.spec.ts dto/list-hotel-bookings.dto.ts .
 ================================================
+================================================
+Date: 2026-11-19
+Student: Seif Moustapha
+Tool: Claude Code (Claude Sonnet 5.5)
+Related Requirement: HTL-21
+Prompt:
+Implement HTL-20, take into account that 
+ 	
+The system shall allow a registered user to cancel their own Confirmed reservation as a whole before the check-in date,
+ after viewing the refund computed from the hotel's tiers (HTL-10) on the full total. The reservation becomes Cancelled,
+  all its rooms are released for those dates and a refund is created (PAY-03). Partial cancellation is not supported.
+How the output was used:
+Updated:booking-view.spec.ts booking-view.ts hotel-booking-hold.service.ts hotel-booking-holds.spec.ts  
+hotel-booking-lifecycle.service.spec.ts hotel-booking-lifecycle.service.ts hotel-booking-payments.contract.ts
+hotel-bookings.controller.ts hotel-bookings.module.ts hotel-bookings.service.spec.ts hotel-bookings.service.ts
+hotel-refunds.contract.ts hotel-room.reader.ts hotel-booking.schema.ts 
+Added hotel refund service for stripe as well as booking cancellation services
+================================================

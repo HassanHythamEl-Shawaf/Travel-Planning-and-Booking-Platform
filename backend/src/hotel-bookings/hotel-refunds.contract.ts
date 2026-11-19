@@ -29,7 +29,7 @@ export interface HotelRefundQuote {
 }
 
 export interface IssuedHotelRefund {
-  /** Person 7's refund record id, or null when no refund was issued. */
+  /**  Refund record id, or null when no refund was issued. */
   refundId: string | null;
   /** Pending, Refunded or Failed (PAY-03), or null when not issued. */
   status: string | null;

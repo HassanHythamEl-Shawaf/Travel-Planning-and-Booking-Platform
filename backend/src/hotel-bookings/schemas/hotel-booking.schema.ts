@@ -167,7 +167,7 @@ export const HotelBookingSchema = SchemaFactory.createForClass(HotelBooking);
 HotelBookingSchema.index({ userId: 1, createdAt: -1 });
 // HTL-22 / overlap checks: bookings of one hotel by stay and status.
 HotelBookingSchema.index({ hotelId: 1, checkInDate: 1, status: 1 });
-// Expiry job (Person 7): Pending Payment holds past their expiry.
+// Expiry job : Pending Payment holds past their expiry.
 HotelBookingSchema.index({ status: 1, holdExpiresAt: 1 });
 // References are unique once issued; unconfirmed bookings hold null.
 HotelBookingSchema.index(
