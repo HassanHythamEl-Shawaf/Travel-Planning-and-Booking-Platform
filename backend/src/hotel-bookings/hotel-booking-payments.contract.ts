@@ -1,7 +1,7 @@
 import type { HotelBookingStatus } from './hotel-booking-status';
 
 /**
- * What the payments module  may do with a hotel booking. Inject
+ * What the payments module (Person 7) may do with a hotel booking. Inject
  * HOTEL_BOOKING_PAYMENTS after importing HotelBookingsModule; it mirrors
  * FLIGHT_BOOKING_PAYMENTS.
  */
@@ -52,4 +52,9 @@ export interface HotelBookingPayments {
    * hold has run out and releases its rooms. Returns how many were expired.
    */
   releaseExpiredHolds(now?: Date): Promise<number>;
+  /**
+   * GEN-11, for the expiry job: Confirmed -> Completed for every reservation
+   * whose check-out date has passed. Returns how many were completed.
+   */
+  completeEndedStays(now?: Date): Promise<number>;
 }

@@ -14,6 +14,7 @@ import { NotificationsService } from '../notifications/notifications.service';
 import { generateBookingReference } from './booking-reference';
 import { HotelBookingStatus } from './hotel-booking-status';
 import { HOTEL_ROOM_READER } from './hotel-room.reader';
+import { endedStayFilter } from './review-rules';
 import { RoomInventoryService } from './room-inventory.service';
 import type { HotelRoomReader } from './hotel-room.reader';
 import type {
@@ -97,6 +98,16 @@ export class HotelBookingLifecycleService implements HotelBookingPayments {
     await this.confirmInventory(confirmed);
     await this.notifyConfirmed(confirmed);
     return this.toConfirmed(confirmed);
+  }
+
+  /** GEN-11 (HTL-23): Confirmed -> Completed once the check-out date has passed. */
+  async completeEndedStays(now: Date = new Date()): Promise<number> {
+    const result = await this.bookings
+      .updateMany(endedStayFilter(now), {
+        $set: { status: HotelBookingStatus.COMPLETED, completedAt: now },
+      })
+      .exec();
+    return result.modifiedCount;
   }
 
   /** HTL-18: payment failed or abandoned; expire the hold now. */
