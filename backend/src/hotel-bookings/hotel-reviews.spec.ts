@@ -45,7 +45,7 @@ describe('Hotel reviews and completion (HTL-23)', () => {
 
   async function makeUser(name: string, extra: Record<string, unknown> = {}) {
     const _id = new Types.ObjectId();
-    await users().insertOne({ _id, name, ...extra });
+    await users().insertOne({ _id, name, status: 'active', ...extra });
     return String(_id);
   }
 
@@ -342,10 +342,24 @@ describe('Hotel reviews and completion (HTL-23)', () => {
     });
 
     it('shows a deactivated reviewer as Deleted user', async () => {
-      const gone = await makeUser('Zed', { isActive: false });
+      const gone = await makeUser('Zed', { status: 'deactivated' });
       await review(gone, await makeBooking(gone), 4, 'Nice');
       const [item] = (await service.listForHotel(String(HOTEL_ID), 1)).data;
       expect(item.reviewerName).toBe('Deleted user');
+    });
+
+    it('keeps the name of a suspended reviewer, and shows a missing user as Deleted user', async () => {
+      const suspended = await makeUser('Sam', { status: 'suspended' });
+      const vanished = await makeUser('Vic');
+      await review(suspended, await makeBooking(suspended), 4, 'Fine');
+      await new Promise((r) => setTimeout(r, 15));
+      await review(vanished, await makeBooking(vanished), 3, 'Okay');
+      await users().deleteOne({ _id: new Types.ObjectId(vanished) });
+
+      const names = (await service.listForHotel(String(HOTEL_ID), 1)).data.map(
+        (r) => r.reviewerName,
+      );
+      expect(names).toEqual(['Deleted user', 'Sam']);
     });
 
     it('leaves hidden reviews out of the list and the average', async () => {
