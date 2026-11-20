@@ -38,6 +38,8 @@ function build() {
     model as never,
     rooms as never,
     notifications as never,
+    {} as never, // connection: only the expiry paths use it
+    {} as never, // inventory: only the expiry paths use it
   );
   return { service, model, rooms, notifications };
 }
