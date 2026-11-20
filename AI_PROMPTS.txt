@@ -710,7 +710,6 @@ confirm it is stable, checked the Swagger UI of the built app against an
 in-memory database, and added a Flight bookings section to the README
 while updating notes that said the booking adapters were still missing.
 ================================================
-================================================
 Date: 2026-11-18
 Student: Seif Moustapha
 Tool: Claude Code (Claude Sonnet 5.5)
@@ -721,8 +720,6 @@ in the same hotel for the same dates in one reservation,assign adults and childr
 guests should exceed its maximum occupancy
 How the output was used:
 Added hotel-bookings folder with its own functionalities,and updated app.module.ts to account for the addition
-================================================
-================================================
 Date: 2026-11-18
 Student: Seif Moustapha
 Tool: Claude Code (Claude Sonnet 5.5)
@@ -734,8 +731,6 @@ How the output was used:
 Updated hotel-bookings.module.ts, hotel-room.reader.ts, hotel-bookings.service.spec.ts to account for the
 new functionalities and added booking-reference and lifecycle.service each with their own .spec,as well as
 adding payments.contract
-================================================
-================================================
 Date: 2026-11-18
 Student: Seif Moustapha
 Tool: Claude Code (Claude Sonnet 5.5)
@@ -750,8 +745,6 @@ How the output was used:
 Updated hotel-booking/lifecycle.service and its spec and hotel-booking-payments.contract as well
 as the hotel-bookings controller and module,added in hotel-booking-hold.service and its spec and a room-
 inventory service
-================================================
-================================================
 Date: 2026-11-18
 Student: Seif Moustapha
 Tool: Claude Code (Claude Sonnet 5.5)
@@ -764,8 +757,6 @@ How the output was used:
 Updated hotel-bookings.controller.ts  and hotel-bookings.module.ts to register HotelBookingQueryService. Added hotel-booking-group.ts
 booking-view.ts booking-view.spec.ts hotel-booking-query.service.ts 
 hotel-booking-queries.spec.ts dto/list-hotel-bookings.dto.ts .
-================================================
-================================================
 Date: 2026-11-19
 Student: Seif Moustapha
 Tool: Claude Code (Claude Sonnet 5.5)
@@ -782,4 +773,165 @@ hotel-booking-lifecycle.service.spec.ts hotel-booking-lifecycle.service.ts hotel
 hotel-bookings.controller.ts hotel-bookings.module.ts hotel-bookings.service.spec.ts hotel-bookings.service.ts
 hotel-refunds.contract.ts hotel-room.reader.ts hotel-booking.schema.ts 
 Added hotel refund service for stripe as well as booking cancellation services
-================================================
+
+Date: 2026-11-16
+Student: Hammad
+Tool: Claude (claude.ai)
+Related Requirement: GEN-08, ITN-01 to ITN-26
+Prompt:
+Read the team's work split, the official requirements sheet and the repo,
+and write a handoff brief for Claude Code covering my whole Milestone 1
+scope (upload module, itineraries, budgets, FX rates, public itineraries,
+hotel and flight lookups), the integration points teammates left for me,
+and the team's ground rules.
+How the output was used:
+Used as the handoff file for Claude Code. It guided the implementation
+plan, the branch and PR split, and the decisions recorded in the specs.
+
+Date: 2026-11-16
+Student: Hammad
+Tool: Claude Code (Claude Opus 5.5)
+Related Requirement: GEN-08, BLG-10
+Prompt:
+Build the shared image upload module from the handoff brief: JPG/PNG
+checked by magic bytes, 5 MB enforced in multer and in the service,
+per-item limits that hold under parallel uploads, random file names,
+files served by URL, and adapters for blog, airline logo and hotel photos.
+Bind it to Blog, update Blog's 501 test, test and document it.
+How the output was used:
+Added src/uploads (service, schema, serving controller, image interceptor,
+adapters), bound BLOG_IMAGE_STORE, replaced Blog's 501 e2e test with real
+upload/delete and a parallel 5-image-limit test, added unit and e2e tests,
+the GEN-08 spec and a README section. Airline and hotel adapters exist but
+their endpoints wait for Yahia's and Seif's agreement.
+
+Date: 2026-11-16
+Student: Hammad
+Tool: Claude Code (Claude Opus 5.5)
+Related Requirement: GEN-08, FLT-01, HTL-01, BLG-10
+Prompt:
+With Yahia's, Seif's and Wael's agreement, connect the upload module to
+their modules: an airline logo upload endpoint (one logo per airline,
+direct URLs still rejected), hotel photo endpoints limited to the hotel's
+moderator (5 per hotel), and the 5 MB multer cap on Blog's image route.
+Test it over HTTP.
+How the output was used:
+Added PUT/DELETE /api/airlines/:id/logo and bound AIRLINE_LOGO_STORE,
+changed the direct-logoUrl check from 501 to 400 and updated Yahia's
+spec, added POST/DELETE /api/hotels/:id/photos with ProviderOwnershipGuard
+and a conditional push, switched Blog's route to ImageFileInterceptor, and
+added an e2e suite for logos and photos including parallel uploads.
+
+Date: 2026-11-16
+Student: Hammad
+Tool: Claude Code (Claude Opus 5.5)
+Related Requirement: ITN-01, ITN-03, ITN-05, ITN-07, ITN-08, ITN-09, ITN-10, ITN-12, ITN-14, ITN-16, ITN-20, ITN-21, GEN-10
+Prompt:
+Build the itineraries module from the handoff brief: itineraries with
+days whose numbers and dates come from their position and the start date,
+city groups, activities with images, budget and transport entries with
+totals, visibility, owner-only access, admin hiding, public search, clone
+with credit, and the moderation handler. Keep parallel edits safe, test
+it and document the decisions.
+How the output was used:
+Added src/itineraries (schema, pure view functions for numbering, dates,
+groups and totals, access rules, services with a version-checked
+read-modify-write, two controllers with Swagger docs, moderation handler),
+unit tests, an e2e suite with parallel-request tests, the ITN spec and a
+README section. Updated two "itineraries answer 501" texts.
+
+Date: 2026-11-16
+Student: Hammad
+Tool: Claude Code (Claude Opus 5.5)
+Related Requirement: ITN-18, ACC-09, ITN-14
+Prompt:
+Add the FXRatesAPI integration from the handoff brief: check the
+provider's response format first, keep the key server-side, fetch rates
+at most once per day and cache them in the database, fall back to cached
+rates when the API is down (503 with no cache), convert itinerary budget
+amounts to the preferred currency with the rate date, and test it with a
+fake client so tests never call the real API.
+How the output was used:
+Added src/fx-rates (HTTP client wrapper with response checks, daily
+snapshot schema, service with shared in-flight fetch, fallback and
+retry wait, conversion maths), converted amounts in the itinerary view
+and a GET /itineraries/:id/budget endpoint, unit and e2e tests, the
+ITN-18 spec and a README section.
+
+Date: 2026-11-16
+Student: Hammad
+Tool: Claude Code (Claude Opus 5.5)
+Related Requirement: ITN-25, ITN-26, HTL-11, FLT-11, FLT-12
+Prompt:
+Add the itinerary hotel and flight lookups from the handoff brief,
+reusing Seif's hotel search and Yahia's flight search instead of copying
+their logic: hotels for a city group's dates with N rooms covering the
+guests, and flights from an origin to the city of day 1 with dates
+defaulting to the first and last day.
+How the output was used:
+Added ItinerarySearchService and controller (hotels, arrival airports,
+flights), the "N biggest rooms cover the guests" rule on top of the hotel
+search's availability, an e2e suite with real hotels, rooms, a booked
+room and flights, and spec and README notes, including the gaps noted for
+Seif (no room-count parameter, no past check-in check).
+
+Date: 2026-11-16
+Student: Hammad
+Tool: Claude Code (Claude Opus 5.5)
+Related Requirement: ITN-25, ITN-26, ITN-18, ACC-09, HTL-11
+Prompt:
+Cross-check all my work against the team's work-split document and the
+official requirements sheet, and implement or test anything still
+missing before the final pull request.
+How the output was used:
+ITN-26 now searches every airport in the city of day 1 (merged, sorted,
+paginated) as the sheet says "any airport", with `to` as an optional
+filter; ITN-25 rooms default to 1 as in HTL-11; the e2e test sets the
+preferred currency through PATCH /api/users/me (ACC-09); spec and README
+updated.
+
+Date: 2026-11-17
+Student: Hammad
+Tool: Claude Code (Claude Opus 5.5)
+Related Requirement: ITN-28 (optional bonus)
+Prompt:
+Check whether the optional bonus items are part of the official
+requirements; if they are, build them and document them clearly.
+How the output was used:
+Added GET /api/itineraries/:id/pdf, which renders the itinerary view
+(days, activities, budget entries, transport, city groups, converted
+totals with the rate date) as a PDF with pdfkit, with the same visibility
+rules as viewing it; unit and e2e tests; spec decisions D29-D31 and a
+README line. ITN-27 was held because hotel bookings (HTL-17) do not exist
+yet, and BLG-13 needs changes in the Blog module (asked first).
+
+Date: 2026-11-17
+Student: Hammad
+Tool: Claude Code (Claude Opus 5.5)
+Related Requirement: ITN-27 (optional bonus), PAY-04, ITN-18
+Prompt:
+The bonus items are optional items of my part, so build them and
+document them correctly.
+How the output was used:
+Added linking of the owner's own Confirmed or Completed flight bookings
+and hotel reservations to itinerary days (POST/DELETE
+.../days/:dayId/bookings). Bookings are read live through the team's
+booking contract (no teammate files changed); their prices are kept apart
+from the planned costs and never converted (PAY-04); links are private to
+the owner and not cloned; unit and e2e tests; spec decisions D32-D36 and
+README section.
+
+Date: 2026-11-17
+Student: Hammad
+Tool: Claude Code (Claude Opus 5.5)
+Related Requirement: BLG-13 (optional bonus), ITN-20, GEN-10
+Prompt:
+The bonus items are optional items of my part, so build them and
+document them correctly.
+How the output was used:
+Added an optional itineraryId to blog posts (create, update, null to
+detach): only the author's own itinerary can be attached, and readers see
+it only under the itinerary's visibility rules (owner always; public for
+others; hidden only for admins; deleted shows as null). Additive changes
+in Wael's Blog module, read through Blog's PublicItineraryReader; e2e
+tests; spec decisions D37-D39 and a README line.

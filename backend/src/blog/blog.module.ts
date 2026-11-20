@@ -5,6 +5,8 @@ import { MongooseModule } from '@nestjs/mongoose';
 import { AuthModule } from '../auth/auth.module';
 import { ModerationModule } from '../moderation/moderation.module';
 import { Report, ReportSchema } from '../reports/schemas/report.schema';
+import { BlogImageUploadAdapter } from '../uploads/adapters/blog-image.adapter';
+import { UploadsModule } from '../uploads/uploads.module';
 import { UsersModule } from '../users/users.module';
 import { AuthorsController } from './authors.controller';
 import { AuthorsService } from './authors.service';
@@ -42,6 +44,7 @@ import { TagsController } from './tags.controller';
     // AuthGuard and OptionalAuthGuard are instantiated here and need JwtService.
     JwtModule.register({}),
     ModerationModule,
+    UploadsModule,
   ],
   controllers: [
     PostsController,
@@ -62,10 +65,8 @@ import { TagsController } from './tags.controller';
     BlogModerationHandlers,
     PublicItineraryReader,
     OptionalAuthGuard,
-    // Bound to the shared upload module (GEN-08) once it is on develop,
-    // e.g. { provide: BLOG_IMAGE_STORE, useExisting: <its service adapter> }.
-    // While null, the image endpoints answer 501.
-    { provide: BLOG_IMAGE_STORE, useValue: null },
+    // Shared upload module (GEN-08): validates JPG/PNG and 5 MB, stores the file.
+    { provide: BLOG_IMAGE_STORE, useExisting: BlogImageUploadAdapter },
   ],
 })
 export class BlogModule {}
