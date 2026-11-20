@@ -78,6 +78,14 @@ export class Post {
   @Prop({ type: Boolean, default: false })
   isHidden: boolean;
 
+  /**
+   * BLG-13 (bonus, added by Person 8): one of the author's own itineraries
+   * attached to the post, or null. Readers see it only while they may view
+   * that itinerary (public and not hidden), see PostsService.
+   */
+  @Prop({ type: Types.ObjectId, default: null })
+  itineraryId: Types.ObjectId | null;
+
   createdAt: Date;
   updatedAt: Date;
 }

@@ -172,7 +172,7 @@ export class AdminModerationController {
   @ApiOperation({
     summary: 'Delete reported or inappropriate content (GEN-10)',
     description:
-      'Deletes the content (a post also loses its comments and likes) and resolves its open reports as content_deleted, in one transaction with the audit entry. The author and the reporters are notified. Reviews and itineraries answer 501 until their owners enable deletion.',
+      'Deletes the content (a post also loses its comments and likes) and resolves its open reports as content_deleted, in one transaction with the audit entry. The author and the reporters are notified. Reviews answer 501 until their owner enables deletion.',
   })
   @ApiParam(TYPE_PARAM)
   @ApiParam(ID_PARAM)

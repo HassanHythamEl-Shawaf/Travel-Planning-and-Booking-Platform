@@ -25,6 +25,8 @@ import { NotificationsModule } from '../notifications/notifications.module';
 import { FlightBookingCancellationService } from '../flight-bookings/flight-booking-cancellation.service';
 import { FlightBookingReaders } from '../flight-bookings/flight-booking-readers';
 import { FlightBookingsModule } from '../flight-bookings/flight-bookings.module';
+import { AirlineLogoUploadAdapter } from '../uploads/adapters/airline-logo.adapter';
+import { UploadsModule } from '../uploads/uploads.module';
 
 @Module({
   imports: [
@@ -42,6 +44,8 @@ import { FlightBookingsModule } from '../flight-bookings/flight-bookings.module'
     NotificationsModule,
     // Person 4's booking adapters; FlightBookingsModule imports this module too.
     forwardRef(() => FlightBookingsModule),
+    // Person 8's shared image upload module (GEN-08), for the airline logo.
+    UploadsModule,
   ],
   controllers: [
     AirlinesController,
@@ -58,8 +62,8 @@ import { FlightBookingsModule } from '../flight-bookings/flight-bookings.module'
       useExisting: FlightBookingCancellationService,
     },
     { provide: FLIGHT_BOOKING_READER, useExisting: FlightBookingReaders },
-    // TODO(Person 8): replace this null binding with the shared image-upload adapter.
-    { provide: AIRLINE_LOGO_STORE, useValue: null },
+    // Logo upload via PUT /airlines/:id/logo; a direct logoUrl is rejected (400).
+    { provide: AIRLINE_LOGO_STORE, useExisting: AirlineLogoUploadAdapter },
   ],
   exports: [
     AirlinesService,

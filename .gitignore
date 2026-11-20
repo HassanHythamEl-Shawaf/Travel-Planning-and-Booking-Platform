@@ -18,3 +18,5 @@ dist/
 # Logs
 *.log
 npm-debug.log*
+# Uploaded images (GEN-08), stored on the server, never committed
+backend/uploads/

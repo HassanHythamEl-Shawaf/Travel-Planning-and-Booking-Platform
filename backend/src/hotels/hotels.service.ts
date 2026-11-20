@@ -3,9 +3,21 @@ import {
   NotFoundException,
   ConflictException,
   BadRequestException,
+  Inject,
+  Logger,
+  NotImplementedException,
+  Optional,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
+import {
+  HOTEL_PHOTO_STORE,
+  type HotelPhotoStore,
+} from '../uploads/adapters/hotel-photo.adapter';
+import {
+  MAX_IMAGES_PER_ITEM,
+  UPLOADS_URL_PREFIX,
+} from '../uploads/uploads.constants';
 import { Hotel, HotelDocument } from './schemas/hotel.schema';
 import { Room, RoomDocument } from './schemas/room.schema';
 import {
@@ -19,13 +31,22 @@ import { BlockRoomDto } from './dto/block-room.dto';
 import { UpdateHotelPoliciesDto } from './dto/update-hotel-policies.dto';
 import { SearchHotelsDto } from './dto/search-hotels.dto';
 
+/** HTL-01 / GEN-08: at most 5 photos per hotel. */
+const MAX_HOTEL_PHOTOS = MAX_IMAGES_PER_ITEM.hotel;
+
 @Injectable()
 export class HotelsService {
+  private readonly logger = new Logger(HotelsService.name);
+
   constructor(
     @InjectModel(Hotel.name) private hotelModel: Model<HotelDocument>,
     @InjectModel(Room.name) private roomModel: Model<RoomDocument>,
     @InjectModel(RoomAvailability.name)
     private roomAvailabilityModel: Model<RoomAvailabilityDocument>,
+    // Person 8's shared upload module (GEN-08), for hotel photos.
+    @Optional()
+    @Inject(HOTEL_PHOTO_STORE)
+    private readonly photoStore?: HotelPhotoStore | null,
   ) {}
 
   async createHotel(createHotelDto: CreateHotelDto): Promise<Hotel> {
@@ -239,6 +260,91 @@ export class HotelsService {
     }
 
     return updatedHotel;
+  }
+
+  // --- HOTEL PHOTOS (HTL-01, GEN-08; added by Person 8) ---
+
+  /**
+   * Adds an uploaded photo (JPG/PNG, 5 MB). The push only happens while the
+   * hotel has fewer than 5 photos, so parallel uploads can never exceed 5;
+   * a rejected upload's file is deleted again.
+   */
+  async addHotelPhoto(
+    hotelId: string,
+    file: unknown,
+  ): Promise<{ photos: string[] }> {
+    const store = this.requirePhotoStore();
+    const hotel = await this.hotelModel
+      .findById(hotelId)
+      .select('photos')
+      .lean()
+      .exec();
+    if (!hotel) throw new NotFoundException('Hotel not found');
+    if ((hotel.photos ?? []).length >= MAX_HOTEL_PHOTOS) {
+      throw new BadRequestException(
+        `A hotel can have at most ${MAX_HOTEL_PHOTOS} photos`,
+      );
+    }
+
+    const url = await store.upload(file, hotelId);
+    const updated = await this.hotelModel
+      .findOneAndUpdate(
+        { _id: hotelId, [`photos.${MAX_HOTEL_PHOTOS - 1}`]: { $exists: false } },
+        { $push: { photos: url } },
+        { returnDocument: 'after' },
+      )
+      .select('photos')
+      .lean()
+      .exec();
+    if (!updated) {
+      await this.removePhotoFile(url, hotelId);
+      const exists = await this.hotelModel.exists({ _id: hotelId }).exec();
+      if (!exists) throw new NotFoundException('Hotel not found');
+      throw new BadRequestException(
+        `A hotel can have at most ${MAX_HOTEL_PHOTOS} photos`,
+      );
+    }
+    return { photos: updated.photos };
+  }
+
+  /** Removes a photo (by its file name) from the hotel, then its file. */
+  async removeHotelPhoto(
+    hotelId: string,
+    fileName: string,
+  ): Promise<{ photos: string[] }> {
+    this.requirePhotoStore();
+    const url = `${UPLOADS_URL_PREFIX}/${fileName}`;
+    const updated = await this.hotelModel
+      .findOneAndUpdate(
+        { _id: hotelId, photos: url },
+        { $pull: { photos: url } },
+        { returnDocument: 'after' },
+      )
+      .select('photos')
+      .lean()
+      .exec();
+    if (!updated) throw new NotFoundException('Photo not found on this hotel');
+    await this.removePhotoFile(url, hotelId);
+    return { photos: updated.photos };
+  }
+
+  private requirePhotoStore(): HotelPhotoStore {
+    if (!this.photoStore) {
+      throw new NotImplementedException('Hotel photo upload is not available');
+    }
+    return this.photoStore;
+  }
+
+  /**
+   * Best effort, after the database change: a failure is only logged. Only
+   * files uploaded for this hotel are deleted.
+   */
+  private async removePhotoFile(url: string, hotelId: string): Promise<void> {
+    try {
+      await this.photoStore?.remove(url, hotelId);
+    } catch {
+      this.logger.warn(`Could not delete hotel photo ${url}`);
+    }
   }
 
   // --- ROOM METHODS ---
