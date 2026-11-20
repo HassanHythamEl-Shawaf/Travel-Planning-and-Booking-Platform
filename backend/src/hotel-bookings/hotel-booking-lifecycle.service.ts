@@ -15,6 +15,7 @@ import { generateBookingReference } from './booking-reference';
 import { HotelBookingStatus } from './hotel-booking-status';
 import { HOTEL_ROOM_READER } from './hotel-room.reader';
 import { endedStayFilter } from './review-rules';
+import { DEFAULT_CANCELLATION_TERMS } from './refund-rules';
 import { RoomInventoryService } from './room-inventory.service';
 import type { HotelRoomReader } from './hotel-room.reader';
 import type {
@@ -72,6 +73,8 @@ export class HotelBookingLifecycleService implements HotelBookingPayments {
 
   async getForPayment(id: string): Promise<HotelBookingPaymentInfo> {
     const booking = await this.find(id);
+    const snapshotBooking =
+      typeof booking.toObject === 'function' ? booking.toObject() : booking;
     return {
       id: String(booking._id),
       userId: String(booking.userId),
@@ -79,6 +82,16 @@ export class HotelBookingLifecycleService implements HotelBookingPayments {
       currency: booking.currency,
       status: booking.status,
       holdExpiresAt: booking.holdExpiresAt,
+      policySnapshot: {
+        cancellationPolicy:
+          snapshotBooking.cancellationPolicy ??
+          (await this.rooms.findCancellationTerms(String(booking.hotelId))) ??
+          DEFAULT_CANCELLATION_TERMS,
+        checkInTime:
+          snapshotBooking.cancellationPolicy?.checkInTime ?? '14:00',
+        checkOutTime:
+          snapshotBooking.cancellationPolicy?.checkOutTime ?? '12:00',
+      },
     };
   }
 
@@ -111,19 +124,31 @@ export class HotelBookingLifecycleService implements HotelBookingPayments {
   }
 
   /** HTL-18: payment failed or abandoned; expire the hold now. */
-  async releaseHold(id: string): Promise<void> {
+  async releaseHold(id: string, now: Date = new Date()): Promise<void> {
     if (!Types.ObjectId.isValid(id)) {
       throw new NotFoundException('Hotel booking not found');
     }
-    await this.expire(new Types.ObjectId(id), null, new Date());
+    await this.expire(new Types.ObjectId(id), null, now);
   }
 
   /** HTL-18: expire every hold that has run out (called by the expiry job). */
-  async releaseExpiredHolds(now: Date = new Date()): Promise<number> {
+  async releaseExpiredHolds(
+    now: Date = new Date(),
+    excludeBookingIds: string[] = [],
+  ): Promise<number> {
     const due = await this.bookings
       .find({
         status: HotelBookingStatus.PENDING_PAYMENT,
         holdExpiresAt: { $lte: now },
+        ...(excludeBookingIds.length > 0
+          ? {
+              _id: {
+                $nin: excludeBookingIds
+                  .filter((id) => Types.ObjectId.isValid(id))
+                  .map((id) => new Types.ObjectId(id)),
+              },
+            }
+          : {}),
       })
       .select('_id')
       .limit(EXPIRY_BATCH_SIZE)
@@ -262,7 +287,10 @@ export class HotelBookingLifecycleService implements HotelBookingPayments {
    */
   private async confirmInventory(booking: HotelBookingDocument) {
     try {
-      await this.rooms.confirmRoomDates(holdKeyOf(String(booking._id)));
+      await this.rooms.confirmRoomDates(
+        holdKeyOf(String(booking._id)),
+        booking.bookingReference ?? undefined,
+      );
     } catch (error) {
       this.logger.error(
         `Could not mark room dates booked for hotel booking ${String(booking._id)}`,

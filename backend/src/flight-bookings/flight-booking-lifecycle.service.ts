@@ -57,20 +57,48 @@ export class FlightBookingLifecycleService implements FlightBookingPayments {
       totalPrice: booking.totalPrice,
       currency: booking.currency,
       holdExpiresAt: booking.holdExpiresAt,
+      policySnapshot: {
+        cancellationPolicy: (
+          await this.airlineModel
+            .findById(booking.airlineId, { cancellationPolicy: 1 })
+            .lean()
+            .exec()
+        )?.cancellationPolicy ?? [],
+        baggagePolicy: booking.segments.map((segment) => ({
+          flightNumber: segment.flightNumber,
+          freeBaggageAllowance: segment.freeBaggageAllowance,
+          maxWeightPerBagKg: segment.maxWeightPerBagKg,
+          pricePerExtraBag: segment.pricePerExtraBag,
+          maxExtraBagsPerPassenger: segment.maxExtraBagsPerPassenger,
+        })),
+      },
     };
   }
 
-  async confirmBooking(bookingId: string): Promise<ConfirmedFlightBooking> {
+  async confirmBooking(
+    bookingId: string,
+    paymentIntentId?: string,
+  ): Promise<ConfirmedFlightBooking> {
     const id = toObjectId(bookingId);
     const confirmedAt = new Date();
     const { before, reference } = await this.claimForConfirmation(
       id,
       confirmedAt,
+      paymentIntentId ?? null,
     );
 
     if (!before) {
       const current = await this.findOrThrow(bookingId);
       if (current.status === FlightBookingStatus.CONFIRMED) {
+        if (
+          paymentIntentId &&
+          current.paymentIntentId &&
+          current.paymentIntentId !== paymentIntentId
+        ) {
+          throw new ConflictException(
+            'A different PaymentIntent already confirmed this booking',
+          );
+        }
         return {
           id: bookingId,
           bookingReference: current.bookingReference!,
@@ -110,6 +138,7 @@ export class FlightBookingLifecycleService implements FlightBookingPayments {
               bookingReference: null,
               confirmedAt: null,
               holdExpiresAt: before.holdExpiresAt,
+              paymentIntentId: null,
             },
           },
         )
@@ -176,12 +205,24 @@ export class FlightBookingLifecycleService implements FlightBookingPayments {
     return true;
   }
 
-  async releaseExpiredHolds(now = new Date()): Promise<number> {
+  async releaseExpiredHolds(
+    now = new Date(),
+    excludeBookingIds: string[] = [],
+  ): Promise<number> {
     const expired = await this.bookingModel
       .find(
         {
           status: FlightBookingStatus.PENDING_PAYMENT,
           holdExpiresAt: { $lte: now },
+          ...(excludeBookingIds.length > 0
+            ? {
+                _id: {
+                  $nin: excludeBookingIds
+                    .filter((id) => Types.ObjectId.isValid(id))
+                    .map((id) => new Types.ObjectId(id)),
+                },
+              }
+            : {}),
         },
         { _id: 1 },
       )
@@ -230,6 +271,7 @@ export class FlightBookingLifecycleService implements FlightBookingPayments {
   private async claimForConfirmation(
     id: Types.ObjectId,
     confirmedAt: Date,
+    paymentIntentId: string | null,
   ): Promise<{ before: LeanBooking | null; reference: string }> {
     for (let attempt = 0; attempt < MAX_REFERENCE_ATTEMPTS; attempt++) {
       const reference = this.newReference();
@@ -246,6 +288,7 @@ export class FlightBookingLifecycleService implements FlightBookingPayments {
                 status: FlightBookingStatus.CONFIRMED,
                 bookingReference: reference,
                 confirmedAt,
+                paymentIntentId,
                 holdExpiresAt: null,
               },
             },

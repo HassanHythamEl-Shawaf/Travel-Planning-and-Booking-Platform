@@ -4,6 +4,14 @@ import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import Stripe from 'stripe';
 
+import {
+  Payment,
+  PaymentDocument,
+  PaymentStatus,
+  Refund,
+  RefundStatus,
+} from '../payments/payment.schema';
+import { createStripeTestClient } from '../payments/stripe-test-mode';
 import type {
   HotelRefundQuote,
   HotelRefundRequest,
@@ -33,11 +41,17 @@ export class StripeHotelRefundsService implements HotelRefunds {
     private readonly config: ConfigService,
     @InjectModel(HotelBooking.name)
     private readonly bookings: Model<HotelBookingDocument>,
+    @InjectModel(Payment.name)
+    private readonly paymentModel: Model<PaymentDocument>,
+    @InjectModel(Refund.name)
+    private readonly refundModel: Model<Refund>,
     @Optional() @Inject(HOTEL_STRIPE_CLIENT) stripeClient?: Stripe,
   ) {
     this.stripe =
       stripeClient ??
-      new Stripe(this.config.getOrThrow<string>('STRIPE_SECRET_KEY'));
+      createStripeTestClient(
+        this.config.getOrThrow<string>('STRIPE_SECRET_KEY'),
+      );
   }
 
   async issueRefund(
@@ -55,42 +69,62 @@ export class StripeHotelRefundsService implements HotelRefunds {
       .exec()) as { paymentIntentId?: string | null } | null;
     const paymentIntentId = stored?.paymentIntentId ?? null;
 
+    let stripeRefundId: string | null = null;
+    let status = RefundStatus.FAILED;
     if (!paymentIntentId) {
       this.logger.error(
         `Cannot refund hotel booking ${request.bookingId}: no Stripe PaymentIntent is stored on it`,
       );
-      return { refundId: null, status: 'Failed' };
-    }
-
-    try {
-      const refund = await this.stripe.refunds.create(
-        {
-          payment_intent: paymentIntentId,
-          amount: Math.round(quote.refundAmount * 100),
-          metadata: {
-            bookingId: request.bookingId,
-            bookingType: 'hotel',
-            userId: request.userId,
-            bookingReference: request.bookingReference ?? '',
+    } else {
+      try {
+        const refund = await this.stripe.refunds.create(
+          {
+            payment_intent: paymentIntentId,
+            amount: Math.round(quote.refundAmount * 100),
+            metadata: {
+              bookingId: request.bookingId,
+              bookingType: 'hotel',
+              userId: request.userId,
+              bookingReference: request.bookingReference ?? '',
+            },
           },
-        },
-        // A retry of the same cancellation can never refund twice.
-        { idempotencyKey: `hotel-refund-${request.bookingId}` },
-      );
-
-      const status =
-        refund.status === 'succeeded'
-          ? 'Refunded'
-          : refund.status === 'pending'
-            ? 'Pending'
-            : 'Failed';
-
-      return { refundId: refund.id, status };
-    } catch (error) {
-      this.logger.error(
-        `Stripe refund failed for hotel booking ${request.bookingId}: ${error instanceof Error ? error.message : String(error)}`,
-      );
-      return { refundId: null, status: 'Failed' };
+          { idempotencyKey: `hotel-refund-${request.bookingId}` },
+        );
+        stripeRefundId = refund.id;
+        status =
+          refund.status === 'succeeded'
+            ? RefundStatus.REFUNDED
+            : refund.status === 'pending'
+              ? RefundStatus.PENDING
+              : RefundStatus.FAILED;
+        if (
+          status === RefundStatus.REFUNDED &&
+          quote.refundAmount >= request.totalPrice
+        ) {
+          await this.paymentModel
+            .updateOne(
+              { bookingType: 'hotel', bookingId: request.bookingId },
+              { $set: { status: PaymentStatus.REFUNDED } },
+            )
+            .exec();
+        }
+      } catch (error) {
+        this.logger.error(
+          `Stripe refund failed for hotel booking ${request.bookingId}: ${error instanceof Error ? error.message : String(error)}`,
+        );
+      }
     }
+
+    const record = await this.refundModel.create({
+      bookingType: 'hotel',
+      bookingId: request.bookingId,
+      userId: request.userId,
+      stripePaymentIntentId: paymentIntentId,
+      stripeRefundId,
+      amountMinor: Math.round(quote.refundAmount * 100),
+      currency: quote.currency,
+      status,
+    });
+    return { refundId: String(record._id), status };
   }
 }

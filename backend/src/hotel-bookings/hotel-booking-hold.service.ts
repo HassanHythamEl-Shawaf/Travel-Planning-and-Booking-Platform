@@ -1,6 +1,7 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { InjectConnection, InjectModel } from '@nestjs/mongoose';
 import { Connection, Model, Types } from 'mongoose';
+import { Payment } from '../payments/payment.schema';
 
 import { QuoteHotelBookingDto } from './dto/quote-hotel-booking.dto';
 import { holdExpiryFor } from './hotel-booking.constants';
@@ -48,6 +49,8 @@ export class HotelBookingHoldService {
     private readonly inventory: RoomInventoryService,
     @InjectModel(HotelBooking.name)
     private readonly bookings: Model<HotelBookingDocument>,
+    @InjectModel(Payment.name)
+    private readonly payments: Model<Payment>,
     @InjectConnection() private readonly connection: Connection,
     @Inject(HOTEL_ROOM_READER) private readonly reader: HotelRoomReader,
   ) {}
@@ -64,9 +67,7 @@ export class HotelBookingHoldService {
     dto: QuoteHotelBookingDto,
     now: Date = new Date(),
   ): Promise<HotelBookingHold> {
-    // Holds that already ran out must not block this request.
-    await this.lifecycle.releaseExpiredHolds(now);
-
+    await this.expireUnpaidHolds(now);
     const quote = await this.quotes.quote(dto, now);
     const bookingId = new Types.ObjectId();
     const checkIn = parseDateOnly(quote.checkIn) as Date;
@@ -90,6 +91,7 @@ export class HotelBookingHoldService {
         checkIn,
         checkOut,
         now,
+        holdExpiresAt,
       });
       await this.bookings.create(
         [
@@ -134,5 +136,26 @@ export class HotelBookingHoldService {
       currency: quote.currency,
       cancellationPolicy,
     };
+  }
+
+  private async expireUnpaidHolds(now: Date): Promise<void> {
+    const expired = await this.bookings
+      .find({
+        status: HotelBookingStatus.PENDING_PAYMENT,
+        holdExpiresAt: { $lte: now },
+      })
+      .select('_id')
+      .limit(100)
+      .lean()
+      .exec();
+    for (const booking of expired) {
+      const paymentExists = await this.payments.exists({
+        bookingType: 'hotel',
+        bookingId: String(booking._id),
+      });
+      if (!paymentExists) {
+        await this.lifecycle.releaseHold(String(booking._id), now);
+      }
+    }
   }
 }

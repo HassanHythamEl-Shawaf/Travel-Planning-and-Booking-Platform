@@ -1,5 +1,5 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
-import { HydratedDocument, Types } from 'mongoose';
+import { HydratedDocument, Schema as MongooseSchema, Types } from 'mongoose';
 
 export type PolicyAcceptanceDocument = HydratedDocument<PolicyAcceptance>;
 
@@ -19,7 +19,14 @@ export class PolicyAcceptance {
 
   @Prop({ type: Date, required: true, default: () => new Date() })
   acceptedAt: Date;
+
+  @Prop({ type: MongooseSchema.Types.Mixed, required: true })
+  policySnapshot: Record<string, unknown>;
 }
 
 export const PolicyAcceptanceSchema =
   SchemaFactory.createForClass(PolicyAcceptance);
+PolicyAcceptanceSchema.index(
+  { bookingType: 1, bookingId: 1, userId: 1 },
+  { unique: true },
+);

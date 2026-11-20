@@ -23,6 +23,12 @@ export class Hotel {
   @Prop({ type: [String], default: [] })
   photos: string[];
 
+  @Prop({ type: Number, min: 1, max: 5, default: 3 })
+  starClass: number;
+
+  @Prop({ type: [String], default: [] })
+  amenities: string[];
+
   @Prop({ default: true })
   isActive: boolean;
 

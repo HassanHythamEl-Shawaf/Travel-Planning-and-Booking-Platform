@@ -1,4 +1,13 @@
-import { IsString, IsNotEmpty, IsOptional, IsArray, ValidateNested } from 'class-validator';
+import {
+  IsArray,
+  IsNotEmpty,
+  IsNumber,
+  IsOptional,
+  IsString,
+  Max,
+  Min,
+  ValidateNested,
+} from 'class-validator';
 import { Type } from 'class-transformer';
 
 class PoliciesDto {
@@ -37,9 +46,23 @@ export class CreateHotelDto {
   country: string;
 
   @IsOptional()
+  @IsNumber()
+  @Min(1)
+  @Max(5)
+  starClass?: number;
+
+  @IsOptional()
   @IsArray()
   @IsString({ each: true })
-  photos?: string[];
+  amenities?: string[];
+
+  @IsOptional()
+  @IsString()
+  checkInTime?: string;
+
+  @IsOptional()
+  @IsString()
+  checkOutTime?: string;
 
   @IsOptional()
   @ValidateNested()

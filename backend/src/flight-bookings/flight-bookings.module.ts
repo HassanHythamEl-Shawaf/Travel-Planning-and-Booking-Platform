@@ -15,6 +15,7 @@ import { FlightBookingLifecycleService } from './flight-booking-lifecycle.servic
 import { FlightBookingsController } from './flight-bookings.controller';
 import { FlightBookingsService } from './flight-bookings.service';
 import { StripeRefundsService } from './stripe-refunds.service';
+import { Payment, PaymentSchema, Refund, RefundSchema } from '../payments/payment.schema';
 import {
   FlightBooking,
   FlightBookingSchema,
@@ -29,6 +30,8 @@ import {
   imports: [
     MongooseModule.forFeature([
       { name: FlightBooking.name, schema: FlightBookingSchema },
+      { name: Payment.name, schema: PaymentSchema },
+      { name: Refund.name, schema: RefundSchema },
     ]),
     // Inventory and flight models; AirlinesModule uses this module's adapters.
     forwardRef(() => AirlinesModule),

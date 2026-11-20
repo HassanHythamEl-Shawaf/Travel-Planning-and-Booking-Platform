@@ -37,6 +37,18 @@ export class SearchHotelsDto {
   @IsOptional()
   @Type(() => Number)
   @IsNumber()
+  @Min(1)
+  guests?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  @Min(1)
+  rooms?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
   @Min(0)
   minPrice?: number;
 
@@ -71,6 +83,6 @@ export class SearchHotelsDto {
   @Type(() => Number)
   @IsNumber()
   @Min(1)
-  @Max(50)
+  @Max(10)
   limit?: number;
 }

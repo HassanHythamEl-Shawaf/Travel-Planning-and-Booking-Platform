@@ -1,20 +1,31 @@
-import { IsString, IsNotEmpty, IsNumber, IsOptional, IsArray, ValidateNested, IsMongoId } from 'class-validator';
+import {
+  IsArray,
+  IsMongoId,
+  IsNotEmpty,
+  IsNumber,
+  IsOptional,
+  IsString,
+  Min,
+  ValidateNested,
+} from 'class-validator';
 import { Type } from 'class-transformer';
 
 class OccupancyDto {
   @IsNotEmpty()
   @IsNumber()
+  @Min(1)
   maxAdults: number;
 
   @IsNotEmpty()
   @IsNumber()
+  @Min(0)
   maxChildren: number;
 }
 
 export class CreateRoomDto {
-  @IsNotEmpty()
+  @IsOptional()
   @IsMongoId()
-  hotelId: string;
+  hotelId?: string;
 
   @IsNotEmpty()
   @IsString()
@@ -22,7 +33,17 @@ export class CreateRoomDto {
 
   @IsNotEmpty()
   @IsNumber()
+  @Min(0.01)
   pricePerNight: number;
+
+  @IsNotEmpty()
+  @IsString()
+  type: string;
+
+  @IsNotEmpty()
+  @IsNumber()
+  @Min(1)
+  beds: number;
 
   @IsNotEmpty()
   @ValidateNested()

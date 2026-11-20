@@ -170,7 +170,7 @@ describe('Hotel booking cancellation (HTL-21)', () => {
       },
       { refundPercentage: 100, refundAmount: 300, currency: 'USD' },
     );
-    expect(notifications.send).toHaveBeenCalledTimes(1);
+    expect(notifications.send).toHaveBeenCalledTimes(2);
     expect(notifications.send).toHaveBeenCalledWith(
       USER,
       expect.anything(),
@@ -327,6 +327,6 @@ describe('Hotel booking cancellation (HTL-21)', () => {
     );
     expect(lost?.reason).toBeInstanceOf(ConflictException);
     expect(refunds.issueRefund).toHaveBeenCalledTimes(1);
-    expect(notifications.send).toHaveBeenCalledTimes(1);
+    expect(notifications.send).toHaveBeenCalledTimes(2);
   });
 });

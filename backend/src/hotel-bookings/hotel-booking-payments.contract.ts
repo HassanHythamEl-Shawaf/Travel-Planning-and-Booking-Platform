@@ -18,6 +18,7 @@ export interface HotelBookingPaymentInfo {
   status: HotelBookingStatus;
   /** End of the Pending Payment hold; null once settled. */
   holdExpiresAt: Date | null;
+  policySnapshot: Record<string, unknown>;
 }
 
 export interface ConfirmedHotelBooking {
@@ -51,7 +52,7 @@ export interface HotelBookingPayments {
    * HTL-18: for the expiry job. Expires every Pending Payment booking whose
    * hold has run out and releases its rooms. Returns how many were expired.
    */
-  releaseExpiredHolds(now?: Date): Promise<number>;
+  releaseExpiredHolds(now?: Date, excludeBookingIds?: string[]): Promise<number>;
   /**
    * GEN-11, for the expiry job: Confirmed -> Completed for every reservation
    * whose check-out date has passed. Returns how many were completed.

@@ -23,9 +23,6 @@ import { ItinerariesService } from './itineraries.service';
 
 /** Seif's search returns at most 50 hotels per page; we read up to this many pages. */
 const HOTEL_PAGE_SIZE = 50;
-const MAX_HOTEL_PAGES = 20;
-/** Flight search pages read per arrival airport (10 flights each). */
-const MAX_FLIGHT_PAGES = 20;
 
 interface AvailableRoom {
   _id: unknown;
@@ -151,7 +148,7 @@ export class ItinerarySearchService {
     // All hotels Seif's search finds for the city and dates (it already
     // drops inactive hotels and rooms that are booked or blocked).
     const found: HotelResult[] = [];
-    for (let p = 1; p <= MAX_HOTEL_PAGES; p++) {
+    for (let p = 1; ; p++) {
       const result = await this.hotels.searchHotels({
         destination: cityName,
         startDate: checkIn,
@@ -286,7 +283,7 @@ export class ItinerarySearchService {
     const items: FlightSearchResultDto[] = [];
     const returnItems: FlightSearchResultDto[] = [];
     for (const to of targets) {
-      for (let page = 1; page <= MAX_FLIGHT_PAGES; page++) {
+      for (let page = 1; ; page++) {
         const result = await this.airlines.searchFlights({
           departureAirportCode: query.from,
           arrivalAirportCode: to,
@@ -302,10 +299,12 @@ export class ItinerarySearchService {
         });
         items.push(...result.items);
         returnItems.push(...(result.returnItems ?? []));
-        const size = result.limit ?? 10;
+        const pageSize = result.limit ?? 10;
         if (
-          result.items.length < size &&
-          (result.returnItems?.length ?? 0) < size
+          result.totalPages !== undefined
+            ? page >= result.totalPages
+            : result.items.length < pageSize &&
+              (result.returnItems?.length ?? 0) < pageSize
         ) {
           break;
         }

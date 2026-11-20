@@ -40,7 +40,7 @@ export interface HotelRoomReader {
     checkOut: Date,
   ): Promise<boolean>;
   /** HTL-17: held -> booked for every room date held under `holdKey`. */
-  confirmRoomDates(holdKey: string): Promise<void>;
+  confirmRoomDates(holdKey: string, reservationReference?: string): Promise<void>;
   /**
    * The hotel's current cancellation terms and check-in time (HTL-10), or null
    * if the hotel does not exist. Works for deactivated hotels too, because
@@ -96,8 +96,11 @@ export class HotelsServiceRoomReader implements HotelRoomReader {
     return this.hotels.checkAvailability(roomId, checkIn, checkOut);
   }
 
-  confirmRoomDates(holdKey: string): Promise<void> {
-    return this.hotels.confirmDates(holdKey);
+  confirmRoomDates(
+    holdKey: string,
+    reservationReference?: string,
+  ): Promise<void> {
+    return this.hotels.confirmDates(holdKey, reservationReference);
   }
 
   async findCancellationTerms(
@@ -116,6 +119,8 @@ export class HotelsServiceRoomReader implements HotelRoomReader {
           policy?.refundPercentageAfterDeadline ??
           DEFAULT_CANCELLATION_TERMS.refundPercentageAfterDeadline,
         checkInTime: hotel.checkInTime ?? DEFAULT_CANCELLATION_TERMS.checkInTime,
+        checkOutTime:
+          hotel.checkOutTime ?? DEFAULT_CANCELLATION_TERMS.checkOutTime,
         description:
           policy?.description ?? DEFAULT_CANCELLATION_TERMS.description,
       };

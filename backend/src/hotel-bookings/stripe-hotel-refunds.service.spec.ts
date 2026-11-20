@@ -1,3 +1,4 @@
+import { RefundStatus } from '../payments/payment.schema';
 import { StripeHotelRefundsService } from './stripe-hotel-refunds.service';
 
 const request = {
@@ -15,10 +16,16 @@ function build(opts: { paymentIntentId?: string | null; stripe?: unknown } = {})
     opts.paymentIntentId === undefined
       ? { paymentIntentId: 'pi_123' }
       : { paymentIntentId: opts.paymentIntentId };
-  const model = {
+  const bookings = {
     findById: jest.fn().mockReturnValue({
       select: () => ({ lean: () => ({ exec: () => Promise.resolve(doc) }) }),
     }),
+  };
+  const paymentModel = {
+    updateOne: jest.fn().mockReturnValue({ exec: jest.fn() }),
+  };
+  const refundModel = {
+    create: jest.fn().mockResolvedValue({ _id: 'refund-record-1' }),
   };
   const stripe = opts.stripe ?? {
     refunds: {
@@ -27,18 +34,29 @@ function build(opts: { paymentIntentId?: string | null; stripe?: unknown } = {})
   };
   const service = new StripeHotelRefundsService(
     { getOrThrow: () => 'sk_test_x' } as never,
-    model as never,
+    bookings as never,
+    paymentModel as never,
+    refundModel as never,
     stripe as never,
   );
-  return { service, model, stripe: stripe as { refunds: { create: jest.Mock } } };
+  return {
+    service,
+    bookings,
+    paymentModel,
+    refundModel,
+    stripe: stripe as { refunds: { create: jest.Mock } },
+  };
 }
 
 describe('StripeHotelRefundsService (PAY-03)', () => {
-  it('refunds the stored PaymentIntent for the computed amount, once', async () => {
-    const { service, stripe } = build();
+  it('refunds the stored PaymentIntent and saves a user-queryable refund record', async () => {
+    const { service, stripe, refundModel } = build();
     const issued = await service.issueRefund(request, quote);
 
-    expect(issued).toEqual({ refundId: 're_1', status: 'Refunded' });
+    expect(issued).toEqual({
+      refundId: 'refund-record-1',
+      status: RefundStatus.REFUNDED,
+    });
     expect(stripe.refunds.create).toHaveBeenCalledWith(
       {
         payment_intent: 'pi_123',
@@ -52,14 +70,24 @@ describe('StripeHotelRefundsService (PAY-03)', () => {
       },
       { idempotencyKey: 'hotel-refund-b1' },
     );
+    expect(refundModel.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        bookingType: 'hotel',
+        bookingId: 'b1',
+        stripePaymentIntentId: 'pi_123',
+        stripeRefundId: 're_1',
+        amountMinor: 15000,
+        status: RefundStatus.REFUNDED,
+      }),
+    );
   });
 
   it('maps Stripe statuses to Refunded, Pending and Failed', async () => {
     for (const [stripeStatus, expected] of [
-      ['succeeded', 'Refunded'],
-      ['pending', 'Pending'],
-      ['failed', 'Failed'],
-      ['canceled', 'Failed'],
+      ['succeeded', RefundStatus.REFUNDED],
+      ['pending', RefundStatus.PENDING],
+      ['failed', RefundStatus.FAILED],
+      ['canceled', RefundStatus.FAILED],
     ] as const) {
       const { service } = build({
         stripe: {
@@ -72,33 +100,58 @@ describe('StripeHotelRefundsService (PAY-03)', () => {
     }
   });
 
-  it('reports Failed, without calling Stripe, when no PaymentIntent is stored', async () => {
-    const { service, stripe } = build({ paymentIntentId: null });
-    await expect(service.issueRefund(request, quote)).resolves.toEqual({
-      refundId: null,
-      status: 'Failed',
+  it('updates payment status when a full refund succeeds', async () => {
+    const { service, paymentModel } = build();
+    await service.issueRefund(request, {
+      refundPercentage: 100,
+      refundAmount: request.totalPrice,
+      currency: request.currency,
     });
-    expect(stripe.refunds.create).not.toHaveBeenCalled();
+
+    expect(paymentModel.updateOne).toHaveBeenCalledWith(
+      { bookingType: 'hotel', bookingId: request.bookingId },
+      { $set: { status: 'Refunded' } },
+    );
   });
 
-  it('reports Failed instead of throwing when Stripe errors', async () => {
+  it('persists Failed when no PaymentIntent is stored', async () => {
+    const { service, bookings, stripe, refundModel } = build({
+      paymentIntentId: null,
+    });
+    await expect(service.issueRefund(request, quote)).resolves.toEqual({
+      refundId: 'refund-record-1',
+      status: RefundStatus.FAILED,
+    });
+    expect(bookings.findById).toHaveBeenCalledWith('b1');
+    expect(stripe.refunds.create).not.toHaveBeenCalled();
+    expect(refundModel.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        stripePaymentIntentId: null,
+        stripeRefundId: null,
+        status: RefundStatus.FAILED,
+      }),
+    );
+  });
+
+  it('persists Failed instead of throwing when Stripe errors', async () => {
     const { service } = build({
       stripe: {
         refunds: { create: jest.fn().mockRejectedValue(new Error('boom')) },
       },
     });
-    await expect(service.issueRefund(request, quote)).resolves.toEqual({
-      refundId: null,
-      status: 'Failed',
+    await expect(service.issueRefund(request, quote)).resolves.toMatchObject({
+      refundId: 'refund-record-1',
+      status: RefundStatus.FAILED,
     });
   });
 
   it('does nothing for a zero refund', async () => {
-    const { service, model, stripe } = build();
+    const { service, bookings, stripe, refundModel } = build();
     await expect(
       service.issueRefund(request, { ...quote, refundAmount: 0 }),
     ).resolves.toEqual({ refundId: null, status: null });
-    expect(model.findById).not.toHaveBeenCalled();
+    expect(bookings.findById).not.toHaveBeenCalled();
     expect(stripe.refunds.create).not.toHaveBeenCalled();
+    expect(refundModel.create).not.toHaveBeenCalled();
   });
 });
