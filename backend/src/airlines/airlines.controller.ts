@@ -1,18 +1,24 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Header,
+  HttpCode,
   Param,
   Patch,
   Post,
   Put,
   Query,
+  UploadedFile,
   UseGuards,
+  UseInterceptors,
 } from '@nestjs/common';
 import {
   ApiBadRequestResponse,
+  ApiBody,
   ApiConflictResponse,
+  ApiConsumes,
   ApiCookieAuth,
   ApiCreatedResponse,
   ApiForbiddenResponse,
@@ -35,6 +41,7 @@ import { AuthGuard } from '../auth/guards/auth.guard';
 import { ProviderOwnershipGuard } from '../auth/guards/provider-ownership.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { ParseObjectIdPipe } from '../common/pipes/parse-object-id.pipe';
+import { ImageFileInterceptor } from '../uploads/image-file.interceptor';
 import { UserRole } from '../users/schemas/user.schema';
 import {
   AirlineResponseDto,
@@ -299,6 +306,63 @@ export class AirlinesController {
     @Body() dto: UpdateAirlineDto,
   ): Promise<AirlineResponseDto> {
     return this.airlines.update(id, dto);
+  }
+
+  @Put(':id/logo')
+  @UseGuards(AuthGuard, RolesGuard, ProviderOwnershipGuard)
+  @Roles(UserRole.MODERATOR)
+  @ProviderOwnership('airline')
+  @UseInterceptors(ImageFileInterceptor('file'))
+  @ApiCookieAuth('access_token')
+  @ApiOperation({
+    summary: 'Upload or replace the airline logo (FLT-01, GEN-08)',
+    description:
+      'Multipart field "file": JPG or PNG, up to 5 MB. One logo per airline: a new upload replaces the old logo and deletes its file. Only the assigned airline moderator.',
+  })
+  @ApiConsumes('multipart/form-data')
+  @ApiBody({
+    schema: {
+      type: 'object',
+      required: ['file'],
+      properties: { file: { type: 'string', format: 'binary' } },
+    },
+  })
+  @ApiParam(ID_PARAM)
+  @ApiOkResponse({ type: AirlineResponseDto })
+  @ApiBadRequestResponse({
+    description: 'Invalid id, missing file, not a JPG/PNG, or over 5 MB',
+  })
+  @ApiUnauthorizedResponse({ description: 'Authentication is required' })
+  @ApiForbiddenResponse({ description: 'Assigned airline moderator required' })
+  @ApiNotFoundResponse({ description: 'Airline not found' })
+  uploadLogo(
+    @Param('id', ParseObjectIdPipe) id: string,
+    @UploadedFile() file: unknown,
+  ): Promise<AirlineResponseDto> {
+    return this.airlines.uploadLogo(id, file);
+  }
+
+  @Delete(':id/logo')
+  @HttpCode(200)
+  @UseGuards(AuthGuard, RolesGuard, ProviderOwnershipGuard)
+  @Roles(UserRole.MODERATOR)
+  @ProviderOwnership('airline')
+  @ApiCookieAuth('access_token')
+  @ApiOperation({
+    summary: 'Remove the airline logo (FLT-01, GEN-08)',
+    description:
+      'Sets logoUrl to null and deletes the file. Only the assigned airline moderator.',
+  })
+  @ApiParam(ID_PARAM)
+  @ApiOkResponse({ type: AirlineResponseDto })
+  @ApiBadRequestResponse({ description: 'Invalid airline id' })
+  @ApiUnauthorizedResponse({ description: 'Authentication is required' })
+  @ApiForbiddenResponse({ description: 'Assigned airline moderator required' })
+  @ApiNotFoundResponse({ description: 'Airline not found' })
+  removeLogo(
+    @Param('id', ParseObjectIdPipe) id: string,
+  ): Promise<AirlineResponseDto> {
+    return this.airlines.removeLogo(id);
   }
 
   @Put(':id/baggage-policy')

@@ -81,6 +81,17 @@ export class CreatePostDto {
   @IsOptional()
   @IsIn(POST_STATUSES)
   status?: PostStatus;
+
+  @ApiPropertyOptional({
+    example: '6650f1c2a1b2c3d4e5f60718',
+    nullable: true,
+    type: String,
+    description:
+      'BLG-13 (bonus): id of one of your own itineraries to attach to the post; null removes it. Readers see it only while the itinerary is public and not hidden.',
+  })
+  @IsOptional()
+  @IsMongoId()
+  itineraryId?: string | null;
 }
 
 /** Any subset; drafts and published posts can move both ways (D3). */
@@ -125,6 +136,25 @@ export class AuthorRefDto {
 
   @ApiProperty({ example: 'Alice Author' })
   name: string;
+}
+
+/** BLG-13 (bonus): the itinerary attached to a post. */
+export class AttachedItineraryDto {
+  @ApiProperty({ example: ID })
+  id: string;
+
+  @ApiProperty({ example: 'Ten days in Egypt' })
+  title: string;
+
+  @ApiProperty({ type: [String], example: ['EG'] })
+  countries: string[];
+
+  @ApiProperty({
+    example: true,
+    description:
+      'False only when the author views their own private itinerary.',
+  })
+  isPublic: boolean;
 }
 
 export class PostImageDto {
@@ -198,6 +228,14 @@ export class PostDetailDto extends PostListItemDto {
 
   @ApiPropertyOptional({ description: 'Shown only to the author and admins.' })
   isHidden?: boolean;
+
+  @ApiProperty({
+    type: AttachedItineraryDto,
+    nullable: true,
+    description:
+      'BLG-13 (bonus): the attached itinerary (GET /api/itineraries/:id for the full view). null when none is attached, or when you may not see it (private, hidden or deleted); the author always sees their own.',
+  })
+  itinerary: AttachedItineraryDto | null;
 
   @ApiProperty({ description: 'Always false for guests.' })
   likedByMe: boolean;

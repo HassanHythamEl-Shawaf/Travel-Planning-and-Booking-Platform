@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  Optional,
   ForbiddenException,
   Injectable,
   NotFoundException,
@@ -26,6 +27,7 @@ import {
   type Viewer,
 } from './blog-visibility';
 import {
+  AttachedItineraryDto,
   CreatePostDto,
   DeletedDto,
   MyPostListItemDto,
@@ -35,6 +37,7 @@ import {
   PostListItemDto,
   UpdatePostDto,
 } from './dto/post.dto';
+import { PublicItineraryReader } from './public-itinerary.reader';
 import { Like } from './schemas/like.schema';
 import { Post } from './schemas/post.schema';
 import { normalizeTag, normalizeTags } from './tags';
@@ -150,6 +153,8 @@ export class PostsService {
     @InjectModel(Like.name) private readonly likeModel: Model<Like>,
     private readonly cascade: BlogCascadeService,
     private readonly imageCleaner: BlogImageCleaner,
+    // BLG-13 (bonus); optional so the existing unit tests can leave it out.
+    @Optional() private readonly itineraries?: PublicItineraryReader,
   ) {}
 
   // -------------------------------------------------------------- writes
@@ -159,6 +164,7 @@ export class PostsService {
     dto: CreatePostDto,
   ): Promise<PostDetailDto> {
     const status = dto.status ?? POST_STATUS.DRAFT;
+    const itineraryId = await this.ownItineraryId(viewer, dto.itineraryId);
     const created = await this.postModel.create({
       authorId: new Types.ObjectId(viewer.sub),
       title: dto.title,
@@ -166,9 +172,17 @@ export class PostsService {
       tags: normalizeTags(dto.tags ?? []),
       status,
       publishedAt: status === POST_STATUS.PUBLISHED ? new Date() : null,
+      ...(itineraryId && { itineraryId }),
     });
+    const post = created.toObject() as LeanPost;
     const author = await this.findAuthor(created.authorId);
-    return this.toDetail(created.toObject() as LeanPost, author, viewer, false);
+    return this.toDetail(
+      post,
+      author,
+      viewer,
+      false,
+      await this.attachedItinerary(post, viewer),
+    );
   }
 
   async update(
@@ -183,6 +197,9 @@ export class PostsService {
     if (dto.content !== undefined) set.content = dto.content;
     if (dto.tags !== undefined) set.tags = normalizeTags(dto.tags);
     if (dto.status !== undefined) set.status = dto.status;
+    if (dto.itineraryId !== undefined) {
+      set.itineraryId = await this.ownItineraryId(viewer, dto.itineraryId);
+    }
     if (Object.keys(set).length === 0) {
       throw new BadRequestException('Nothing to update');
     }
@@ -211,7 +228,13 @@ export class PostsService {
     }
 
     const likedByMe = await this.likedBy(updated._id, viewer);
-    return this.toDetail(updated, author, viewer, likedByMe);
+    return this.toDetail(
+      updated,
+      author,
+      viewer,
+      likedByMe,
+      await this.attachedItinerary(updated, viewer),
+    );
   }
 
   /**
@@ -254,7 +277,13 @@ export class PostsService {
   async findOne(id: string, viewer: Viewer): Promise<PostDetailDto> {
     const { post, author } = await this.loadViewable(id, viewer);
     const likedByMe = await this.likedBy(post._id, viewer);
-    return this.toDetail(post, author, viewer, likedByMe);
+    return this.toDetail(
+      post,
+      author,
+      viewer,
+      likedByMe,
+      await this.attachedItinerary(post, viewer),
+    );
   }
 
   /** GET /posts and GET /tags/:tag/posts (BLG-02, BLG-08, BLG-09). */
@@ -366,6 +395,55 @@ export class PostsService {
   }
 
   /** Whether the viewer liked the post (BLG-06); false for guests. */
+  // ------------------------------------------- BLG-13 attached itinerary
+
+  /**
+   * BLG-13 (bonus): an author may attach only one of their own itineraries
+   * (any visibility). null / undefined means none. 400 otherwise, so ids of
+   * other users' itineraries cannot be probed.
+   */
+  private async ownItineraryId(
+    viewer: AuthenticatedUser,
+    itineraryId: string | null | undefined,
+  ): Promise<Types.ObjectId | null> {
+    if (!itineraryId) return null;
+    const id = new Types.ObjectId(itineraryId);
+    const itinerary = await this.itineraries?.findById(id);
+    if (!itinerary || itinerary.ownerId !== viewer.sub) {
+      throw new BadRequestException(
+        'itineraryId must be one of your own itineraries',
+      );
+    }
+    return id;
+  }
+
+  /**
+   * BLG-13: the attached itinerary as this viewer may see it, with the
+   * itinerary rules (ITN-20, GEN-10): its owner always; others only while
+   * it is public, and hidden ones only for admins. Private ones stay
+   * private even for admins (as on GET /api/itineraries/:id). A deleted
+   * itinerary shows as null.
+   */
+  private async attachedItinerary(
+    post: LeanPost,
+    viewer: Viewer,
+  ): Promise<AttachedItineraryDto | null> {
+    if (!post.itineraryId || !this.itineraries) return null;
+    const itinerary = await this.itineraries.findById(post.itineraryId);
+    if (!itinerary) return null;
+    const isOwner = !!viewer && itinerary.ownerId === viewer.sub;
+    const visible =
+      isOwner ||
+      (itinerary.isPublic && (!itinerary.isHidden || isAdmin(viewer)));
+    if (!visible) return null;
+    return {
+      id: itinerary.id,
+      title: itinerary.title,
+      countries: itinerary.countries,
+      isPublic: itinerary.isPublic,
+    };
+  }
+
   private async likedBy(
     postId: Types.ObjectId,
     viewer: Viewer,
@@ -399,6 +477,7 @@ export class PostsService {
     author: AuthorInfo | null,
     viewer: Viewer,
     likedByMe: boolean,
+    itinerary: AttachedItineraryDto | null = null,
   ): PostDetailDto {
     const isOwner = isAuthorOf(post, viewer);
     const privileged = isOwner || isAdmin(viewer);
@@ -416,6 +495,7 @@ export class PostsService {
         status: post.status,
         isHidden: post.isHidden === true,
       }),
+      itinerary,
       likedByMe,
       isOwner,
       createdAt: post.createdAt,
