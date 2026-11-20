@@ -38,6 +38,12 @@ const booking = (over: Record<string, unknown> = {}): LeanHotelBooking =>
     ],
     totalPrice: 751.5,
     currency: 'USD',
+    cancellationPolicy: {
+      freeCancellationHours: 24,
+      refundPercentageAfterDeadline: 50,
+      checkInTime: '14:00',
+      description: 'Free cancellation up to 24 hours before check-in.',
+    },
     status: HotelBookingStatus.CONFIRMED,
     holdExpiresAt: null,
     bookingReference: 'HTL-ABCD2345',
@@ -88,7 +94,7 @@ describe('booking views (HTL-20)', () => {
     expect(summary.holdExpiresAt).toEqual(hold);
   });
 
-  it('gives full details with per-room guests and prices', () => {
+  it('gives full details with per-room guests and the cancellation terms', () => {
     const details = toDetails(booking(), NOW);
     expect(details.rooms[0]).toEqual({
       roomId: 'r1',
@@ -98,6 +104,7 @@ describe('booking views (HTL-20)', () => {
       childrenAges: [4, 9],
       subtotal: 300,
     });
+    expect(details.cancellationPolicy?.refundPercentageAfterDeadline).toBe(50);
     expect(details.refundId).toBeNull();
   });
 
@@ -114,6 +121,12 @@ describe('booking views (HTL-20)', () => {
     ]) {
       expect(toDetails(booking({ status }), NOW).cancellable).toBe(false);
     }
+  });
+
+  it('copes with bookings that predate the policy snapshot', () => {
+    expect(
+      toDetails(booking({ cancellationPolicy: null }), NOW).cancellationPolicy,
+    ).toBeNull();
   });
 
   it('builds a filter per group', () => {

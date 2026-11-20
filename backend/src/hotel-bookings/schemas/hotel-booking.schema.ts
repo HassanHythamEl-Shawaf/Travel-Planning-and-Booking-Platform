@@ -38,6 +38,30 @@ export class HotelBookedRoom {
 export const HotelBookedRoomSchema =
   SchemaFactory.createForClass(HotelBookedRoom);
 
+/**
+ * The hotel's cancellation terms when the rooms were held, so the refund
+ * follows the policy the guest saw and accepted, not a later edit (HTL-21).
+ */
+@Schema({ _id: false })
+export class HotelCancellationPolicy {
+  @Prop({ required: true, min: 0 })
+  freeCancellationHours: number;
+
+  @Prop({ required: true, min: 0, max: 100 })
+  refundPercentageAfterDeadline: number;
+
+  /** "HH:mm" check-in time of the hotel. */
+  @Prop({ required: true, default: '14:00' })
+  checkInTime: string;
+
+  @Prop({ default: '' })
+  description: string;
+}
+
+export const HotelCancellationPolicySchema = SchemaFactory.createForClass(
+  HotelCancellationPolicy,
+);
+
 export type HotelBookingDocument = HydratedDocument<HotelBooking>;
 
 /**
@@ -88,6 +112,10 @@ export class HotelBooking {
   @Prop({ required: true, default: PLATFORM_CURRENCY })
   currency: string;
 
+  /** Snapshot taken at hold time (null only for bookings that predate it). */
+  @Prop({ type: HotelCancellationPolicySchema, default: null })
+  cancellationPolicy: HotelCancellationPolicy | null;
+
   @Prop({
     type: String,
     required: true,
@@ -103,6 +131,10 @@ export class HotelBooking {
   /** Generated at confirmation; null before. */
   @Prop({ type: String, default: null })
   bookingReference: string | null;
+
+  /** Stripe PaymentIntent that paid this booking; set at confirmation (PAY-03 refunds). */
+  @Prop({ type: String, default: null })
+  paymentIntentId: string | null;
 
   @Prop({ type: Date, default: null })
   confirmedAt: Date | null;
@@ -135,7 +167,7 @@ export const HotelBookingSchema = SchemaFactory.createForClass(HotelBooking);
 HotelBookingSchema.index({ userId: 1, createdAt: -1 });
 // HTL-22 / overlap checks: bookings of one hotel by stay and status.
 HotelBookingSchema.index({ hotelId: 1, checkInDate: 1, status: 1 });
-// Expiry job (Person 7): Pending Payment holds past their expiry.
+// Expiry job : Pending Payment holds past their expiry.
 HotelBookingSchema.index({ status: 1, holdExpiresAt: 1 });
 // References are unique once issued; unconfirmed bookings hold null.
 HotelBookingSchema.index(

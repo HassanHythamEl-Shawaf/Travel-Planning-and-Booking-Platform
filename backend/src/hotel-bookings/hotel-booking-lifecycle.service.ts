@@ -73,8 +73,8 @@ export class HotelBookingLifecycleService implements HotelBookingPayments {
     const booking = await this.find(id);
     return {
       id: String(booking._id),
-      ownerId: String(booking.userId),
-      amount: booking.totalPrice,
+      userId: String(booking.userId),
+      totalPrice: booking.totalPrice,
       currency: booking.currency,
       status: booking.status,
       holdExpiresAt: booking.holdExpiresAt,
@@ -84,9 +84,14 @@ export class HotelBookingLifecycleService implements HotelBookingPayments {
   /** HTL-17. One conditional update, so confirm and expiry can never both win. */
   async confirmBooking(
     id: string,
+    paymentIntentId?: string,
     now: Date = new Date(),
   ): Promise<ConfirmedHotelBooking> {
-    const confirmed = await this.transitionToConfirmed(id, now);
+    const confirmed = await this.transitionToConfirmed(
+      id,
+      now,
+      paymentIntentId ?? null,
+    );
     if (!confirmed) return this.settleWithoutTransition(id);
 
     await this.confirmInventory(confirmed);
@@ -184,6 +189,7 @@ export class HotelBookingLifecycleService implements HotelBookingPayments {
   private async transitionToConfirmed(
     id: string,
     now: Date,
+    paymentIntentId: string | null,
   ): Promise<HotelBookingDocument | null> {
     if (!Types.ObjectId.isValid(id)) {
       throw new NotFoundException('Hotel booking not found');
@@ -201,6 +207,7 @@ export class HotelBookingLifecycleService implements HotelBookingPayments {
               $set: {
                 status: HotelBookingStatus.CONFIRMED,
                 bookingReference: generateBookingReference(),
+                paymentIntentId,
                 confirmedAt: now,
                 holdExpiresAt: null,
               },

@@ -58,7 +58,7 @@ describe('HotelBookingLifecycleService.confirmBooking (HTL-17)', () => {
       ),
     );
 
-    const result = await service.confirmBooking(ID, NOW);
+    const result = await service.confirmBooking(ID, 'pi_123', NOW);
 
     const [filter, update] = model.findOneAndUpdate.mock.calls[0];
     expect(filter.status).toBe(HotelBookingStatus.PENDING_PAYMENT);
@@ -66,6 +66,7 @@ describe('HotelBookingLifecycleService.confirmBooking (HTL-17)', () => {
     expect(update.$set.status).toBe(HotelBookingStatus.CONFIRMED);
     expect(update.$set.bookingReference).toMatch(/^HTL-[A-Z2-9]{8}$/);
     expect(update.$set.holdExpiresAt).toBeNull();
+    expect(update.$set.paymentIntentId).toBe('pi_123');
 
     expect(result).toMatchObject({
       id: ID,
@@ -105,7 +106,7 @@ describe('HotelBookingLifecycleService.confirmBooking (HTL-17)', () => {
           }),
         ),
       );
-    await expect(service.confirmBooking(ID, NOW)).resolves.toMatchObject({
+    await expect(service.confirmBooking(ID, undefined, NOW)).resolves.toMatchObject({
       bookingReference: 'HTL-ZZZZ2222',
     });
     expect(model.findOneAndUpdate).toHaveBeenCalledTimes(2);
@@ -114,7 +115,7 @@ describe('HotelBookingLifecycleService.confirmBooking (HTL-17)', () => {
   it('does not swallow other database errors', async () => {
     const { service, model } = build();
     model.findOneAndUpdate.mockReturnValue(rejects(new Error('db down')));
-    await expect(service.confirmBooking(ID, NOW)).rejects.toThrow('db down');
+    await expect(service.confirmBooking(ID, undefined, NOW)).rejects.toThrow('db down');
   });
 
   it('is safe to repeat: returns the reference, retries the dates, notifies once', async () => {
@@ -129,7 +130,7 @@ describe('HotelBookingLifecycleService.confirmBooking (HTL-17)', () => {
         }),
       ),
     );
-    const result = await service.confirmBooking(ID, NOW);
+    const result = await service.confirmBooking(ID, undefined, NOW);
     expect(result.bookingReference).toBe('HTL-ABCD2345');
     expect(rooms.confirmRoomDates).toHaveBeenCalledWith(ID);
     expect(notifications.send).not.toHaveBeenCalled();
@@ -141,7 +142,7 @@ describe('HotelBookingLifecycleService.confirmBooking (HTL-17)', () => {
     model.findById.mockReturnValue(
       resolves(booking({ holdExpiresAt: new Date('2026-11-18T09:00:00Z') })),
     );
-    await expect(service.confirmBooking(ID, NOW)).rejects.toThrow(
+    await expect(service.confirmBooking(ID, undefined, NOW)).rejects.toThrow(
       ConflictException,
     );
     expect(rooms.confirmRoomDates).not.toHaveBeenCalled();
@@ -156,15 +157,15 @@ describe('HotelBookingLifecycleService.confirmBooking (HTL-17)', () => {
       HotelBookingStatus.EXPIRED,
     ]) {
       model.findById.mockReturnValue(resolves(booking({ status })));
-      await expect(service.confirmBooking(ID, NOW)).rejects.toThrow(
+      await expect(service.confirmBooking(ID, undefined, NOW)).rejects.toThrow(
         ConflictException,
       );
     }
     model.findById.mockReturnValue(resolves(null));
-    await expect(service.confirmBooking(ID, NOW)).rejects.toThrow(
+    await expect(service.confirmBooking(ID, undefined, NOW)).rejects.toThrow(
       NotFoundException,
     );
-    await expect(service.confirmBooking('not-an-id', NOW)).rejects.toThrow(
+    await expect(service.confirmBooking('not-an-id', undefined, NOW)).rejects.toThrow(
       NotFoundException,
     );
   });
@@ -181,7 +182,7 @@ describe('HotelBookingLifecycleService.confirmBooking (HTL-17)', () => {
       ),
     );
     rooms.confirmRoomDates.mockRejectedValue(new Error('inventory down'));
-    await expect(service.confirmBooking(ID, NOW)).resolves.toMatchObject({
+    await expect(service.confirmBooking(ID, undefined, NOW)).resolves.toMatchObject({
       bookingReference: 'HTL-ABCD2345',
     });
     expect(notifications.send).toHaveBeenCalledTimes(1);
@@ -194,8 +195,8 @@ describe('HotelBookingLifecycleService.getForPayment', () => {
     model.findById.mockReturnValue(resolves(booking()));
     await expect(service.getForPayment(ID)).resolves.toEqual({
       id: ID,
-      ownerId: USER,
-      amount: 751.5,
+      userId: USER,
+      totalPrice: 751.5,
       currency: 'USD',
       status: HotelBookingStatus.PENDING_PAYMENT,
       holdExpiresAt: new Date('2026-11-18T10:05:00Z'),
