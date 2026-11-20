@@ -1,0 +1,35 @@
+import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
+import { Document, Schema as MongooseSchema, Types } from 'mongoose';
+
+export type RoomAvailabilityDocument = RoomAvailability & Document;
+
+@Schema({ timestamps: true })
+export class RoomAvailability {
+  @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'Room', required: true })
+  roomId: Types.ObjectId;
+
+  @Prop({ required: true })
+  startDate: Date;
+
+  @Prop({ required: true })
+  endDate: Date;
+
+  @Prop({
+    required: true,
+    enum: ['available', 'held', 'booked', 'maintenance'],
+    default: 'booked',
+  })
+  status: string;
+
+  @Prop({ type: String, required: false })
+  bookingReference?: string;
+
+  @Prop({ type: String, required: false })
+  reservationReference?: string;
+
+  @Prop({ type: Date, required: false })
+  holdExpiresAt?: Date;
+}
+
+export const RoomAvailabilitySchema =
+  SchemaFactory.createForClass(RoomAvailability);

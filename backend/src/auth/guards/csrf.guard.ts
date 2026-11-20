@@ -13,7 +13,7 @@ export class CsrfGuard implements CanActivate {
 
   constructor(configService: ConfigService) {
     const frontendUrl =
-      configService.get<string>('FRONTEND_URL') ?? 'http://localhost:3000';
+      configService.get<string>('FRONTEND_URL') ?? 'http://localhost:3001';
     this.frontendOrigin = new URL(frontendUrl).origin;
   }
 

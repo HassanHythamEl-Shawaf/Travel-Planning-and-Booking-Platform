@@ -1,0 +1,161 @@
+import { Inject, Injectable } from '@nestjs/common';
+import { InjectConnection, InjectModel } from '@nestjs/mongoose';
+import { Connection, Model, Types } from 'mongoose';
+import { Payment } from '../payments/payment.schema';
+
+import { QuoteHotelBookingDto } from './dto/quote-hotel-booking.dto';
+import { holdExpiryFor } from './hotel-booking.constants';
+import {
+  HotelBookingLifecycleService,
+  holdKeyOf,
+} from './hotel-booking-lifecycle.service';
+import { HotelBookingStatus } from './hotel-booking-status';
+import { HOTEL_ROOM_READER } from './hotel-room.reader';
+import type { HotelRoomReader } from './hotel-room.reader';
+import { CancellationTerms, DEFAULT_CANCELLATION_TERMS } from './refund-rules';
+import {
+  HotelBookingQuoteRoom,
+  HotelBookingsService,
+} from './hotel-bookings.service';
+import { RoomInventoryService } from './room-inventory.service';
+import {
+  HotelBooking,
+  HotelBookingDocument,
+} from './schemas/hotel-booking.schema';
+import { parseDateOnly } from './stay-rules';
+
+export interface HotelBookingHold {
+  id: string;
+  status: HotelBookingStatus;
+  /** Pay before this instant or the booking becomes Expired. */
+  holdExpiresAt: Date;
+  hotelId: string;
+  hotelName: string;
+  checkIn: string;
+  checkOut: string;
+  nights: number;
+  rooms: HotelBookingQuoteRoom[];
+  totalPrice: number;
+  currency: string;
+  /** The cancellation terms that apply to this booking. */
+  cancellationPolicy: CancellationTerms;
+}
+
+@Injectable()
+export class HotelBookingHoldService {
+  constructor(
+    private readonly quotes: HotelBookingsService,
+    private readonly lifecycle: HotelBookingLifecycleService,
+    private readonly inventory: RoomInventoryService,
+    @InjectModel(HotelBooking.name)
+    private readonly bookings: Model<HotelBookingDocument>,
+    @InjectModel(Payment.name)
+    private readonly payments: Model<Payment>,
+    @InjectConnection() private readonly connection: Connection,
+    @Inject(HOTEL_ROOM_READER) private readonly reader: HotelRoomReader,
+  ) {}
+
+  /**
+   * HTL-18: hold every selected room together for 10 minutes as one Pending
+   * Payment reservation. The same validation as the HTL-16 quote applies
+   * (dates, guests, occupancy). If any room overlaps a Confirmed reservation,
+   * an unexpired hold or a blocked range, the whole request is rejected with
+   * 409 and nothing is held.
+   */
+  async hold(
+    userId: string,
+    dto: QuoteHotelBookingDto,
+    now: Date = new Date(),
+  ): Promise<HotelBookingHold> {
+    await this.expireUnpaidHolds(now);
+    const quote = await this.quotes.quote(dto, now);
+    const bookingId = new Types.ObjectId();
+    const checkIn = parseDateOnly(quote.checkIn) as Date;
+    const checkOut = parseDateOnly(quote.checkOut) as Date;
+    const holdExpiresAt = holdExpiryFor(now);
+    const roomIds = quote.rooms.map((room) => room.roomId);
+
+    // HTL-21: the refund later follows the terms the guest sees now.
+    const cancellationPolicy: CancellationTerms =
+      (await this.reader.findCancellationTerms(quote.hotelId)) ??
+      DEFAULT_CANCELLATION_TERMS;
+
+    await this.inventory.ensureLocks(roomIds);
+
+    // One transaction: the room dates and the booking are held together or
+    // not at all. The helper retries when a concurrent hold wins a room.
+    await this.connection.transaction(async (session) => {
+      await this.inventory.hold(session, {
+        holdKey: holdKeyOf(String(bookingId)),
+        roomIds,
+        checkIn,
+        checkOut,
+        now,
+        holdExpiresAt,
+      });
+      await this.bookings.create(
+        [
+          {
+            _id: bookingId,
+            userId: new Types.ObjectId(userId),
+            hotelId: new Types.ObjectId(quote.hotelId),
+            hotelName: quote.hotelName,
+            checkInDate: checkIn,
+            checkOutDate: checkOut,
+            nights: quote.nights,
+            rooms: quote.rooms.map((room) => ({
+              roomId: new Types.ObjectId(room.roomId),
+              roomName: room.roomName,
+              pricePerNight: room.pricePerNight,
+              adults: room.adults,
+              childrenAges: room.childrenAges,
+              subtotal: room.subtotal,
+            })),
+            totalPrice: quote.totalPrice,
+            currency: quote.currency,
+            cancellationPolicy,
+            status: HotelBookingStatus.PENDING_PAYMENT,
+            holdExpiresAt,
+          },
+        ],
+        { session },
+      );
+    });
+
+    return {
+      id: String(bookingId),
+      status: HotelBookingStatus.PENDING_PAYMENT,
+      holdExpiresAt,
+      hotelId: quote.hotelId,
+      hotelName: quote.hotelName,
+      checkIn: quote.checkIn,
+      checkOut: quote.checkOut,
+      nights: quote.nights,
+      rooms: quote.rooms,
+      totalPrice: quote.totalPrice,
+      currency: quote.currency,
+      cancellationPolicy,
+    };
+  }
+
+  private async expireUnpaidHolds(now: Date): Promise<void> {
+    const expired = await this.bookings
+      .find({
+        status: HotelBookingStatus.PENDING_PAYMENT,
+        holdExpiresAt: { $lte: now },
+      })
+      .select('_id')
+      .limit(100)
+      .lean()
+      .exec();
+    for (const booking of expired) {
+      const paymentExists = await this.payments.exists({
+        bookingType: 'hotel',
+        bookingId: String(booking._id),
+      });
+      if (!paymentExists) {
+        await this.lifecycle.releaseHold(String(booking._id), now);
+      }
+    }
+  }
+}

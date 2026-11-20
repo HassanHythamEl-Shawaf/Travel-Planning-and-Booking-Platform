@@ -5,10 +5,26 @@ import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { UsersModule } from './users/users.module';
 import { AuthModule } from './auth/auth.module';
+import { ReferenceDataModule } from './reference-data/reference-data.module';
+import { AuditLogsModule } from './audit-logs/audit-logs.module';
+import { NotificationsModule } from './notifications/notifications.module';
+import { AdminModule } from './admin/admin.module';
+import { ModerationModule } from './moderation/moderation.module';
+import { ReportsModule } from './reports/reports.module';
+import { BlogModule } from './blog/blog.module';
+import { AirlinesModule } from './airlines/airlines.module';
+import { FlightBookingsModule } from './flight-bookings/flight-bookings.module';
+import { HotelsModule } from './hotels/hotels.module';
+import { HotelBookingsModule } from './hotel-bookings/hotel-bookings.module';
+import { PaymentsModule } from './payments/payments.module';
+import { UploadsModule } from './uploads/uploads.module';
+import { ItinerariesModule } from './itineraries/itineraries.module';
+import { ScheduleModule } from '@nestjs/schedule';
 
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
+    ScheduleModule.forRoot(),
     MongooseModule.forRootAsync({
       inject: [ConfigService],
       useFactory: (config: ConfigService) => ({
@@ -17,6 +33,20 @@ import { AuthModule } from './auth/auth.module';
     }),
     UsersModule,
     AuthModule,
+    ReferenceDataModule,
+    AuditLogsModule,
+    NotificationsModule,
+    AdminModule,
+    ModerationModule,
+    ReportsModule,
+    BlogModule,
+    AirlinesModule,
+    FlightBookingsModule,
+    HotelsModule,
+    HotelBookingsModule,
+    PaymentsModule,
+    UploadsModule,
+    ItinerariesModule,
   ],
   controllers: [AppController],
   providers: [AppService],

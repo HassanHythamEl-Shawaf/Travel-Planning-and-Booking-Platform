@@ -2,6 +2,31 @@
 AI PROMPT LOG
 Add one entry per prompt that materially contributed to the project.
 
+Date: 2026-11-10
+Student: Yahia Mohamed
+Tool: GitHub Copilot (VS Code)
+Related Requirement: FLT-01, FLT-02, FLT-03, FLT-04, FLT-05, FLT-06, FLT-08, FLT-09, FLT-11, FLT-12, FLT-15, FLT-17, FLT-22, FLT-29, FLT-30
+Prompt:
+Create a final compatibility branch without changing teammate-owned work.
+Fix the requirements-compatible endpoint paths, add the missing Phase 0
+report, preserve explicit Person 4/7/8 integration contracts, and open a PR.
+How the output was used:
+Added a root-level compatibility controller that delegates to the existing
+airline service, added the required passenger-export path, documented the
+remaining TODO integrations, and saved the Phase 0 findings and validation.
+================================================
+
+Date: 2026-11-10
+Student: Yahia Mohamed
+Tool: GitHub Copilot (VS Code)
+Related Requirement: FLT-29
+Prompt:
+Implement FLT-29 only: assigned airline moderator booking listing and CSV
+passenger export, using a TODO contract for Person 4's booking integration.
+Include ownership checks, cabin remaining-seat calculations, tests and docs.
+How the output was used:
+Added the FLIGHT_BOOKING_READER contract, moderator-only booking endpoints,
+CSV escaping, ownership enforcement, focused tests and README documentation.
 ================================================
 Date: 2026-11-01
 Student: Hassan
@@ -12,7 +37,31 @@ Asked for a split of the Milestone 1 backend work between 8 people, with work or
 How the output was used:
 Used it as the team work split and work order documents.
 ================================================
-
+Date: 2026-11-10
+Student: Yahia Mohamed
+Tool: GitHub Copilot (VS Code)
+Related Requirement: FLT-06
+Prompt:
+Implement FLT-06 only: explicit-confirmation cancellation for Scheduled
+flights, booking cancellation and inventory-hold release contracts, shared
+passenger notifications, tests and documentation.
+How the output was used:
+Added the confirmation DTO and endpoint, atomic Scheduled-to-Cancelled
+transition, TODO booking-canceller contract, inventory hold release method,
+shared cancellation notification path, tests and README documentation.
+================================================
+Date: 2026-11-10
+Student: Yahia Mohamed
+Tool: GitHub Copilot (VS Code)
+Related Requirement: FLT-05
+Prompt:
+Implement FLT-05 only: assigned-moderator updates for Scheduled flight times
+and cabin seat counts/prices, booked-plus-held seat-floor validation, shared
+schedule notifications, tests and documentation.
+How the output was used:
+Added the schedule update DTO and endpoint, Scheduled-state enforcement,
+booked/held seat-floor validation, and a TODO passenger-reader contract that
+uses the existing notification service when bound by Person 4.
 ================================================
 Date: 2026-11-01
 Student: Hassan
@@ -23,4 +72,908 @@ Asked for step-by-step guidance to set up the GitHub repo, branches and the Nest
 How the output was used:
 Followed the commands to create the repo structure and the main and develop branches.
 ================================================
+
+================================================
+Date: 2026-11-02
+Student: Hassan
+Tool: Copilot
+Related Requirement: GEN-13, ACC-05, ACC-06, ACC-08, ACC-09, ACC-11, ACC-12, ACC-19
+Prompt:
+Asked to audit Person 1's assigned milestone work against the project work split, finish safely implementable gaps, and verify backend behavior.
+How the output was used:
+Hardened revocation and temporary-password enforcement, configured cookie CSRF protection, added shared pagination and exception handling, and defined fail-closed integration contracts for moderator provider ownership and booking-restricted account deactivation.
+================================================
+
+================================================
+Date: 2026-11-03
+Student: Hassan
+Tool: Copilot
+Related Requirement: ACC-01, ACC-04, ACC-08, ACC-09, ACC-11, ACC-12, ACC-19
+Prompt:
+Asked to review the updated project description and Person 1 work split, and implement any missing Person 1 changes.
+How the output was used:
+Changed the password-change API to PATCH as specified in the updated endpoint list, added requirement-linked Swagger request/response documentation, and verified the update introduced no ACC-03 registration tag.
+================================================
 '@ | Set-Content -Path AI_PROMPTS.txt -Encoding ascii
+
+================================================
+Date: 2026-11-04
+Student: Wael (Person 2)
+Tool: Claude (claude.ai) and Claude Code
+Related Requirement: GEN-12, ACC-18
+
+Prompt:
+Plan and implement the reference-data seed (countries, cities, airports,
+attractions, derived currencies) and the seeded admin account, following
+the agreed spec (string CSV ids as _id, camelCase fields, upsert-only,
+validate everything before writing, separate `npm run seed` command,
+public read-only reference endpoints, Jest tests).
+
+How the output was used:
+Claude produced the spec after a Q&A on design decisions; Claude Code
+implemented it. I reviewed the code, ran the tests and the seed twice
+against the shared Atlas database, and checked the endpoints in Swagger.
+================================================
+
+================================================
+Date: 2026-11-05
+Student: Wael (Person 2)
+Tool: Claude Code
+Related Requirement: ACC-13, ACC-15
+
+Prompt:
+Implement the moderator assignment from the agreed admin spec
+(docs/requirements/ACC-13-admin-spec.md): a standalone
+ModeratorAssignmentsModule with a unique-per-moderator assignment schema,
+a reader implementing Hassan's ProviderAssignmentReader (returns null for a
+missing or deactivated provider), and ProviderDirectory / BookingDirectory
+adapters that read teammates' collections by the names in one contracts
+file. Add unit tests for the reader and for Hassan's guard wired to it.
+
+How the output was used:
+Claude Code wrote the module, adapters and tests. I reviewed the code,
+checked that the only change to Hassan's files is the module import in
+auth.module.ts, and ran the tests, lint and build.
+================================================
+
+================================================
+Date: 2026-11-05
+Student: Wael (Person 2)
+Tool: Claude Code
+Related Requirement: GEN-07, GEN-01
+
+Prompt:
+Implement the audit log and in-app notifications from the admin spec:
+an append-only AuditLog (record() throws so an admin action cannot lose its
+entry; GET /api/admin/audit-logs with action/actor/target/date filters) and
+a shared NotificationsService (send/sendMany never throw, per-type message
+templates) with owner-only list, unread-count, mark-read and read-all
+endpoints. Add unit tests.
+
+How the output was used:
+Claude Code wrote the modules, endpoints and tests. A boot check against an
+in-memory MongoDB showed that modules using AuthGuard must import UsersModule
+and JwtModule themselves; this was fixed. I reviewed the code and ran the
+tests, lint and build.
+================================================
+
+================================================
+Date: 2026-11-05
+Student: Wael (Person 2)
+Tool: Claude Code
+Related Requirement: ACC-13, ACC-14, ACC-15, ACC-16, ACC-17, ACC-07a, GEN-07, GEN-01
+
+Prompt:
+Implement the admin endpoints from the admin spec: create moderator (user,
+assignment and audit entry in one transaction), list/search accounts,
+suspend/reactivate with conditional updates, admin password reset, provider
+deactivate/reactivate with deduplicated notifications, a read-only combined
+bookings list, and GET /api/moderator/assignment. Add unit tests and an e2e
+test on an in-memory MongoDB replica set covering the moderator lifecycle and
+two parallel suspends.
+
+How the output was used:
+Claude Code wrote the admin module, tests and README section. I reviewed the
+code, ran the unit and e2e tests (in-memory MongoDB, not Atlas), lint and
+build, and checked the endpoints in Swagger.
+================================================
+
+================================================
+Date: 2026-11-05
+Student: Wael (Person 2)
+Tool: Claude Code
+Related Requirement: GEN-12, ACC-13, ACC-14, ACC-15, ACC-16, ACC-17, ACC-07a, GEN-07, GEN-01
+
+Prompt:
+Run the admin smoke test against a personal Atlas cluster. Check the
+environment variables are present (without printing them), apply the ACC-05
+fix temporarily, check connectivity and transactions, run the seed twice to
+confirm it is idempotent, build and start the backend, run the 64-check admin
+smoke script, confirm the test data was cleaned up, then stop the server and
+undo the temporary change.
+
+How the output was used:
+Confirmed the admin and moderator endpoints (moderator creation, account
+search, suspend/reactivate, provider deactivate/reactivate, admin password
+reset, booking inspection, audit logs and in-app notifications) work end to
+end on a real Atlas replica set: 64/64 checks passed. Confirmed the seed is
+idempotent (8 countries, 7 currencies, 8 cities, 8 airports, 8 attractions,
+one admin) and that the smoke fixtures leave no leftover data. No source
+code was changed.
+================================================
+
+================================================
+Date: 2026-11-05
+Student: Wael (Person 2)
+Tool: Claude Code
+Related Requirement: GEN-09
+
+Prompt:
+Implement the user side of content reports from the reports spec: add the
+content collection names to teammate-contracts, a ModerationRegistry with
+raw-collection default handlers for posts, comments, reviews and itineraries
+(find, conditional hide/unhide, delete for posts and comments only), a Report
+schema with a partial unique index on open reports, POST /api/reports (only
+visible content, 403 on own content, 409 on a duplicate open report, snapshot
+of the content) and GET /api/reports/mine. Add unit tests.
+
+How the output was used:
+Claude Code wrote the moderation registry, the reports module and the unit
+tests. I reviewed the code, ran the unit tests, lint and build, and booted the
+app against an in-memory MongoDB through the admin e2e suite to check the new
+modules resolve.
+================================================
+
+================================================
+Date: 2026-11-05
+Student: Wael (Person 2)
+Tool: Claude Code
+Related Requirement: GEN-10, GEN-09, GEN-07, GEN-01
+
+Prompt:
+Implement admin moderation from the reports spec: GET /api/admin/reports
+(open by default, filters, reporter and author names from one lookup, open
+report count per content), PATCH /api/admin/reports/:id to dismiss or hide,
+PATCH /api/admin/content/:type/:id/hide and /unhide, and
+DELETE /api/admin/content/:type/:id (501 for reviews and itineraries until
+their owners register a handler). Each action resolves all open reports on
+the content and writes its audit entry in one transaction; notifications go
+out after the commit. Add REPORT_RESOLVED and CONTENT_UNHIDDEN notifications,
+unit tests and an e2e test on an in-memory MongoDB replica set, including two
+parallel resolutions and a failed audit write.
+
+How the output was used:
+Claude Code wrote the admin moderation endpoints, notification templates,
+tests and README section. I reviewed the code, ran the unit tests, the
+reports and admin e2e suites (in-memory MongoDB, not Atlas), lint and build.
+================================================
+
+Date: 2026-11-14
+Student: Moaz Abozaid
+Tool: GitHub Copilot (VS Code)
+Related Requirement: PAY-01, PAY-02, PAY-03, PAY-04, GEN-11, GEN-01
+Prompt:
+Implement the required payment, refund and expiry lifecycle for both booking
+modules: policies must be fetchable and accepted with a timestamp, Stripe test
+mode must create and retry PaymentIntents until the hold expires, a verified
+webhook confirms only after the PaymentIntent succeeds, failed payment leaves
+the booking in Pending Payment, and expired holds cancel the PaymentIntent and
+release inventory. Add the refund schema and Stripe Refunds flow with status
+Pending, Refunded or Failed, refund preview and provider-based calculation
+including 100% for provider-initiated cancellations. Use a single platform
+currency, no raw card data persistence, and one shared ExpiryService cron
+that releases holds and marks confirmed bookings as Completed once departure
+or check-out has passed. Include notification calls for payment success,
+payment failure and refunds.
+How the output was used:
+Mapped the design to the existing NestJS booking schema and lifecycle service,
+confirmed the payment contract and the held booking fields in the codebase,
+and prepared a requirements-aligned plan for the Stripe adapter, verified
+webhook flow, refund lifecycle and shared expiry service without changing
+source files yet.
+================================================
+
+================================================
+Date: 2026-11-05
+Student: Wael (Person 2)
+Tool: Claude Code
+Related Requirement: GEN-01
+
+Prompt:
+Grill me on the notifications module before teammates start using it, then
+apply the recommended answers: one sender per event (contract table), no
+separate payment-success type, refunds notified only on success or failure,
+booking messages that name the booking type and provider before a reference
+exists, an allow-list for payload keys so secrets never reach the client,
+and a README demo for Swagger. Write the spec first, then the code and tests.
+
+How the output was used:
+Claude Code wrote docs/requirements/GEN-01-notifications-spec.md, the payload
+allow-list, the new template wording, unit tests and the README section. I
+reviewed the decisions and the code, ran lint, build, the unit tests and the
+admin and reports e2e suites (in-memory MongoDB, not Atlas).
+================================================
+
+================================================
+Date: 2026-11-05
+Student: Wael (Person 2)
+Tool: Claude Code
+Related Requirement: BLG-01, BLG-02, BLG-03, BLG-04, BLG-08, BLG-09
+
+Prompt:
+Implement blog posts from the blog spec: a Post schema with the field names
+fixed in teammate-contracts.ts, draft/published in both directions with
+publishedAt set on the first publish only, one visibility helper (drafts for
+the author only, hidden for author and admins, deactivated authors for admins
+only, suspended authors visible), an OptionalAuthGuard for public GETs that
+mirrors AuthGuard's checks without throwing, posts CRUD, GET /posts/mine,
+normalised tags (max 5), search by escaped keyword ordered by likes +
+comments then newest, and tag listing. A hard delete of a post closes open
+reports on it as content_deleted in the same transaction. Read the
+requirements sheet first and follow it where it differs.
+
+How the output was used:
+Claude Code read the BLG rows from the sheet (search covers title, tags and
+author name; comments max 500), wrote the spec, schema, guard, services,
+controllers, unit tests and a blog e2e test on an in-memory MongoDB replica
+set. I reviewed the code and ran the unit tests, the blog, reports and admin
+e2e suites (not Atlas), lint and build.
+================================================
+
+================================================
+Date: 2026-11-05
+Student: Wael (Person 2)
+Tool: Claude Code
+Related Requirement: BLG-05, BLG-06, BLG-07
+
+Prompt:
+Add comments and likes to the blog: Comment and Like schemas (unique
+{postId, userId}), flat comments of 1–500 characters on published visible
+posts only, listed oldest first with hidden comments only for their author
+and admins and "Deleted user" for deactivated authors, edit/delete by the
+comment author only (post authors cannot delete others' comments), and
+idempotent like/unlike returning { liked, likeCount }. Keep likeCount and
+commentCount on the post, changed in the same transaction as the write,
+never below 0, and treat a duplicate-key race as "already liked". Prove it
+with an e2e test of 20 parallel likes from one user and parallel likes from
+5 users.
+
+How the output was used:
+Claude Code wrote the schemas, services, controllers, unit tests and the
+comment/like part of the blog e2e test. I reviewed the transaction logic,
+ran the unit tests, the blog e2e suite three times (the race tests stayed
+green), the reports and admin e2e suites (in-memory MongoDB, not Atlas),
+lint and build.
+================================================
+
+================================================
+Date: 2026-11-05
+Student: Wael (Person 2)
+Tool: Claude Code
+Related Requirement: BLG-10, BLG-12, GEN-08, GEN-09, GEN-10
+
+Prompt:
+Finish the blog: post images through the shared upload module behind a
+BLOG_IMAGE_STORE token (501 until it is bound, max 5 per post, first image is
+the cover), the public author page (name, join date, published posts, up to
+10 public non-hidden itineraries read through teammate-contracts.ts; 404 for
+deactivated, admin and moderator accounts), and real post/comment moderation
+handlers that replace the GEN-09 defaults: hiding a comment updates the
+post's commentCount and deleting a post cascades to comments and likes. Add
+an afterDelete hook to ModerationHandler that ModerationService calls after
+the commit, so the post handler can delete image files. Extend the blog e2e
+to the full scenario and write the README section.
+
+How the output was used:
+Claude Code wrote the image service, author page, itinerary reader,
+moderation handlers, the afterDelete hook with its GEN-09 unit tests, the
+README section and the rest of the blog e2e. I reviewed the code and ran the
+unit tests, the blog, reports and admin e2e suites (in-memory MongoDB, not
+Atlas), lint and build.
+================================================
+
+================================================
+Date: 2026-11-10
+Student: Yahia Mohamed
+Tool: GitHub Copilot (VS Code)
+Related Requirement: FLT-02
+Prompt:
+Implement the FLT-02 seeded-airports endpoint using the existing reference
+data without editing Person 2's files, and add tests, documentation and the
+required separate commit.
+How the output was used:
+Added a read-only airport response DTO and `/api/airlines/airports` route that
+maps Person 2's seeded airport records to the FLT-02 contract. The existing
+ReferenceDataModule is imported unchanged; tests cover the mapping and the
+README documents the endpoint.
+================================================
+
+================================================
+Date: 2026-11-10
+Student: Yahia Mohamed
+Tool: GitHub Copilot (VS Code)
+Related Requirement: FLT-01
+Prompt:
+Implement only the FLT-01 airline profile branch from the latest develop:
+admin-only airline creation, assigned-moderator-only profile editing with the
+existing ProviderOwnershipGuard, a Person 8 logo-upload interface stub, tests,
+documentation and separate conventional commits.
+How the output was used:
+Used the existing NestJS, Mongoose, Swagger, AuthGuard, RolesGuard and
+ProviderOwnershipGuard conventions to add the airline schema, DTOs, service,
+controller and module. Kept logo handling behind an AIRLINE_LOGO_STORE TODO
+stub, rejected direct logo URLs until Person 8's upload module is merged,
+added focused service tests, updated the backend README, and verified the
+targeted tests, lint and build.
+================================================
+
+================================================
+Date: 2026-11-10
+Student: Yahia Mohamed
+Tool: GitHub Copilot (VS Code)
+Related Requirement: FLT-03
+Prompt:
+Implement FLT-03 flight creation with seeded-airport validation, airport-local
+date-time conversion using IANA zones, UTC persistence, duplicate-flight
+protection, tests and documentation without editing teammate files.
+How the output was used:
+Added the flight schema and DTOs, Luxon-based local-to-UTC conversion, assigned
+moderator ownership validation, seeded-airport checks and the compound
+duplicate-flight index. Added timezone tests and documented the endpoint.
+================================================
+
+================================================
+Date: 2026-11-10
+Student: Yahia Mohamed
+Tool: GitHub Copilot (VS Code)
+Related Requirement: FLT-04
+Prompt:
+Implement only the FLT-04 flight cabin categories and capacity endpoints,
+keeping booking and inventory constraints for later branches, with tests and
+documentation.
+How the output was used:
+Added embedded fixed-category cabin documents with seat, price and baggage
+validation, assigned-moderator cabin create/update endpoints, focused tests and
+README documentation. Booking-dependent seat floors remain deferred.
+================================================
+
+================================================
+Date: 2026-11-10
+Student: Yahia Mohamed
+Tool: GitHub Copilot (VS Code)
+Related Requirement: FLT-08
+Prompt:
+Implement only the FLT-08 airline extra-baggage policy endpoint with positive
+pricing, non-negative per-passenger limits, ownership protection, tests and
+documentation.
+How the output was used:
+Added the embedded airline baggage policy, validated DTOs, assigned-moderator
+PUT endpoint, focused service coverage and README documentation. Cabin-specific
+maximum bag weight remains represented by the cabin policy for later booking use.
+================================================
+
+================================================
+Date: 2026-11-10
+Student: Yahia Mohamed
+Tool: GitHub Copilot (VS Code)
+Related Requirement: FLT-09
+Prompt:
+Implement only the FLT-09 airline cancellation policy endpoint with unique
+days-before-departure tiers, refund percentages from 0 to 100, ownership
+protection, a reusable refund-tier helper, tests and documentation.
+How the output was used:
+Added validated cancellation tiers, assigned-moderator PUT endpoint, pure refund
+tier selection helper, focused service and helper tests, and README documentation.
+================================================
+Date: 2026-11-10
+Student: Yahia Mohamed
+Tool: GitHub Copilot (VS Code)
+Related Requirement: FLT-30
+Prompt:
+Implement only FLT-30 flight status derivation from persisted cancellation
+state and departure time, expose a scheduler-facing service method and status
+endpoint without adding a cron job, with tests and documentation.
+How the output was used:
+Added the status response DTO, public status endpoint, deterministic service
+derivation for Scheduled, Departed and Cancelled, focused tests and README
+documentation.
+================================================
+Date: 2026-11-10
+Student: Yahia Mohamed
+Tool: GitHub Copilot (VS Code)
+Related Requirement: FLT-22
+Prompt:
+Implement FLT-22 only as the flight inventory interface for Person 4:
+checkAvailability, concurrency-safe createHold, confirmInventory and
+releaseHold, with infants consuming no seats, tests for parallel holds and
+documentation. Do not build the booking module.
+How the output was used:
+Added atomic conditional seat-held updates, hold persistence and lifecycle
+methods behind the exported FLIGHT_INVENTORY contract, plus capacity and
+availability tests and README documentation. Booking endpoints and infant
+classification remain with Person 4.
+================================================
+================================================
+Date: 2026-11-10
+Student: Yahia Mohamed
+Tool: GitHub Copilot (VS Code)
+Related Requirement: FLT-11
+Prompt:
+Implement the FLT-11 public flight search requirement only, using seeded
+airports, active airlines, Scheduled flights, local departure date,
+passenger-capacity filtering, friendly empty results, tests and docs.
+How the output was used:
+Added validated search DTOs, an active-airline scheduled-flight query with
+cabin availability mapping, a public Swagger endpoint, focused tests and README
+documentation. Round-trip, passenger-type, price, sorting and pagination
+features remain for their later requirements.
+================================================
+Date: 2026-11-10
+Student: Yahia Mohamed
+Tool: GitHub Copilot (VS Code)
+Related Requirement: FLT-12
+Prompt:
+Extend the existing flight search only for FLT-12: round-trip outbound and
+return options, adult/child/infant validation and pricing, optional cabin
+filter, tests and documentation.
+How the output was used:
+Added round-trip criteria, passenger-type validation, infant pricing at 10%,
+seat requirements for adults and children, cabin filtering, return options,
+focused tests and README documentation.
+================================================
+Date: 2026-11-10
+Student: Yahia Mohamed
+Tool: GitHub Copilot (VS Code)
+Related Requirement: FLT-15
+Prompt:
+Extend the existing search only for FLT-15 with inclusive minimum and maximum
+price filters, price/duration/departure sorting, shared page-size-10
+pagination, inverted-range validation, tests and documentation.
+How the output was used:
+Added validated price, sort and page criteria, cabin-price filtering,
+deterministic sorting, shared pagination metadata and focused validation tests
+with README documentation.
+================================================
+Date: 2026-11-10
+Student: Yahia Mohamed
+Tool: GitHub Copilot (VS Code)
+Related Requirement: FLT-17
+Prompt:
+Implement FLT-17 only as a public flight-details endpoint with airline data,
+airport-local times, duration, current status, cabin prices and availability,
+baggage allowances, cancellation policy, tests and documentation.
+How the output was used:
+Added a details DTO, service mapping and Swagger endpoint with timezone-aware
+local times, duration, cabin information and cancellation tiers. Added a
+clearly marked FLT-22 inventory boundary for remaining seats, tests and docs.
+================================================
+Date: 2026-11-10
+Student: Yassin Arafa
+Tool: Claude Code (Claude Opus 5.5)
+Related Requirement: FLT-22
+Prompt:
+My flight booking hold tests fail against an in-memory MongoDB with
+"$expr can only be applied to the top-level document" from
+FlightInventoryService.createHold(). Find the cause, fix the inventory
+queries without changing the interface, and add tests that run against a
+real MongoDB instead of mocks.
+How the output was used:
+Moved the seat-availability check in createHold() to a top-level $expr over
+the cabins array, and used $elemMatch in confirmInventory() and
+releaseSeats() so the positional update always targets the held cabin (it
+could previously update a different cabin). Added in-memory MongoDB tests
+for parallel holds, confirm, release and multi-cabin flights.
+================================================
+Date: 2026-11-10
+Student: Yassin Arafa
+Tool: Claude Code (Claude Opus 5.5)
+Related Requirement: FLT-22
+Prompt:
+My flight booking hold tests fail against an in-memory MongoDB with
+"$expr can only be applied to the top-level document" from
+FlightInventoryService.createHold(). Find the cause, fix the inventory
+queries without changing the interface, and add tests that run against a
+real MongoDB instead of mocks.
+How the output was used:
+Moved the seat-availability check in createHold() to a top-level $expr over
+the cabins array, and used $elemMatch in confirmInventory() and
+releaseSeats() so the positional update always targets the held cabin (it
+could previously update a different cabin). Added in-memory MongoDB tests
+for parallel holds, confirm, release and multi-cabin flights.
+================================================
+Date: 2026-11-10
+Student: Yassin Arafa
+Tool: Claude Code (Claude Opus 5.5)
+Related Requirement: FLT-22, FLT-19, FLT-21, FLT-12
+Prompt:
+Implement POST /api/flight-bookings (booking summary, nothing saved) and
+POST /api/flight-bookings/hold (atomic seat hold through Person 3's
+inventory interface, Pending Payment booking for 10 minutes). Validate
+passenger type against date of birth, adult/infant rules, extra-bag limits
+and weights, deactivated airlines, non-Scheduled or departed flights and
+round-trip route pairing. A round trip holds both flights or neither.
+Test with parallel requests.
+How the output was used:
+Added request/response DTOs with Swagger docs, a service that validates and
+prices the booking (infant 10% fare, per-segment extra-bag fees, local
+times) and holds seats per segment with compensation on failure, and a
+controller restricted to registered users. Added in-memory MongoDB tests
+including 20 parallel holds on a 5-seat cabin.
+================================================
+Date: 2026-11-10
+Student: Yassin Arafa
+Tool: Claude Code (Claude Opus 5.5)
+Related Requirement: FLT-23, FLT-22, GEN-11, PAY-01
+Prompt:
+Expose confirmBooking(id) and releaseHold(id) for Person 7's payments and
+shared ExpiryService. Confirmation runs only after the webhook verifies
+payment: convert held seats to booked through the inventory interface,
+issue a unique booking reference, set Confirmed and send BOOKING_CONFIRMED.
+Release expires the booking, frees the seats and sends BOOKING_EXPIRED.
+Make both safe against repeated webhooks and against racing each other,
+and add helpers for the cron (release expired holds, mark departed
+bookings Completed).
+How the output was used:
+Added a FlightBookingPayments contract and token for Person 7, and a
+lifecycle service that claims each transition with one conditional status
+update so confirm and expiry cannot both win, retries on reference
+collisions, rolls back if inventory confirmation fails, and gives the
+inventory hold a 2-minute grace beyond the booking hold. Added in-memory
+MongoDB tests for idempotency, concurrency, expiry and completion.
+================================================
+Date: 2026-11-10
+Student: Yassin Arafa
+Tool: Claude Code (Claude Opus 5.5)
+Related Requirement: FLT-25, ACC-11, GEN-05
+Prompt:
+Implement GET /api/flight-bookings (my bookings grouped as Upcoming, Past
+and Cancelled, 10 per page, showing reference, flight, date, passengers,
+cabin and status) and GET /api/flight-bookings/:id (full details, owner
+only). Every status must fall into exactly one group even before the
+expiry job runs. Add tests.
+How the output was used:
+Added group filters that cover every status once (pending holds by expiry
+time, confirmed bookings by outbound departure), a paginated list with
+per-group counts for tabs, owner-only details that report other users'
+bookings as not found, Swagger docs, and in-memory MongoDB tests for
+grouping, ordering, pagination and ownership.
+================================================
+Date: 2026-11-10
+Student: Yassin Arafa
+Tool: Claude Code (Claude Opus 5.5)
+Related Requirement: FLT-26, PAY-03, FLT-09, FLT-12
+Prompt:
+Implement cancellation of a user's own Confirmed flight booking before
+departure: a refund preview from the airline's cancellation tiers on the
+full total using the outbound departure, then POST /:id/cancel with
+explicit confirmation. Return the seats to inventory and request the
+refund from Person 7 through an interface, since payments is not built
+yet. Make it safe against double cancellation and refund failures.
+How the output was used:
+Added releaseConfirmedSeats() to the flight inventory interface, a
+FLIGHT_REFUNDS contract with a default tier-based calculator that logs
+instead of moving money until Person 7 binds Stripe refunds, refund fields
+on the booking, a cancellation service that claims the cancel with one
+conditional update and refuses if the refund changed since the preview,
+two Swagger endpoints, and in-memory MongoDB tests.
+================================================
+Date: 2026-11-10
+Student: Yassin Arafa
+Tool: Claude Code (Claude Opus 5.5)
+Related Requirement: FLT-06, FLT-05, FLT-29, ACC-12, GEN-01
+Prompt:
+Bind the booking adapters other teammates left as TODO(Person 4): the
+flight canceller for FLT-06 (100% refund, return the affected users and
+send nothing), the passenger reader for schedule-change notifications,
+the per-flight booking reader for the moderator list and CSV (FLT-29),
+and the upcoming-booking check that blocks account deactivation (ACC-12).
+Avoid circular imports and prove the whole app works over HTTP.
+How the output was used:
+Found that flight cancellation notified nobody (bookings were cancelled
+before looking up who to notify) and changed the canceller to return the
+affected user ids for Person 3 to notify. Added cancel-all-for-flight
+(pending holds expired first to close a race with late payments),
+read-only booking readers, a contract-based eligibility reader covering
+flights and hotels, forwardRef module wiring, adapter tests and an HTTP
+end-to-end test from booking to airline cancellation.
+================================================
+Date: 2026-11-10
+Student: Yassin Arafa
+Tool: Claude Code (Claude Opus 5.5)
+Related Requirement: FLT-23, GEN-06
+Prompt:
+Add GET /api/flight-bookings/:id/e-ticket returning a downloadable PDF,
+only for the owner and only once the booking is Confirmed. Show the
+booking reference, each flight in its airports' local times, cabin and
+baggage allowance, passengers with masked ID numbers, and the amount paid.
+How the output was used:
+Added pdfkit, a pure renderer that builds a one-page A4 e-ticket, a
+service method that checks ownership and status and looks up airline
+names, a Swagger-documented endpoint that streams the file as an
+attachment, unit tests for the PDF and helpers, and e2e checks that the
+download works after payment and is refused for unpaid or cancelled
+bookings. Rendered a sample and adjusted the column layout after review.
+================================================
+Date: 2026-11-10
+Student: Yassin Arafa
+Tool: Claude Code (Claude Opus 5.5)
+Related Requirement: FLT-22, FLT-19 to FLT-26
+Prompt:
+Final checks for my flight booking work: prove over HTTP that parallel
+hold requests never oversell a flight, check every endpoint in the
+running app's Swagger UI, and document the module, the payment contracts
+and the adapters in the README.
+How the output was used:
+Added an e2e test where four users send 20 parallel holds for a 5-seat
+cabin (exactly 5 succeed, 15 get 409, all 5 confirm), ran it repeatedly to
+confirm it is stable, checked the Swagger UI of the built app against an
+in-memory database, and added a Flight bookings section to the README
+while updating notes that said the booking adapters were still missing.
+================================================
+Date: 2026-11-18
+Student: Seif Moustapha
+Tool: Claude Code (Claude Sonnet 5.5)
+Related Requirement: HTL-16
+Prompt:
+Implement HTL-16, keep in mind that the system should allow a registered user to book on or more available rooms
+in the same hotel for the same dates in one reservation,assign adults and children(0-17) one room each.No rooms
+guests should exceed its maximum occupancy
+How the output was used:
+Added hotel-bookings folder with its own functionalities,and updated app.module.ts to account for the addition
+Date: 2026-11-18
+Student: Seif Moustapha
+Tool: Claude Code (Claude Sonnet 5.5)
+Related Requirement: HTL-17
+Prompt:
+Implement HTL-17, take into consideration that a system shall set the reservation to confirmed after a successful payment,
+generate a unique booking reference,as well as send an in app notification with the reservation details
+How the output was used:
+Updated hotel-bookings.module.ts, hotel-room.reader.ts, hotel-bookings.service.spec.ts to account for the
+new functionalities and added booking-reference and lifecycle.service each with their own .spec,as well as
+adding payments.contract
+Date: 2026-11-18
+Student: Seif Moustapha
+Tool: Claude Code (Claude Sonnet 5.5)
+Related Requirement: HTL-18
+Prompt:
+Implement HTL-18, take into account that when a user proceeds to payment, the system shall hold all selected rooms together for 
+10 minutes as one Pending Payment reservation. If any room overlaps a Confirmed reservation, an unexpired 
+hold or a blocked range, the whole request is rejected and nothing is held. If payment does not succeed 
+within the hold, the reservation becomes Expired and the rooms are released. Dates must satisfy check-out
+after check-in and check-in not in the past.
+How the output was used:
+Updated hotel-booking/lifecycle.service and its spec and hotel-booking-payments.contract as well
+as the hotel-bookings controller and module,added in hotel-booking-hold.service and its spec and a room-
+inventory service
+Date: 2026-11-18
+Student: Seif Moustapha
+Tool: Claude Code (Claude Sonnet 5.5)
+Related Requirement: HTL-20
+Prompt:
+Implement HTL-20, take into account that The system shall allow a registered user to view their hotel reservations
+ grouped as Upcoming, Past and Cancelled, showing reference, hotel, rooms, dates, guests, total and status
+ and to open full details.
+How the output was used:
+Updated hotel-bookings.controller.ts  and hotel-bookings.module.ts to register HotelBookingQueryService. Added hotel-booking-group.ts
+booking-view.ts booking-view.spec.ts hotel-booking-query.service.ts 
+hotel-booking-queries.spec.ts dto/list-hotel-bookings.dto.ts .
+Date: 2026-11-19
+Student: Seif Moustapha
+Tool: Claude Code (Claude Sonnet 5.5)
+Related Requirement: HTL-21
+Prompt:
+Implement HTL-20, take into account that the system shall allow a registered user to cancel their own Confirmed reservation as a whole before the check-in date,
+after viewing the refund computed from the hotel's tiers (HTL-10) on the full total. The reservation becomes Cancelled,
+all its rooms are released for those dates and a refund is created (PAY-03). Partial cancellation is not supported.
+How the output was used:
+Updated:booking-view.spec.ts booking-view.ts hotel-booking-hold.service.ts hotel-booking-holds.spec.ts  
+hotel-booking-lifecycle.service.spec.ts hotel-booking-lifecycle.service.ts hotel-booking-payments.contract.ts
+hotel-bookings.controller.ts hotel-bookings.module.ts hotel-bookings.service.spec.ts hotel-bookings.service.ts
+hotel-refunds.contract.ts hotel-room.reader.ts hotel-booking.schema.ts 
+Added hotel refund service for stripe as well as booking cancellation services
+Date: 2026-11-19
+Student: Seif Moustapha
+Tool: Claude Code (Claude Sonnet 5.5)
+Related Requirement: HTL-23
+Prompt:
+Implement HTL-23, take into account that a Confirmed reservation becomes Completed once its check-out date has passed. The system shall allow the user to submit
+one rating (1-5) and an optional review (max 1000 characters) per Completed reservation, regardless of the number of rooms,
+and later edit or delete it. The hotel's average rating is recalculated accordingly.
+How the output was used:
+Updated:hotel-booking-lifecycle.service.ts hotel-booking-payments.contract.ts and hotel-bookings.module.ts
+hotel-bookings.controller.ts hotel-bookings.module.ts hotel-bookings.service.spec.ts hotel-bookings.service.ts
+hotel-refunds.contract.ts hotel-room.reader.ts hotel-booking.schema.ts 
+Added create list and update review dto files as well as a review moderation,service,spec and controller.
+Also added a review schema and review rules
+Date: 2026-11-19
+Student: Seif Moustapha
+Tool: Claude Code (Claude Sonnet 5.5)
+Related Requirement: HTL-23
+Prompt:
+Implement HTL-24, take into account that the system shall allow a guest or registered user to view a hotel's average rating,
+number of ratings and reviews (newest first, paginated).
+How the output was used:
+Updated:hotel-booking-lifecycle.service.ts hotel-bookings.controller.ts  hotel-bookings.service.spec.ts hotel-bookings.service.ts
+hotel-refunds.contract.ts hotel-room.reader.ts hotel-booking.schema.ts list-reviews.dto 
+
+Date: 2026-11-16
+Student: Hammad
+Tool: Claude (claude.ai)
+Related Requirement: GEN-08, ITN-01 to ITN-26
+Prompt:
+Read the team's work split, the official requirements sheet and the repo,
+and write a handoff brief for Claude Code covering my whole Milestone 1
+scope (upload module, itineraries, budgets, FX rates, public itineraries,
+hotel and flight lookups), the integration points teammates left for me,
+and the team's ground rules.
+How the output was used:
+Used as the handoff file for Claude Code. It guided the implementation
+plan, the branch and PR split, and the decisions recorded in the specs.
+
+Date: 2026-11-16
+Student: Hammad
+Tool: Claude Code (Claude Opus 5.5)
+Related Requirement: GEN-08, BLG-10
+Prompt:
+Build the shared image upload module from the handoff brief: JPG/PNG
+checked by magic bytes, 5 MB enforced in multer and in the service,
+per-item limits that hold under parallel uploads, random file names,
+files served by URL, and adapters for blog, airline logo and hotel photos.
+Bind it to Blog, update Blog's 501 test, test and document it.
+How the output was used:
+Added src/uploads (service, schema, serving controller, image interceptor,
+adapters), bound BLOG_IMAGE_STORE, replaced Blog's 501 e2e test with real
+upload/delete and a parallel 5-image-limit test, added unit and e2e tests,
+the GEN-08 spec and a README section. Airline and hotel adapters exist but
+their endpoints wait for Yahia's and Seif's agreement.
+
+Date: 2026-11-16
+Student: Hammad
+Tool: Claude Code (Claude Opus 5.5)
+Related Requirement: GEN-08, FLT-01, HTL-01, BLG-10
+Prompt:
+With Yahia's, Seif's and Wael's agreement, connect the upload module to
+their modules: an airline logo upload endpoint (one logo per airline,
+direct URLs still rejected), hotel photo endpoints limited to the hotel's
+moderator (5 per hotel), and the 5 MB multer cap on Blog's image route.
+Test it over HTTP.
+How the output was used:
+Added PUT/DELETE /api/airlines/:id/logo and bound AIRLINE_LOGO_STORE,
+changed the direct-logoUrl check from 501 to 400 and updated Yahia's
+spec, added POST/DELETE /api/hotels/:id/photos with ProviderOwnershipGuard
+and a conditional push, switched Blog's route to ImageFileInterceptor, and
+added an e2e suite for logos and photos including parallel uploads.
+
+Date: 2026-11-16
+Student: Hammad
+Tool: Claude Code (Claude Opus 5.5)
+Related Requirement: ITN-01, ITN-03, ITN-05, ITN-07, ITN-08, ITN-09, ITN-10, ITN-12, ITN-14, ITN-16, ITN-20, ITN-21, GEN-10
+Prompt:
+Build the itineraries module from the handoff brief: itineraries with
+days whose numbers and dates come from their position and the start date,
+city groups, activities with images, budget and transport entries with
+totals, visibility, owner-only access, admin hiding, public search, clone
+with credit, and the moderation handler. Keep parallel edits safe, test
+it and document the decisions.
+How the output was used:
+Added src/itineraries (schema, pure view functions for numbering, dates,
+groups and totals, access rules, services with a version-checked
+read-modify-write, two controllers with Swagger docs, moderation handler),
+unit tests, an e2e suite with parallel-request tests, the ITN spec and a
+README section. Updated two "itineraries answer 501" texts.
+
+Date: 2026-11-16
+Student: Hammad
+Tool: Claude Code (Claude Opus 5.5)
+Related Requirement: ITN-18, ACC-09, ITN-14
+Prompt:
+Add the FXRatesAPI integration from the handoff brief: check the
+provider's response format first, keep the key server-side, fetch rates
+at most once per day and cache them in the database, fall back to cached
+rates when the API is down (503 with no cache), convert itinerary budget
+amounts to the preferred currency with the rate date, and test it with a
+fake client so tests never call the real API.
+How the output was used:
+Added src/fx-rates (HTTP client wrapper with response checks, daily
+snapshot schema, service with shared in-flight fetch, fallback and
+retry wait, conversion maths), converted amounts in the itinerary view
+and a GET /itineraries/:id/budget endpoint, unit and e2e tests, the
+ITN-18 spec and a README section.
+
+Date: 2026-11-16
+Student: Hammad
+Tool: Claude Code (Claude Opus 5.5)
+Related Requirement: ITN-25, ITN-26, HTL-11, FLT-11, FLT-12
+Prompt:
+Add the itinerary hotel and flight lookups from the handoff brief,
+reusing Seif's hotel search and Yahia's flight search instead of copying
+their logic: hotels for a city group's dates with N rooms covering the
+guests, and flights from an origin to the city of day 1 with dates
+defaulting to the first and last day.
+How the output was used:
+Added ItinerarySearchService and controller (hotels, arrival airports,
+flights), the "N biggest rooms cover the guests" rule on top of the hotel
+search's availability, an e2e suite with real hotels, rooms, a booked
+room and flights, and spec and README notes, including the gaps noted for
+Seif (no room-count parameter, no past check-in check).
+
+Date: 2026-11-16
+Student: Hammad
+Tool: Claude Code (Claude Opus 5.5)
+Related Requirement: ITN-25, ITN-26, ITN-18, ACC-09, HTL-11
+Prompt:
+Cross-check all my work against the team's work-split document and the
+official requirements sheet, and implement or test anything still
+missing before the final pull request.
+How the output was used:
+ITN-26 now searches every airport in the city of day 1 (merged, sorted,
+paginated) as the sheet says "any airport", with `to` as an optional
+filter; ITN-25 rooms default to 1 as in HTL-11; the e2e test sets the
+preferred currency through PATCH /api/users/me (ACC-09); spec and README
+updated.
+
+Date: 2026-11-17
+Student: Hammad
+Tool: Claude Code (Claude Opus 5.5)
+Related Requirement: ITN-28 (optional bonus)
+Prompt:
+Check whether the optional bonus items are part of the official
+requirements; if they are, build them and document them clearly.
+How the output was used:
+Added GET /api/itineraries/:id/pdf, which renders the itinerary view
+(days, activities, budget entries, transport, city groups, converted
+totals with the rate date) as a PDF with pdfkit, with the same visibility
+rules as viewing it; unit and e2e tests; spec decisions D29-D31 and a
+README line. ITN-27 was held because hotel bookings (HTL-17) do not exist
+yet, and BLG-13 needs changes in the Blog module (asked first).
+
+Date: 2026-11-17
+Student: Hammad
+Tool: Claude Code (Claude Opus 5.5)
+Related Requirement: ITN-27 (optional bonus), PAY-04, ITN-18
+Prompt:
+The bonus items are optional items of my part, so build them and
+document them correctly.
+How the output was used:
+Added linking of the owner's own Confirmed or Completed flight bookings
+and hotel reservations to itinerary days (POST/DELETE
+.../days/:dayId/bookings). Bookings are read live through the team's
+booking contract (no teammate files changed); their prices are kept apart
+from the planned costs and never converted (PAY-04); links are private to
+the owner and not cloned; unit and e2e tests; spec decisions D32-D36 and
+README section.
+
+Date: 2026-11-17
+Student: Hammad
+Tool: Claude Code (Claude Opus 5.5)
+Related Requirement: BLG-13 (optional bonus), ITN-20, GEN-10
+Prompt:
+The bonus items are optional items of my part, so build them and
+document them correctly.
+How the output was used:
+Added an optional itineraryId to blog posts (create, update, null to
+detach): only the author's own itinerary can be attached, and readers see
+it only under the itinerary's visibility rules (owner always; public for
+others; hidden only for admins; deleted shows as null). Additive changes
+in Wael's Blog module, read through Blog's PublicItineraryReader; e2e
+tests; spec decisions D37-D39 and a README line.
+================================================
+
+Date: 2026-11-20
+Student: Hassan
+Tool: GitHub Copilot (VS Code)
+Related Requirement: HTL-04, HTL-05, HTL-06, HTL-08, HTL-11, HTL-15, HTL-22, PAY-01, PAY-02, PAY-03, GEN-01, GEN-09, GEN-10, GEN-11, ITN-25, ITN-26
+Prompt:
+Audit the remaining incomplete or disconnected Milestone 1 backend workflows
+against the project requirements; implement the missing hotel APIs, shared
+flight/hotel payments and refunds, scheduled booking lifecycle, and uncapped
+itinerary search pagination; then validate the backend.
+How the output was used:
+Implemented the hotel API and inventory integrations, shared Stripe policy,
+payment and refund workflows, scheduled booking expiry/completion, and
+uncapped itinerary search pagination. Added regression tests and validated
+the backend with the full Jest suite, build, lint and diff checks. The final
+HTTP integration pass also wired payment module dependencies, isolated E2E
+tests from Atlas, updated review-moderation expectations, and documented
+root setup instructions.
+================================================

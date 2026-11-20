@@ -65,6 +65,503 @@ other origins. Authentication cookies are `httpOnly`, use `SameSite=Lax`, and
 are marked `Secure` in production. Keep the frontend and API on the same site
 in production, and set `FRONTEND_URL` to the frontend's origin.
 
+## Shared backend utilities
+
+List endpoints should use `getPagination(page)` from `src/common/pagination.ts`.
+It validates a positive integer page and returns the fixed page size of 10,
+plus the MongoDB `skip` value.
+
+The global HTTP exception filter preserves Nest HTTP errors and logs unexpected
+server errors without returning internal details to clients.
+
+### Provider ownership integration
+
+Provider-specific moderator routes should use `@ProviderOwnership('airline')`
+or `@ProviderOwnership('hotel')` with `ProviderOwnershipGuard` after
+`AuthGuard`. The guard allows admins and checks moderators through the
+`ProviderAssignmentReader` contract in `src/auth/provider-assignment.reader.ts`.
+The assignment module must register a provider using
+`PROVIDER_ASSIGNMENT_READER` and be imported by `AuthModule`; requests are
+denied with a service-unavailable response until that integration is
+registered. A route using this guard without `@ProviderOwnership()` also fails
+closed.
+
+### Account deactivation integration
+
+`DELETE /api/users/me` requires `{ "confirm": true }` and checks
+`BookingEligibilityReader.hasUpcomingConfirmedBookings(userId)` before
+deactivating the account and clearing cookies. `AuthModule` binds the token
+`BOOKING_ELIGIBILITY_READER` to `MongoBookingEligibilityReader`
+(`src/integrations/booking-eligibility.ts`), which checks Confirmed flight
+bookings with a flight still ahead and Confirmed hotel bookings whose check-in
+is ahead, through the collection contract in `teammate-contracts.ts`.
+User content owners must also resolve deactivated-user public references as
+`Deleted user`.
+
+## Seeding the database (GEN-12, ACC-18)
+
+The seed loads the official reference data (countries, cities, airports, attractions)
+from `src/seed/data/*.csv`, derives supported currencies from Countries, and creates
+the seeded admin account.
+
+1. In `backend/.env` set `MONGODB_URI`, `SEED_ADMIN_NAME`, `SEED_ADMIN_EMAIL`, `SEED_ADMIN_PASSWORD`
+   (password: 8+ characters, at least one letter and one digit).
+2. From the `backend/` folder run: `npm run seed`
+
+Safe to run repeatedly: it inserts missing records and updates changed ones, never deletes,
+and never changes an existing admin's password. If any CSV row is invalid it prints every
+error and writes nothing.
+
+Reference IDs are the official dataset IDs (e.g. airport `CAI`, city `cairo`, country `EG`,
+attraction `att-1`, currency `EUR`) and are stored as the documents' `_id`. Store them as
+strings when referencing them from other schemas.
+
+## Admin & moderator setup (ACC-13 – ACC-17, ACC-07a, GEN-07, GEN-01)
+
+Log in as the seeded admin (see above), then in Swagger (`/api/docs`):
+
+1. Create the airline or hotel first (`POST /api/airlines`, `POST /api/hotels`, owned by Persons 3–6).
+2. `POST /api/admin/moderators` with `name`, `email`, `temporaryPassword`, `providerType`
+   (`airline` | `hotel`) and `providerId`. The account, its assignment and the audit entry
+   are written in one transaction. A moderator manages exactly one provider; a provider
+   may have several moderators. Assignments are permanent: to move someone, suspend the
+   account and create a new moderator.
+3. The moderator logs in with the temporary password, calls `PATCH /api/auth/change-password`,
+   then logs in again. `GET /api/moderator/assignment` tells the dashboard which provider it manages.
+
+Other admin endpoints: `GET /api/admin/accounts`, `PATCH /api/admin/accounts/:id/suspend|reactivate`,
+`POST /api/admin/users/:id/reset-password`, `PATCH /api/admin/providers/:type/:id/deactivate|reactivate`,
+`GET /api/admin/bookings` (read-only) and `GET /api/admin/audit-logs`. Admin accounts cannot be
+suspended or have their password reset. Suspending ends the account's sessions immediately.
+
+**For teammates**
+
+- **Provider routes:** decorate with `@UseGuards(AuthGuard, RolesGuard, ProviderOwnershipGuard)` and
+  `@ProviderOwnership('airline' | 'hotel', '<id param>')`. Nest builds guards inside *your*
+  module, so that module must import `UsersModule`, `JwtModule.register({})` and
+  `ModeratorAssignmentsModule`. Without the last one the guard answers 503.
+- **Deactivated providers:** the admin sets `isActive: false` on your `airlines` / `hotels`
+  document. Exclude those from search and reject new holds/bookings. Their moderators
+  automatically get 403 on provider routes.
+- **Collection and field names** this code reads are listed in
+  `src/integrations/teammate-contracts.ts`. If yours differ, change that file only.
+- **Notifications:** import `NotificationsModule` and call
+  `notificationsService.send(userId, NotificationType.X, payload)` *after* your transaction
+  commits. It never throws. See "Notifications (GEN-01)" below for who sends which type.
+- **Audit:** import `AuditLogsModule` and call `auditLogsService.record({...}, session?)`. It throws,
+  so an action without its audit entry fails.
+
+Tests: `npm test` (unit) and `npm run test:e2e -- admin` (in-memory MongoDB replica set via
+`mongodb-memory-server`; the first run downloads a `mongod` binary, and Atlas is never touched).
+
+## Notifications (GEN-01)
+
+Endpoints (any logged-in account, own notifications only): `GET /api/notifications?page&unreadOnly`,
+`GET /api/notifications/unread-count`, `PATCH /api/notifications/:id/read` (404 for someone else's)
+and `PATCH /api/notifications/read-all`.
+
+**Demo in Swagger:** as the admin, suspend and then reactivate a test user. Log in as that user:
+unread count is 2, the list shows both (newest first), mark one read, then read-all → `{ "updated": 1 }`.
+
+**For teammates** (full contract: `docs/requirements/GEN-01-notifications-spec.md`):
+
+| Event | Type | Sender |
+|---|---|---|
+| Booking confirmed after payment | `BOOKING_CONFIRMED` | Arafa / Yassin, in `confirmBooking()` |
+| Hold expired | `BOOKING_EXPIRED` | Arafa / Yassin, in the release method the ExpiryService calls |
+| User cancels | `BOOKING_CANCELLED` | Arafa / Yassin |
+| Payment failed | `PAYMENT_FAILED` | Abozaid |
+| Refund succeeded / failed | `REFUND_ISSUED` / `REFUND_FAILED` | Abozaid |
+| Schedule change | `FLIGHT_SCHEDULE_CHANGED` | Yahia |
+| Airline cancels a flight | `FLIGHT_CANCELLED` | Yahia only (Arafa's cancel-all returns the user ids and sends nothing) |
+
+- Send **after** your transaction commits; `send` / `sendMany` never throw.
+- Pass `bookingType` (`'flight'` / `'hotel'`) and `providerName` with booking events, so the message
+  reads "your hotel booking at Hilton Cairo" before a reference exists.
+- Only the keys in `NOTIFICATION_PAYLOAD_KEYS` (`notification.constants.ts`) with primitive values
+  are stored; anything else is dropped with a warning in the server log. Ask Wael to add a key.
+
+## Reports & moderation (GEN-09, GEN-10)
+
+Any logged-in account can report a blog post, comment, hotel review or itinerary:
+
+- `POST /api/reports` with `targetType` (`post` | `comment` | `review` | `itinerary`), `targetId`,
+  `reason` (`spam` | `harassment` | `inappropriate` | `misinformation` | `other`) and optional
+  `details` (required when the reason is `other`, max 500 characters).
+  Only content the caller can currently see is reportable (otherwise 404); reporting your own
+  content is 403; one open report per account per item (409 until it is resolved).
+- `GET /api/reports/mine` lists the caller's reports and their status.
+
+Admins (Swagger tag **Admin – Moderation**):
+
+- `GET /api/admin/reports`: open reports by default (`status=all` for every status), with
+  reporter, a snapshot of the content taken at report time, and the number of open reports
+  on the same content.
+- `PATCH /api/admin/reports/:id` with `action: 'dismiss' | 'hide'` and an optional internal `note`.
+  Resolving one report resolves **every** open report on the same content with the same outcome.
+- `PATCH /api/admin/content/:type/:id/hide|unhide` moderates without a report. Unhiding never
+  reopens reports.
+- `DELETE /api/admin/content/:type/:id?note=…` deletes the content (a post also loses its
+  comments and likes) and resolves its open reports as `content_deleted`.
+
+Every admin action runs in one transaction with its audit entry (`REPORT_DISMISSED`,
+`CONTENT_HIDDEN`, `CONTENT_UNHIDDEN`, `CONTENT_DELETED`). After the commit, the author gets
+`CONTENT_HIDDEN` / `CONTENT_UNHIDDEN` / `CONTENT_DELETED`, and each reporter gets one
+`REPORT_RESOLVED` (`action_taken` or `no_violation`). Notifications never name the admin or
+other reporters.
+
+**For content owners (Blog, reviews, itineraries)**
+
+- Add `isHidden: boolean` (default `false`) to your schema. Hidden content must be visible only
+  to its author and admins (404 for everyone else) and excluded from search, lists, counts and
+  (for reviews) the hotel average rating. The moderation code only sets the flag.
+- Until you register a handler, moderation reads and writes your raw collection with the names in
+  `src/integrations/teammate-contracts.ts` (`CONTENT_COLLECTIONS`). Admin delete of reviews
+  answers **501** until you register a handler with `delete` (itineraries register one).
+- Register in your module (which imports `ModerationModule`):
+  `onModuleInit() { this.moderationRegistry.register('review', { find, setHidden, delete }) }`.
+  The interface and a full example are in `src/moderation/moderation.registry.ts`. Use the
+  session you are given for every write, and recompute derived data (ratings, images) there.
+
+Tests: `npm run test:e2e -- reports` (in-memory replica set, never Atlas).
+
+## Image uploads (GEN-08)
+
+Swagger tag **Uploads**. Full rules: `docs/requirements/GEN-08-uploads-spec.md`.
+
+- **Limits** — JPG or PNG only, at most 5 MB each. The type is checked from the file's first
+  bytes, not from the name or the mimetype the client sends. Anything else gets a 400.
+  Per-item maximums (`MAX_IMAGES_PER_ITEM`): 5 per post, activity or hotel, 1 logo per airline.
+- **Storage** — files go to `UPLOAD_DIR` (optional; default `backend/uploads/`, git-ignored)
+  under a random name `<uuid>.jpg|png`, with a record in the `uploads` collection.
+- **Serving** — `GET /api/uploads/:fileName` is public and returns the image with its stored
+  content type. Every upload returns its `url` in this form, relative to the API host.
+
+**For teammates:**
+- Import `UploadsModule`, then bind your token to an adapter, e.g.
+  `{ provide: BLOG_IMAGE_STORE, useExisting: BlogImageUploadAdapter }`, or call
+  `UploadsService.upload(file, { type, id })` / `delete(id)` / `deleteByUrl(url)` directly.
+- Enforce the per-item maximum on your own document with a conditional update (Blog uses
+  `'images.4': { $exists: false }`). If it fails, delete the file you just uploaded and answer 400.
+- Use `@UseInterceptors(ImageFileInterceptor('file'))` on upload routes. It stops reading a file
+  at 5 MB and answers 400 instead of multer's 413.
+- Delete files only after your database change is committed. Deletes are idempotent.
+- Bound: `BLOG_IMAGE_STORE` (Blog), `AIRLINE_LOGO_STORE` (Airlines) and `HOTEL_PHOTO_STORE`
+  (Hotels). Routes using them:
+  - Blog: `POST /api/posts/:id/images`, `DELETE /api/posts/:id/images/:imageId`, post author
+    only, 5 per post.
+  - Airlines: `PUT /api/airlines/:id/logo` (upload or replace) and `DELETE /api/airlines/:id/logo`,
+    assigned airline moderator only. One logo per airline: a new upload replaces the old one and
+    deletes its file. A direct `logoUrl` in create/update is rejected with 400.
+  - Hotels: `POST /api/hotels/:id/photos`, `DELETE /api/hotels/:id/photos/:fileName`, assigned
+    hotel moderator only (`ProviderOwnershipGuard`), 5 per hotel.
+
+Tests: `npm test -- src/uploads` and `npm run test:e2e -- uploads provider-images` (in-memory
+MongoDB, temporary folder).
+
+## Itineraries (ITN-01 – ITN-28)
+
+Swagger tags **Itineraries** and **Itinerary days, activities and budget**. Full rules:
+`docs/requirements/ITN-itineraries-spec.md`.
+
+- **Itineraries** — `POST /api/itineraries` (user accounts; `title` ≤100, `countries` codes,
+  `startDate` `YYYY-MM-DD`; private by default), `GET /api/itineraries/mine` (most recently
+  updated first), `GET|PATCH /api/itineraries/:id`, `PATCH /api/itineraries/:id/visibility`
+  (`{ isPublic }`), `DELETE /api/itineraries/:id` with `{ "confirm": true }`.
+- **Days** — `POST /api/itineraries/:id/days` (`cityId` from the city list, optional `notes` and
+  `position`), `PATCH|DELETE .../days/:dayId` (delete needs `{ "confirm": true }`),
+  `PATCH .../days/:dayId/position`. At most 60 days. Day numbers and dates are never stored:
+  they come from the day's position and the start date, so they can't drift. Consecutive days in
+  the same city are returned as `cityGroups` with day count, dates and budget subtotal.
+- **Activities** — `POST|PATCH|DELETE .../days/:dayId/activities[/:activityId]` (name,
+  description, optional time `HH:mm`, optional cost + currency). Images:
+  `POST .../activities/:activityId/images` (multipart `file`, GEN-08, 5 per activity) and
+  `DELETE .../images/:imageId`.
+- **Budget** — `POST|PATCH|DELETE .../days/:dayId/budget-entries[/:entryId]` (`food`,
+  `accommodation`, `in_city_transport`, `activities`; amount ≥ 0; supported currency) and
+  `POST|PATCH|DELETE /api/itineraries/:id/transport-entries[/:entryId]` (mode, from/to city,
+  amount, currency, `dayId`). Transport entries follow their day when days move and are deleted
+  with it. `budget` in every response totals by category, by day and overall, one amount per
+  currency (activity costs count as `activities`; transport is `intercity_transport`).
+- **Public** — `GET /api/itineraries?q=&country=&cityId=&minDays=&maxDays=&page=` (guests too;
+  `q` matches title, country name/code or city name; newest first; 10 per page) and
+  `POST /api/itineraries/:id/clone` (user accounts): a private, independent copy with its own
+  image files and `clonedFrom` crediting the original author.
+- **Hotels and flights** (owner) — `GET /api/itineraries/:id/hotels?group=&guests=&rooms=`
+  (ITN-25): hotels in a city group's city for its dates (check-out = the day after the group's
+  last day) with at least `rooms` free rooms whose combined occupancy covers `guests`, through
+  `HotelsService.searchHotels`. `GET .../flights/airports` and
+  `GET .../flights?from=&to=&tripType=` (ITN-26): flights to any airport in day 1's city (or only
+  `to`), through `AirlinesService.searchFlights` for each airport, merged, sorted and paginated;
+  dates default to the first and last day. `rooms` defaults to 1.
+- **Linked bookings** (ITN-27, optional bonus, owner) — `POST .../days/:dayId/bookings`
+  (`{ type: 'flight' | 'hotel', bookingId }`, your own Confirmed or Completed booking) and
+  `DELETE .../days/:dayId/bookings/:linkId`. Prices are read live and feed
+  `budget.byDay[].bookings`, `budget.bookings` and `budget.totalWithBookings`, kept apart from
+  the planned costs and never converted (PAY-04). Only the owner sees them; clones don't copy
+  them. Bookings are read through `integrations/teammate-contracts.ts`; hotel reservations
+  appear once Person 6's module stores them under those names.
+- **PDF export** (ITN-28, optional bonus) — `GET /api/itineraries/:id/pdf?currency=`: the same
+  content as `GET /api/itineraries/:id` as a printable A4 PDF (`itinerary-<id>.pdf`), with the
+  same visibility rules and converted totals. Non-Western-European characters show as "?"
+  (built-in fonts).
+
+Who sees what: the owner always; a private itinerary nobody else (404, admins too); a public one
+everyone, read-only (other users get 403 on writes); hidden (GEN-10) only the owner and admins;
+public itineraries of a deactivated owner only admins (ACC-12). Search applies the same rules.
+Every write that changes days or entries is a read-modify-write that only saves if nobody saved
+in between (a `version` field), and retries otherwise; after 12 tries it answers 409.
+
+**For teammates:**
+- Model `Itinerary`, collection `itineraries`, fields as in `ITINERARY_FIELDS` (Blog's author
+  page reads them). Older raw documents without days or a start date are tolerated.
+- Moderation: an `itinerary` handler is registered (hide, unhide, delete; delete removes the
+  activity image files after the commit). An owner's delete closes open reports as
+  `content_deleted` with the note `Deleted by owner`.
+- `ItinerariesModule` exports `ItinerariesService` (`loadViewable`, `findOne`).
+
+Tests: `npm test -- src/itineraries` and `npm run test:e2e -- itineraries` (in-memory replica
+set, includes parallel day edits, the 60-day limit and 5 images per activity under parallel
+requests).
+
+## Exchange rates (ITN-18)
+
+Full rules: `docs/requirements/ITN-18-fx-rates-spec.md`.
+
+- **Source** — FXRatesAPI `GET /latest`, server-side only. Set `FXRATES_API_KEY` in `.env`; it
+  is sent as a Bearer header and never logged or returned.
+- **Once a day** — the first request of the (UTC) day fetches the rates and stores them in
+  `fx_rate_snapshots` (one per day); everything else reads that snapshot. No cron job.
+- **API down** — the latest stored snapshot is used and responses say `usingCachedRates: true`
+  with its `rateDate`. Nothing stored at all → 503. A failed fetch is retried after 10 minutes.
+- **Itinerary amounts** — `GET /api/itineraries/:id` and every itinerary write response add
+  `converted` to each budget total and `convertedAmount` / `convertedCost` to each entry, in
+  `?currency=`, else the user's `preferredCurrency` (ACC-09), else USD. `budget.conversion` shows
+  `{ currency, rateDate, usingCachedRates }`. If no rates are available the itinerary still loads
+  with `conversion: null`. `GET /api/itineraries/:id/budget?currency=` returns only the converted
+  budget (503 if it can't convert). Unsupported currency → 400. Booking prices are never converted
+  (PAY-04).
+
+**For teammates:** `FxRatesModule` exports `FxRatesService` (`converter(viewer, currency?)` gives
+`convert(amount, from)` and the rate date). In tests, override the `FX_RATES_CLIENT` token
+(see `test/itineraries.e2e-spec.ts`) so nothing calls the real API.
+
+Tests: `npm test -- src/fx-rates` and `npm run test:e2e -- itineraries` (fake provider).
+
+## Blog (BLG-01 – BLG-13)
+
+Swagger tag **Blog**. Full rules: `docs/requirements/BLG-blog-spec.md`.
+
+- **Posts** — `POST /api/posts` (`title` 3–150, `content` 1–20,000, `tags`, `status`
+  `draft` | `published`, default draft), `PATCH` / `DELETE /api/posts/:id` (author only),
+  `GET /api/posts/mine` (drafts included, `status` filter). Publishing sets `publishedAt` the
+  first time only; a post can go back to draft. Deleting a post also deletes its comments and
+  likes, and closes open reports on them as `content_deleted`.
+- **Reading** — `GET /api/posts/:id`, `GET /api/posts?q=&tag=&authorId=`,
+  `GET /api/tags/:tag/posts` and `GET /api/authors/:id` are public. `q` matches the title, tags
+  or author name. Results are ordered by likes + comments, newest first on ties.
+  A draft is visible only to its author; a hidden post to its author and admins; a post by a
+  deactivated author to admins only. Everyone else gets 404.
+- **Tags** — up to 5 per post, each 1–30 characters of `a-z`, `0-9` and `-`. Tags are trimmed,
+  lowercased and deduplicated (`"Cairo "` and `"cairo"` become one tag).
+- **Comments** — `GET|POST /api/posts/:id/comments`, `PATCH|DELETE /api/comments/:id`
+  (comment author only). Comments are 1–500 characters, listed oldest first, and allowed only on
+  published, visible posts. Comments by deactivated accounts show as "Deleted user".
+- **Likes** — `POST|DELETE /api/posts/:id/like`, both idempotent, both return
+  `{ liked, likeCount }`. `likeCount` and `commentCount` are stored on the post and change in the
+  same transaction as the like or comment (hidden comments are not counted).
+- **Images** — `POST /api/posts/:id/images` (multipart `file`) and
+  `DELETE /api/posts/:id/images/:imageId`. They go through the shared upload module (JPG/PNG,
+  5 MB, max 5 per post; the first image is the cover). `BlogModule` binds
+  `BLOG_IMAGE_STORE` to the upload module's `BlogImageUploadAdapter`.
+- **Author page** — `GET /api/authors/:id` returns name, join date, published posts (paginated)
+  and up to 10 public itineraries (read from `itineraries` via
+  `ITINERARY_FIELDS` in `teammate-contracts.ts`).
+- **Attached itinerary** (BLG-13, optional bonus, added by Person 8) — `POST` / `PATCH
+  /api/posts[/:id]` accept `itineraryId` (one of your own itineraries; `null` detaches). Post
+  details return `itinerary: { id, title, countries, isPublic }`, or `null` when the reader may
+  not see it (private, hidden or deleted). Rules: `docs/requirements/ITN-itineraries-spec.md`
+  D37–D39.
+
+Public GETs use `OptionalAuthGuard` (`src/blog/optional-auth.guard.ts`). It applies the same
+checks as `AuthGuard`, but a missing or invalid session makes the request a guest request,
+never a 401. Only `user` accounts write posts, comments and likes. Admins moderate through
+the GEN-10 endpoints: Blog registers real `post` and `comment` moderation handlers, so hiding a
+comment updates `commentCount`, and deleting a post removes its comments, likes and image files.
+
+Tests: `npm run test:e2e -- blog` (in-memory replica set, includes 20 parallel likes).
+
+## Airlines (FLT-01)
+
+Airline profiles are exposed through Swagger under the **Airlines** tag:
+
+- `POST /api/airlines` — administrator-only creation with a unique name and
+  airline code. New airlines are active by default.
+- `GET /api/airlines/:id` — public profile lookup.
+- `PATCH /api/airlines/:id` — only the assigned airline moderator may edit the
+  profile name or code. This route uses `ProviderOwnershipGuard` and does not
+  grant administrators moderator editing access.
+
+The `isActive` flag is owned by the profile for the separate administrator
+deactivate/reactivate endpoints. Existing confirmed bookings are unaffected by
+that flag. Airline logos are intentionally not accepted as direct URLs (sending
+`logoUrl` returns `400`). The assigned airline moderator uploads the logo with
+`PUT /api/airlines/:id/logo` (multipart `file`, JPG/PNG, 5 MB) and removes it
+with `DELETE /api/airlines/:id/logo`, through Person 8's shared upload module
+bound to `AIRLINE_LOGO_STORE` (see "Image uploads (GEN-08)").
+
+Targeted validation:
+
+```bash
+npm test -- --runInBand src/airlines/airlines.service.spec.ts
+npm run build
+```
+
+`GET /api/airlines/airports` (FLT-02) exposes the seeded, read-only airport
+list with IATA code, name, city, country and IANA time zone. Flight inputs must
+use these seeded airport identifiers.
+
+`POST /api/airlines/flights` (FLT-03) is restricted to airline moderators and
+accepts local departure and arrival date-times. The service resolves each
+airport's IANA zone, stores UTC instants plus both zones, rejects past or
+non-positive schedules, and enforces unique flight number per airline and
+departure date.
+
+Cabin inventory endpoints (FLT-04) are `POST /api/flights/:id/cabins` and
+`PATCH /api/flights/:id/cabins/:cabinId`. They support Economy, Premium
+Economy, Business and First once each, with positive seats and price plus
+free-baggage count and maximum bag weight.
+
+`PUT /api/airlines/:id/baggage-policy` (FLT-08) is restricted to the assigned
+airline moderator and stores the extra-bag price and per-passenger maximum.
+
+`PUT /api/airlines/:id/cancellation-policy` (FLT-09) stores unique
+days-before-departure thresholds and refund percentages. The exported
+`calculateRefundPercentage` helper selects the highest applicable threshold for
+refund services.
+
+`GET /api/airlines/flights/:id/status` (FLT-30) derives `Scheduled`, `Departed`,
+or persisted `Cancelled` status from the flight departure time. The
+`AirlinesService.getFlightStatus` method is the scheduler-facing contract; no
+cron job is added here.
+
+The FLT-22 `FLIGHT_INVENTORY` contract is exported for the booking module. It
+provides `checkAvailability`, `createHold`, `confirmInventory`, and
+`releaseHold`. Hold creation uses one atomic conditional flight update, so
+parallel requests cannot exceed `seatCount`; infants must be excluded from the
+requested seat count by the booking caller.
+`GET /api/airlines/flights/search` (FLT-11) searches active airlines for
+scheduled flights between seeded airports on the departure airport's local
+date. Results include cabin availability; insufficient-capacity flights are
+excluded and an empty result returns a friendly message.
+
+FLT-12 extends search with `tripType=round-trip`, `returnDate`, adult/child/
+infant counts and an optional `cabinClass`. Adults and children consume seats
+at the cabin fare; infants consume no seats and are priced at 10%. At least one
+adult is required and infants cannot exceed adults.
+
+FLT-15 adds inclusive `minPrice`/`maxPrice` filters, `price`, `duration` and
+`departure` sorting, and page-size-10 pagination through the shared pagination
+helper. An inverted price range is rejected with a client error.
+
+`GET /api/airlines/flights/:id` (FLT-17) returns the airline identity,
+airport-local departure and arrival times, duration, status, cabin prices and
+baggage allowances, inventory-backed remaining seats, and cancellation tiers.
+
+FLT-05 provides `PATCH /api/airlines/flights/:id` for assigned moderators to
+change local times on Scheduled flights and prevents cabin seat counts below
+booked plus held seats. Confirmed-passenger schedule notifications are routed
+through the shared notification service when the Person 4 passenger-reader
+contract is bound.
+
+`POST /api/airlines/flights/:id/cancel` (FLT-06) requires
+`{ "confirm": true }`, cancels only Scheduled flights, delegates booking
+cancellation to the flight bookings module (Confirmed bookings are cancelled
+with a 100% refund, unpaid holds expire), releases inventory holds, and sends
+`FLIGHT_CANCELLED` to the affected users the canceller returns.
+
+FLT-29 provides moderator-only `GET /api/airlines/flights/:id/bookings` and
+`GET /api/airlines/flights/:id/bookings/export` endpoints. The service verifies
+that the moderator owns the flight's airline, then reads booking references,
+passengers, cabin, seats and status through the `FLIGHT_BOOKING_READER` contract.
+The export is CSV and includes remaining seats for each cabin. The contract is
+bound to the flight bookings module (see below).
+
+## Flight bookings (FLT-19 – FLT-26)
+
+All endpoints are under the **Flight Bookings** tag in Swagger, require a
+logged-in registered user (role `user`) and only ever show the caller's own
+bookings; another user's booking is reported as not found (ACC-11).
+
+| Method | Endpoint | Requirement |
+|---|---|---|
+| POST | `/api/flight-bookings` | FLT-19, FLT-21: validate passengers and baggage, return the price summary (nothing saved) |
+| POST | `/api/flight-bookings/hold` | FLT-22: hold the seats, booking in Pending Payment for 10 minutes |
+| GET | `/api/flight-bookings?group=upcoming\|past\|cancelled&page=1` | FLT-25: my bookings, 10 per page, with `counts` per group |
+| GET | `/api/flight-bookings/:id` | FLT-25: full details, including refund fields |
+| GET | `/api/flight-bookings/:id/refund-preview` | FLT-26: refund the airline's tiers give today |
+| POST | `/api/flight-bookings/:id/cancel` | FLT-26: `{ "confirm": true, "expectedRefundAmount"?: number }` |
+| GET | `/api/flight-bookings/:id/e-ticket` | FLT-23: PDF download, Confirmed or Completed bookings only |
+
+Rules enforced on the backend:
+
+- **Passengers (FLT-12, FLT-19):** adult 12+, child 2–11, infant under 2,
+  checked against the date of birth on the outbound departure date. At least
+  one adult and no more infants than adults. Infants pay 10% and take no seat.
+- **Baggage (FLT-08):** extra bags apply to every flight of the trip, up to the
+  airline's maximum, each up to the cabin's weight per bag.
+- **Round trip (FLT-12):** send `returnFlight`; it must fly the reverse route
+  after the outbound lands. One booking, two segments, one payment and one
+  reference, cancelled as a whole using the outbound flight's tier.
+- **Holds (FLT-22):** each flight's seats are reserved with one atomic update
+  through `FlightInventoryService`, so parallel requests never oversell; a
+  round trip holds both flights or neither. Deactivated airlines and flights
+  that are not Scheduled or have departed are rejected.
+- **Statuses (GEN-11):** only Pending Payment → Confirmed/Expired and
+  Confirmed → Completed/Cancelled; each change is one conditional update, so
+  confirmation, expiry and cancellation can never both win.
+
+### Contracts for payments (Person 7)
+
+Import `FlightBookingsModule` and inject `FLIGHT_BOOKING_PAYMENTS`
+(`src/flight-bookings/flight-booking-payments.contract.ts`):
+
+- `getForPayment(id)`: amount, currency, owner, status and `holdExpiresAt`.
+- `confirmBooking(id)`: call after the webhook verifies the PaymentIntent.
+  Books the seats, issues the reference, sends `BOOKING_CONFIRMED`. Safe to
+  repeat; refuses an expired hold (refund the payment).
+- `releaseHold(id)`, `releaseExpiredHolds()`: expire unpaid holds, free the
+  seats, send `BOOKING_EXPIRED`.
+- `completeDepartedBookings()`: Confirmed → Completed once every flight has
+  departed (GEN-11).
+
+Refunds go through `FLIGHT_REFUNDS` (`flight-refunds.contract.ts`). Until the
+payments module binds its Stripe refund service in `flight-bookings.module.ts`,
+`AirlineTierRefunds` calculates the amount from the airline's tiers (100% for
+airline cancellations) and logs that no money was refunded.
+
+### Adapters for other modules
+
+| Token | Used by | Bound to |
+|---|---|---|
+| `FLIGHT_BOOKING_CANCELLER` | FLT-06 flight cancellation | `FlightBookingCancellationService` |
+| `FLIGHT_PASSENGER_READER` | FLT-05 schedule-change notifications | `FlightBookingReaders` |
+| `FLIGHT_BOOKING_READER` | FLT-29 moderator list and CSV | `FlightBookingReaders` |
+| `BOOKING_ELIGIBILITY_READER` | ACC-12 account deactivation | `MongoBookingEligibilityReader` |
+
+### Tests
+
+Unit tests run against an in-memory MongoDB (`mongodb-memory-server`), never
+Atlas: `npm test -- src/flight-bookings`. `test/flight-bookings.e2e-spec.ts`
+(`npm run test:e2e`) drives the whole app over HTTP, from booking and payment
+to the airline cancelling the flight, plus 20 parallel holds on a 5-seat
+cabin.
+
+The requirements-compatible aliases `/api/airports` and `/api/flights/...`
+are also available. The existing `/api/airlines/...` routes remain supported.
+FLT-29 passenger CSV export is available at
+`GET /api/flights/:id/passengers/export`.
+
 ## Deployment
 
 When you're ready to deploy your NestJS application to production, there are some key steps you can take to ensure it runs as efficiently as possible. Check out the [deployment documentation](https://docs.nestjs.com/deployment) for more information.
