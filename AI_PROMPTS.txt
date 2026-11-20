@@ -773,6 +773,22 @@ hotel-booking-lifecycle.service.spec.ts hotel-booking-lifecycle.service.ts hotel
 hotel-bookings.controller.ts hotel-bookings.module.ts hotel-bookings.service.spec.ts hotel-bookings.service.ts
 hotel-refunds.contract.ts hotel-room.reader.ts hotel-booking.schema.ts 
 Added hotel refund service for stripe as well as booking cancellation services
+Date: 2026-11-19
+Student: Seif Moustapha
+Tool: Claude Code (Claude Sonnet 5.5)
+Related Requirement: HTL-23
+Prompt:
+Implement HTL-23, take into account that 
+ 	
+A Confirmed reservation becomes Completed once its check-out date has passed. The system shall allow the user to submit
+ one rating (1-5) and an optional review (max 1000 characters) per Completed reservation, regardless of the number of rooms,
+  and later edit or delete it. The hotel's average rating is recalculated accordingly.
+How the output was used:
+Updated:hotel-booking-lifecycle.service.ts hotel-booking-payments.contract.ts and hotel-bookings.module.ts
+hotel-bookings.controller.ts hotel-bookings.module.ts hotel-bookings.service.spec.ts hotel-bookings.service.ts
+hotel-refunds.contract.ts hotel-room.reader.ts hotel-booking.schema.ts 
+Added create list and update review dto files as well as a review moderation,service,spec and controller.
+Also added a review schema and review rules
 
 Date: 2026-11-16
 Student: Hammad
