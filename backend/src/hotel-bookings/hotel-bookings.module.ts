@@ -9,6 +9,7 @@ import { UsersModule } from '../users/users.module';
 import { HOTEL_BOOKING_PAYMENTS } from './hotel-booking-payments.contract';
 import { HotelBookingHoldService } from './hotel-booking-hold.service';
 import { HotelBookingLifecycleService } from './hotel-booking-lifecycle.service';
+import { HotelBookingQueryService } from './hotel-booking-query.service';
 import { HotelBookingsController } from './hotel-bookings.controller';
 import { HotelBookingsService } from './hotel-bookings.service';
 import { HOTEL_ROOM_READER, HotelsServiceRoomReader } from './hotel-room.reader';
@@ -16,9 +17,8 @@ import { RoomInventoryService } from './room-inventory.service';
 import { HotelBooking, HotelBookingSchema } from './schemas/hotel-booking.schema';
 
 /**
- * Hotel booking (Person 6: HTL-16 to HTL-21: quote, hold, confirmation). Hotels, rooms and availability
- * are reached only through HOTEL_ROOM_READER, bound to Person 5's
- * HotelsService.
+ * Hotel booking ( HTL-16 to HTL-21: quote, hold, confirmation, list/details). Hotels, rooms and availability
+ * are reached only through HOTEL_ROOM_READER, bound to HotelsService.
  */
 @Module({
   imports: [
@@ -38,10 +38,11 @@ import { HotelBooking, HotelBookingSchema } from './schemas/hotel-booking.schema
   providers: [
     HotelBookingsService,
     HotelBookingHoldService,
+    HotelBookingQueryService,
     HotelBookingLifecycleService,
     RoomInventoryService,
     { provide: HOTEL_ROOM_READER, useClass: HotelsServiceRoomReader },
-    // Person 7 (payments) depends on this token only.
+    // Payments depends on this token only.
     {
       provide: HOTEL_BOOKING_PAYMENTS,
       useExisting: HotelBookingLifecycleService,

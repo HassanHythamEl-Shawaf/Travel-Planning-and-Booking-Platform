@@ -745,6 +745,18 @@ How the output was used:
 Updated hotel-booking/lifecycle.service and its spec and hotel-booking-payments.contract as well
 as the hotel-bookings controller and module,added in hotel-booking-hold.service and its spec and a room-
 inventory service
+Date: 2026-11-18
+Student: Seif Moustapha
+Tool: Claude Code (Claude Sonnet 5.5)
+Related Requirement: HTL-20
+Prompt:
+Implement HTL-20, take into account that The system shall allow a registered user to view their hotel reservations
+ grouped as Upcoming, Past and Cancelled, showing reference, hotel, rooms, dates, guests, total and status
+ and to open full details.
+How the output was used:
+Updated hotel-bookings.controller.ts  and hotel-bookings.module.ts to register HotelBookingQueryService. Added hotel-booking-group.ts
+booking-view.ts booking-view.spec.ts hotel-booking-query.service.ts 
+hotel-booking-queries.spec.ts dto/list-hotel-bookings.dto.ts .
 
 Date: 2026-11-16
 Student: Hammad
