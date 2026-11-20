@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   ConflictException,
+  Inject,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
@@ -8,10 +9,17 @@ import { InjectConnection, InjectModel } from '@nestjs/mongoose';
 import { Connection, Model, Types } from 'mongoose';
 import type { ClientSession } from 'mongoose';
 
-import { PROVIDER_COLLECTIONS } from '../integrations/teammate-contracts';
+import { getPagination } from '../common/pagination';
+import {
+  PROVIDER_COLLECTIONS,
+  USERS_COLLECTION,
+} from '../integrations/teammate-contracts';
 import { CreateReviewDto } from './dto/create-review.dto';
 import { UpdateReviewDto } from './dto/update-review.dto';
+import { AccountStatus } from '../users/schemas/user.schema';
 import { HotelBookingStatus } from './hotel-booking-status';
+import { HOTEL_ROOM_READER } from './hotel-room.reader';
+import type { HotelRoomReader } from './hotel-room.reader';
 import {
   endedStayFilter,
   normalizeComment,
@@ -24,6 +32,8 @@ import {
   HotelBookingDocument,
 } from './schemas/hotel-booking.schema';
 import { Review, ReviewDocument } from './schemas/review.schema';
+
+const DELETED_USER = 'Deleted user';
 
 const isDuplicateKey = (error: unknown): boolean =>
   (error as { code?: number } | null)?.code === 11000;
@@ -40,6 +50,30 @@ export interface MyReview {
   updatedAt: Date;
 }
 
+export interface HotelReviewItem {
+  id: string;
+  rating: number;
+  comment: string | null;
+  reviewerName: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface HotelReviewList {
+  /** Average over the visible reviews, 0 when there are none. */
+  averageRating: number;
+  /** Number of ratings: every visible review carries exactly one. */
+  ratingCount: number;
+  data: HotelReviewItem[];
+  /** Same as ratingCount; the pagination total. */
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+}
+
+type LeanReview = Review & { _id: Types.ObjectId };
+
 @Injectable()
 export class HotelReviewsService {
   constructor(
@@ -48,6 +82,7 @@ export class HotelReviewsService {
     @InjectModel(Review.name)
     private readonly reviews: Model<ReviewDocument>,
     @InjectConnection() private readonly connection: Connection,
+    @Inject(HOTEL_ROOM_READER) private readonly reader: HotelRoomReader,
   ) {}
 
   /**
@@ -166,6 +201,52 @@ export class HotelReviewsService {
   }
 
   /**
+   * HTL-24: a hotel's average rating, number of ratings and visible reviews,
+   * newest first, 10 per page. Public: guests and users see the same.
+   */
+  async listForHotel(hotelId: string, page?: number): Promise<HotelReviewList> {
+    const hotel = await this.reader.findHotel(hotelId);
+    if (!hotel || !hotel.isActive) throw new NotFoundException('Hotel not found');
+
+    const { skip, limit } = getPagination(page);
+    const match = { hotelId: this.oid(hotelId), isHidden: { $ne: true } };
+
+    const [summary] = await this.reviews
+      .aggregate<{ avg: number; count: number }>([
+        { $match: match },
+        { $group: { _id: null, avg: { $avg: '$rating' }, count: { $sum: 1 } } },
+      ])
+      .exec();
+    const total = summary?.count ?? 0;
+
+    const rows = (await this.reviews
+      .find(match)
+      .sort({ createdAt: -1, _id: -1 })
+      .skip(skip)
+      .limit(limit)
+      .lean()
+      .exec()) as unknown as LeanReview[];
+
+    const names = await this.reviewerNames(rows.map((row) => row.userId));
+    return {
+      averageRating: summary ? roundRating(summary.avg) : 0,
+      ratingCount: total,
+      data: rows.map((row) => ({
+        id: String(row._id),
+        rating: row.rating,
+        comment: row.comment ?? null,
+        reviewerName: names.get(String(row.userId)) ?? DELETED_USER,
+        createdAt: row.createdAt,
+        updatedAt: row.updatedAt,
+      })),
+      total,
+      page: Math.floor(skip / limit) + 1,
+      limit,
+      totalPages: Math.ceil(total / limit),
+    };
+  }
+
+  /**
    * Recalculates a hotel's averageRating from its visible reviews. Call it
    * after anything that changes a review's visibility (admin hide/unhide).
    */
@@ -200,6 +281,28 @@ export class HotelReviewsService {
       .collection(PROVIDER_COLLECTIONS.hotel)
       .updateOne({ _id: hotelId }, { $set: { averageRating: average } }, { session });
     return average;
+  }
+
+  private async reviewerNames(
+    userIds: Types.ObjectId[],
+  ): Promise<Map<string, string>> {
+    const ids = [...new Set(userIds.map(String))].map((id) => this.oid(id));
+    if (ids.length === 0) return new Map();
+    // User schema fields: name and status. Only a deactivated account (or a
+    // user that no longer exists) is shown as "Deleted user"; suspended
+    // accounts keep their name.
+    const users = await this.connection
+      .collection(USERS_COLLECTION)
+      .find({ _id: { $in: ids } }, { projection: { name: 1, status: 1 } })
+      .toArray();
+    return new Map(
+      users.map((user) => [
+        String(user._id),
+        user.status === AccountStatus.DEACTIVATED
+          ? DELETED_USER
+          : String(user.name ?? DELETED_USER),
+      ]),
+    );
   }
 
   private assertValid(rating: number | undefined, comment: string | null) {

@@ -51,6 +51,12 @@ describe('Review moderation handler (GEN-10)', () => {
     return out.value as T;
   }
 
+  /** `delete` is optional on ModerationHandler; ours must provide it. */
+  const deleteReview = (id: string, session: ClientSession): Promise<boolean> => {
+    if (!handler.delete) throw new Error('the review handler has no delete');
+    return handler.delete(id, session);
+  };
+
   async function makeReview(rating: number, comment?: string) {
     const userId = new Types.ObjectId();
     const _id = new Types.ObjectId();
@@ -125,6 +131,7 @@ describe('Review moderation handler (GEN-10)', () => {
 
   it('registers itself as the handler for reviews', () => {
     expect(registry.register).toHaveBeenCalledWith('review', expect.any(Object));
+    expect(handler.delete).toBeDefined();
   });
 
   it('finds a review with its author, visibility and a short excerpt', async () => {
@@ -172,11 +179,11 @@ describe('Review moderation handler (GEN-10)', () => {
     await makeReview(5);
     expect(await hotelRating()).toBe(3);
 
-    expect(await asAdminAction((s) => handler.delete(doomed.id, s))).toBe(true);
+    expect(await asAdminAction((s) => deleteReview(doomed.id, s))).toBe(true);
     expect(await reviewModel.countDocuments()).toBe(1);
     expect(await hotelRating()).toBe(5);
 
-    expect(await asAdminAction((s) => handler.delete(doomed.id, s))).toBe(false);
+    expect(await asAdminAction((s) => deleteReview(doomed.id, s))).toBe(false);
     expect(await hotelRating()).toBe(5);
   });
 
