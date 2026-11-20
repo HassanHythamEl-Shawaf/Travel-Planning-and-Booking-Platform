@@ -74,6 +74,7 @@ describe('Reports & moderation (e2e)', () => {
     process.env.MONGODB_URI = replSet.getUri('e2e');
     process.env.JWT_ACCESS_SECRET = 'e2e-access-secret';
     process.env.JWT_REFRESH_SECRET = 'e2e-refresh-secret';
+    process.env.STRIPE_SECRET_KEY = 'sk_test_e2e_placeholder_not_real';
 
     const { AppModule } = await import('../src/app.module');
     const moduleRef = await Test.createTestingModule({
@@ -349,12 +350,6 @@ describe('Reports & moderation (e2e)', () => {
     await admin.delete(`/api/admin/content/comment/${commentId}`).expect(404);
   });
 
-  it('answers 501 for deleting reviews until their owner enables it (D16)', async () => {
-    await admin.delete(`/api/admin/content/review/${reviewId}`).expect(501);
-    await admin.delete(`/api/admin/content/ship/${reviewId}`).expect(400);
-    await admin.delete('/api/admin/content/review/not-an-id').expect(400);
-  });
-
   it('rolls everything back when the audit write fails (D12)', async () => {
     const created = await report(bob, 'review', reviewId).expect(201);
     const auditLogs = app.get(AuditLogsService, { strict: false });
@@ -403,7 +398,8 @@ describe('Reports & moderation (e2e)', () => {
       ]),
     );
     const deleted = logs.body.items.find(
-      (l: { action: string }) => l.action === 'CONTENT_DELETED',
+      (l: { action: string; targetId: string }) =>
+        l.action === 'CONTENT_DELETED' && l.targetId === commentId,
     );
     expect(deleted).toMatchObject({
       targetType: 'comment',
@@ -425,5 +421,25 @@ describe('Reports & moderation (e2e)', () => {
         { $set: { isPublic: false } },
       );
     await report(bob, 'itinerary', itineraryId).expect(404);
+  });
+
+  it('deletes reviews through admin moderation (GEN-10)', async () => {
+    const deleted = await admin
+      .delete(`/api/admin/content/review/${reviewId}`)
+      .expect(200);
+    expect(deleted.body).toEqual({
+      targetType: 'review',
+      targetId: reviewId,
+      deleted: true,
+      resolvedReports: 0,
+    });
+    expect(
+      await connection
+        .collection('reviews')
+        .countDocuments({ _id: new Types.ObjectId(reviewId) }),
+    ).toBe(0);
+
+    await admin.delete(`/api/admin/content/ship/${reviewId}`).expect(400);
+    await admin.delete('/api/admin/content/review/not-an-id').expect(400);
   });
 });

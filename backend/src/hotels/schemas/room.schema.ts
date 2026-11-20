@@ -11,7 +11,13 @@ export class Room {
   @Prop({ required: true, trim: true })
   name: string;
 
-  @Prop({ required: true })
+  @Prop({ required: true, trim: true, default: 'Standard' })
+  type: string;
+
+  @Prop({ required: true, min: 1, default: 1 })
+  beds: number;
+
+  @Prop({ required: true, min: 0.01 })
   pricePerNight: number;
 
   @Prop({ type: Object, required: true })

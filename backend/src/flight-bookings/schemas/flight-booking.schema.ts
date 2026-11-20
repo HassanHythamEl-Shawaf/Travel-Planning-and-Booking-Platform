@@ -223,6 +223,9 @@ export class FlightBooking {
   @Prop({ type: String, default: null })
   bookingReference: string | null;
 
+  @Prop({ type: String, default: null })
+  paymentIntentId: string | null;
+
   @Prop({ type: Date, default: null })
   confirmedAt: Date | null;
 

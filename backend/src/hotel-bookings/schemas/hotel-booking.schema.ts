@@ -54,6 +54,9 @@ export class HotelCancellationPolicy {
   @Prop({ required: true, default: '14:00' })
   checkInTime: string;
 
+  @Prop({ required: true, default: '12:00' })
+  checkOutTime: string;
+
   @Prop({ default: '' })
   description: string;
 }

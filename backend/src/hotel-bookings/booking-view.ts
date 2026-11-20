@@ -94,6 +94,7 @@ export interface HotelBookingDetails
     freeCancellationHours: number;
     refundPercentageAfterDeadline: number;
     checkInTime: string;
+    checkOutTime?: string;
     description: string;
   } | null;
   /** Confirmed and before the check-in date, so HTL-21 would accept it. */
@@ -154,6 +155,7 @@ export function toDetails(
           freeCancellationHours: policy.freeCancellationHours,
           refundPercentageAfterDeadline: policy.refundPercentageAfterDeadline,
           checkInTime: policy.checkInTime,
+          checkOutTime: policy.checkOutTime ?? '12:00',
           description: policy.description,
         }
       : null,

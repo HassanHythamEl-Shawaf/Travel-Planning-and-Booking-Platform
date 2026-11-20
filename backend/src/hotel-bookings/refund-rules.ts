@@ -9,6 +9,7 @@ export interface CancellationTerms {
   refundPercentageAfterDeadline: number;
   /** "HH:mm", the hotel's check-in time. */
   checkInTime: string;
+  checkOutTime?: string;
   description: string;
 }
 
@@ -17,6 +18,7 @@ export const DEFAULT_CANCELLATION_TERMS: CancellationTerms = {
   freeCancellationHours: 24,
   refundPercentageAfterDeadline: 0,
   checkInTime: '14:00',
+  checkOutTime: '12:00',
   description: 'Free cancellation up to 24 hours before check-in.',
 };
 

@@ -24,6 +24,7 @@ export interface PayableFlightBooking {
   currency: string;
   /** Payment is only allowed while this is in the future. */
   holdExpiresAt: Date | null;
+  policySnapshot: Record<string, unknown>;
 }
 
 export interface ConfirmedFlightBooking {
@@ -44,7 +45,10 @@ export interface FlightBookingPayments {
    * Throws ConflictException if the hold already expired or the booking is
    * not Pending Payment (payments should then refund).
    */
-  confirmBooking(bookingId: string): Promise<ConfirmedFlightBooking>;
+  confirmBooking(
+    bookingId: string,
+    paymentIntentId?: string,
+  ): Promise<ConfirmedFlightBooking>;
 
   /**
    * FLT-22: marks an expired Pending Payment booking Expired, releases its
@@ -55,7 +59,7 @@ export interface FlightBookingPayments {
   releaseHold(bookingId: string): Promise<boolean>;
 
   /** For the shared ExpiryService cron: releases every expired hold. Returns how many. */
-  releaseExpiredHolds(now?: Date): Promise<number>;
+  releaseExpiredHolds(now?: Date, excludeBookingIds?: string[]): Promise<number>;
 
   /**
    * GEN-11, for the same cron: Confirmed bookings whose every flight has

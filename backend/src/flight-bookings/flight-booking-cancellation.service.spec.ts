@@ -329,7 +329,7 @@ describe('FlightBookingCancellationService (FLT-26, PAY-03)', () => {
       expect(results.filter((r) => r.status === 'fulfilled')).toHaveLength(1);
       expect(await seats(out._id)).toEqual({ held: 0, booked: 0 });
       expect(refunds.issueRefund).toHaveBeenCalledTimes(1);
-      expect(notifications.send).toHaveBeenCalledTimes(1);
+      expect(notifications.send).toHaveBeenCalledTimes(2);
     });
 
     it('keeps the cancellation when issuing the refund fails', async () => {

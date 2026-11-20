@@ -78,6 +78,7 @@ describe('Blog (e2e)', () => {
     process.env.MONGODB_URI = replSet.getUri('blog-e2e');
     process.env.JWT_ACCESS_SECRET = 'e2e-access-secret';
     process.env.JWT_REFRESH_SECRET = 'e2e-refresh-secret';
+    process.env.STRIPE_SECRET_KEY = 'sk_test_e2e_placeholder_not_real';
     // Uploaded images go to a temporary folder (GEN-08).
     uploadDir = mkdtempSync(join(tmpdir(), 'blog-e2e-uploads-'));
     process.env.UPLOAD_DIR = uploadDir;

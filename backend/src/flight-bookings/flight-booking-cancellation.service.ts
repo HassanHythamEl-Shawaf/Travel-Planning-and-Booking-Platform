@@ -154,6 +154,7 @@ export class FlightBookingCancellationService implements FlightBookingCanceller 
       bookingReference: cancelled.bookingReference,
       providerName: await this.airlineName(cancelled.airlineId),
     });
+    await this.notifyRefund(userId, bookingId, cancelled.bookingReference, quote, issued);
 
     return {
       booking: toDetails(final ?? cancelled),
@@ -276,6 +277,30 @@ export class FlightBookingCancellationService implements FlightBookingCanceller 
       );
       return { refundId: null, status: 'Failed' };
     }
+  }
+
+  private async notifyRefund(
+    userId: string,
+    bookingId: string,
+    bookingReference: string | null,
+    quote: FlightRefundQuote,
+    issued: IssuedFlightRefund,
+  ): Promise<void> {
+    if (!issued.status) return;
+    await this.notifications.send(
+      userId,
+      issued.status === 'Failed'
+        ? NotificationType.REFUND_FAILED
+        : NotificationType.REFUND_ISSUED,
+      {
+        bookingId,
+        bookingType: 'flight',
+        bookingReference,
+        refundId: issued.refundId,
+        amount: quote.refundAmount,
+        currency: quote.currency,
+      },
+    );
   }
 
   /** Someone else's booking is reported as not found (ACC-11). */

@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 
@@ -27,6 +27,7 @@ export class PolicyAcceptanceService {
       policyVersion: acceptance?.policyVersion ?? 'v1',
       acceptedAt: acceptance?.acceptedAt ?? null,
       accepted: Boolean(acceptance),
+      policySnapshot: acceptance?.policySnapshot ?? null,
     };
   }
 
@@ -35,12 +36,13 @@ export class PolicyAcceptanceService {
     bookingId: string,
     userId: string,
     policyVersion = 'v1',
+    policySnapshot: Record<string, unknown>,
   ) {
     const now = new Date();
     const acceptance = await this.model
       .findOneAndUpdate(
         { bookingType, bookingId, userId: new Types.ObjectId(userId) },
-        { $set: { policyVersion, acceptedAt: now } },
+        { $set: { policyVersion, acceptedAt: now, policySnapshot } },
         { upsert: true, new: true, setDefaultsOnInsert: true },
       )
       .exec();
@@ -51,6 +53,7 @@ export class PolicyAcceptanceService {
       userId,
       policyVersion: acceptance.policyVersion,
       acceptedAt: acceptance.acceptedAt,
+      policySnapshot: acceptance.policySnapshot,
     };
   }
 }

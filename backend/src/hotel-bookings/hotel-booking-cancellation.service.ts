@@ -159,8 +159,9 @@ export class HotelBookingCancellationService {
       throw new ConflictException('The booking can no longer be cancelled');
     }
 
-    const refundId = await this.requestRefund(cancelled, amount, percentage);
+    const refund = await this.requestRefund(cancelled, amount, percentage);
     await this.notifyCancelled(cancelled, amount, percentage);
+    await this.notifyRefund(cancelled, amount, refund);
 
     return {
       bookingId: String(cancelled._id),
@@ -169,7 +170,7 @@ export class HotelBookingCancellationService {
       refundPercentage: percentage,
       refundAmount: amount,
       currency: cancelled.currency,
-      refundId,
+      refundId: refund?.refundId ?? null,
     };
   }
 
@@ -222,6 +223,8 @@ export class HotelBookingCancellationService {
         freeCancellationHours: snapshot.freeCancellationHours,
         refundPercentageAfterDeadline: snapshot.refundPercentageAfterDeadline,
         checkInTime: snapshot.checkInTime,
+        checkOutTime:
+          snapshot.checkOutTime ?? DEFAULT_CANCELLATION_TERMS.checkOutTime,
         description: snapshot.description,
       };
     }
@@ -236,7 +239,7 @@ export class HotelBookingCancellationService {
     booking: HotelBookingDocument,
     amount: number,
     percentage: number,
-  ): Promise<string | null> {
+  ): Promise<{ refundId: string | null; status: string | null } | null> {
     if (amount <= 0) return null;
     const quote: HotelRefundQuote = {
       refundPercentage: percentage,
@@ -265,14 +268,36 @@ export class HotelBookingCancellationService {
           .updateOne({ _id: booking._id }, { $set: { refundId: issued.refundId } })
           .exec();
       }
-      return issued.refundId;
+      return issued;
     } catch (error) {
       this.logger.error(
         `Refund request failed for cancelled hotel booking ${String(booking._id)}`,
         error instanceof Error ? error.stack : String(error),
       );
-      return null;
+      return { refundId: null, status: 'Failed' };
     }
+  }
+
+  private async notifyRefund(
+    booking: HotelBookingDocument,
+    amount: number,
+    refund: { refundId: string | null; status: string | null } | null,
+  ): Promise<void> {
+    if (!refund?.status) return;
+    await this.notifications.send(
+      String(booking.userId),
+      refund.status === 'Failed'
+        ? NotificationType.REFUND_FAILED
+        : NotificationType.REFUND_ISSUED,
+      {
+        bookingId: String(booking._id),
+        bookingType: 'hotel',
+        bookingReference: booking.bookingReference,
+        refundId: refund.refundId,
+        amount,
+        currency: booking.currency,
+      },
+    );
   }
 
   /** GEN-01. Never throws; sent after the cancellation is committed. */

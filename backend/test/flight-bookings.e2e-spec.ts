@@ -81,6 +81,7 @@ describe('Flight bookings (e2e)', () => {
     process.env.MONGODB_URI = replSet.getUri('e2e-flight-bookings');
     process.env.JWT_ACCESS_SECRET = 'e2e-access-secret';
     process.env.JWT_REFRESH_SECRET = 'e2e-refresh-secret';
+    process.env.STRIPE_SECRET_KEY = 'sk_test_e2e_placeholder_not_real';
 
     const { AppModule } = await import('../src/app.module');
     const moduleRef = await Test.createTestingModule({

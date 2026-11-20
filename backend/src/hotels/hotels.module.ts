@@ -4,6 +4,7 @@ import { MongooseModule } from '@nestjs/mongoose';
 import { AuthModule } from '../auth/auth.module';
 import { ModeratorAssignmentsModule } from '../moderator-assignments/moderator-assignments.module';
 import { UploadsModule } from '../uploads/uploads.module';
+import { RoomInventoryService } from '../hotel-bookings/room-inventory.service';
 import { UsersModule } from '../users/users.module';
 import { Hotel, HotelSchema } from './schemas/hotel.schema';
 import { Room, RoomSchema } from './schemas/room.schema';
@@ -28,7 +29,7 @@ import { HotelsController } from './hotels.controller';
     UploadsModule,
   ],
   controllers: [HotelsController],
-  providers: [HotelsService],
-  exports: [MongooseModule, HotelsService],
+  providers: [HotelsService, RoomInventoryService],
+  exports: [MongooseModule, HotelsService, RoomInventoryService],
 })
 export class HotelsModule {}

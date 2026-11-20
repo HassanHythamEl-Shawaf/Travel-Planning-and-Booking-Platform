@@ -407,6 +407,10 @@ describe('FlightBookingLifecycleService (FLT-22, FLT-23, GEN-11)', () => {
       totalPrice: 800,
       currency: 'USD',
       holdExpiresAt: held.holdExpiresAt,
+      policySnapshot: expect.objectContaining({
+        cancellationPolicy: [],
+        baggagePolicy: expect.any(Array),
+      }),
     });
   });
 });

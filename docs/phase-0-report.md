@@ -65,3 +65,14 @@ Before this compatibility branch, the backend suite passed 340 tests, and the
 build and lint commands passed. The compatibility controller is validated by
 the same TypeScript build and endpoint delegation patterns used by the existing
 controllers.
+
+## Integration status update (2026-11-20)
+
+The adapter work listed above as remaining integration is now wired through the
+feature modules, including booking reads/cancellation, payment/refund handling,
+provider ownership, and shared image uploads. The earlier TODO list is a
+historical Phase 0 snapshot, not the current integration status.
+
+The final local validation on this branch passed 649 unit tests and 99 HTTP
+end-to-end tests across 9 suites, plus the Nest build. End-to-end tests use an
+in-memory MongoDB replica set; they do not connect to the shared Atlas database.

@@ -16,13 +16,19 @@ export class RoomAvailability {
 
   @Prop({
     required: true,
-    enum: ['held', 'booked', 'maintenance'],
+    enum: ['available', 'held', 'booked', 'maintenance'],
     default: 'booked',
   })
   status: string;
 
   @Prop({ type: String, required: false })
   bookingReference?: string;
+
+  @Prop({ type: String, required: false })
+  reservationReference?: string;
+
+  @Prop({ type: Date, required: false })
+  holdExpiresAt?: Date;
 }
 
 export const RoomAvailabilitySchema =

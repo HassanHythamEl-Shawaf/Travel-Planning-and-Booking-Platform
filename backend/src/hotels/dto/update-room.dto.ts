@@ -26,8 +26,17 @@ export class UpdateRoomDto {
 
   @IsOptional()
   @IsNumber()
-  @Min(0)
+  @Min(0.01)
   pricePerNight?: number;
+
+  @IsOptional()
+  @IsString()
+  type?: string;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(1)
+  beds?: number;
 
   @IsOptional()
   @ValidateNested()

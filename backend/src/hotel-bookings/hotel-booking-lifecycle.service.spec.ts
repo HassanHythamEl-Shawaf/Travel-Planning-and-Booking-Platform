@@ -3,6 +3,7 @@ import { Types } from 'mongoose';
 
 import { HotelBookingLifecycleService } from './hotel-booking-lifecycle.service';
 import { HotelBookingStatus } from './hotel-booking-status';
+import { DEFAULT_CANCELLATION_TERMS } from './refund-rules';
 
 const ID = new Types.ObjectId().toHexString();
 const USER = new Types.ObjectId().toHexString();
@@ -32,7 +33,10 @@ const rejects = (error: unknown) => ({ exec: () => Promise.reject(error) });
 
 function build() {
   const model = { findOneAndUpdate: jest.fn(), findById: jest.fn() };
-  const rooms = { confirmRoomDates: jest.fn().mockResolvedValue(undefined) };
+  const rooms = {
+    confirmRoomDates: jest.fn().mockResolvedValue(undefined),
+    findCancellationTerms: jest.fn().mockResolvedValue(null),
+  };
   const notifications = { send: jest.fn().mockResolvedValue(undefined) };
   const service = new HotelBookingLifecycleService(
     model as never,
@@ -73,7 +77,7 @@ describe('HotelBookingLifecycleService.confirmBooking (HTL-17)', () => {
       bookingReference: 'HTL-ABCD2345',
       status: HotelBookingStatus.CONFIRMED,
     });
-    expect(rooms.confirmRoomDates).toHaveBeenCalledWith(ID);
+    expect(rooms.confirmRoomDates).toHaveBeenCalledWith(ID, 'HTL-ABCD2345');
     expect(notifications.send).toHaveBeenCalledTimes(1);
     expect(notifications.send).toHaveBeenCalledWith(
       USER,
@@ -132,7 +136,7 @@ describe('HotelBookingLifecycleService.confirmBooking (HTL-17)', () => {
     );
     const result = await service.confirmBooking(ID, undefined, NOW);
     expect(result.bookingReference).toBe('HTL-ABCD2345');
-    expect(rooms.confirmRoomDates).toHaveBeenCalledWith(ID);
+    expect(rooms.confirmRoomDates).toHaveBeenCalledWith(ID, 'HTL-ABCD2345');
     expect(notifications.send).not.toHaveBeenCalled();
   });
 
@@ -200,6 +204,37 @@ describe('HotelBookingLifecycleService.getForPayment', () => {
       currency: 'USD',
       status: HotelBookingStatus.PENDING_PAYMENT,
       holdExpiresAt: new Date('2026-11-18T10:05:00Z'),
+      policySnapshot: {
+        cancellationPolicy: DEFAULT_CANCELLATION_TERMS,
+        checkInTime: '14:00',
+        checkOutTime: '12:00',
+      },
     });
+  });
+
+  it('converts the embedded cancellation policy to a plain snapshot', async () => {
+    const { service, model } = build();
+    const cancellationPolicy = { ...DEFAULT_CANCELLATION_TERMS };
+    const hydratedPolicy = Object.assign(
+      Object.create({ hydrated: true }),
+      cancellationPolicy,
+    );
+    const plainBooking = booking({ cancellationPolicy });
+    const hydratedBooking = {
+      ...booking({ cancellationPolicy: hydratedPolicy }),
+      toObject: () => plainBooking,
+    };
+    model.findById.mockReturnValue(resolves(hydratedBooking));
+
+    const result = await service.getForPayment(ID);
+
+    expect(result.policySnapshot).toEqual({
+      cancellationPolicy,
+      checkInTime: cancellationPolicy.checkInTime,
+      checkOutTime: cancellationPolicy.checkOutTime,
+    });
+    expect(
+      Object.getPrototypeOf(result.policySnapshot.cancellationPolicy),
+    ).toBe(Object.prototype);
   });
 });

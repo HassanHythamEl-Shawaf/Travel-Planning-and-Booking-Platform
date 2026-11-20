@@ -16,14 +16,15 @@ import { HotelBookingQueryService } from './hotel-booking-query.service';
 import { HotelBookingsController } from './hotel-bookings.controller';
 import { HotelReviewModerationHandler } from './hotel-review-moderation.handler';
 import { HotelReviewsController } from './hotel-reviews.controller';
+import { HotelReservationsController } from './hotel-reservations.controller';
 import { HotelReviewsService } from './hotel-reviews.service';
 import { HotelBookingsService } from './hotel-bookings.service';
 import { HOTEL_REFUNDS } from './hotel-refunds.contract';
 import { HOTEL_ROOM_READER, HotelsServiceRoomReader } from './hotel-room.reader';
-import { RoomInventoryService } from './room-inventory.service';
 import { StripeHotelRefundsService } from './stripe-hotel-refunds.service';
 import { HotelBooking, HotelBookingSchema } from './schemas/hotel-booking.schema';
 import { Review, ReviewSchema } from './schemas/review.schema';
+import { Payment, PaymentSchema, Refund, RefundSchema } from '../payments/payment.schema';
 
 /**
  * Hotel booking (Person 6: HTL-16 to HTL-21: quote, hold, confirmation, list/details, cancellation, reviews). Hotels, rooms and availability
@@ -35,6 +36,8 @@ import { Review, ReviewSchema } from './schemas/review.schema';
     MongooseModule.forFeature([
       { name: HotelBooking.name, schema: HotelBookingSchema },
       { name: Review.name, schema: ReviewSchema },
+      { name: Payment.name, schema: PaymentSchema },
+      { name: Refund.name, schema: RefundSchema },
     ]),
     AuthModule,
     // Provides HotelsService (must be in HotelsModule's exports).
@@ -48,7 +51,11 @@ import { Review, ReviewSchema } from './schemas/review.schema';
     UsersModule,
     JwtModule.register({}),
   ],
-  controllers: [HotelBookingsController, HotelReviewsController],
+  controllers: [
+    HotelBookingsController,
+    HotelReviewsController,
+    HotelReservationsController,
+  ],
   providers: [
     HotelBookingsService,
     HotelBookingHoldService,
@@ -57,7 +64,6 @@ import { Review, ReviewSchema } from './schemas/review.schema';
     HotelBookingCancellationService,
     HotelBookingQueryService,
     HotelBookingLifecycleService,
-    RoomInventoryService,
     { provide: HOTEL_ROOM_READER, useClass: HotelsServiceRoomReader },
     // PAY-03: refunds the Stripe payment stored on the booking.
     { provide: HOTEL_REFUNDS, useClass: StripeHotelRefundsService },

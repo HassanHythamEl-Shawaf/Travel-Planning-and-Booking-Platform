@@ -10,6 +10,7 @@ import { HotelBookingStatus } from './hotel-booking-status';
 import { HotelBookingsService } from './hotel-bookings.service';
 import type { HotelRoomReader } from './hotel-room.reader';
 import { RoomInventoryService } from './room-inventory.service';
+import { Payment, PaymentSchema } from '../payments/payment.schema';
 import {
   HotelBooking,
   HotelBookingDocument,
@@ -49,6 +50,7 @@ describe('Hotel booking holds (HTL-18)', () => {
   let replSet: MongoMemoryReplSet;
   let connection: Connection;
   let bookingModel: Model<HotelBookingDocument>;
+  let paymentModel: Model<Payment>;
   let holds: HotelBookingHoldService;
   let lifecycle: HotelBookingLifecycleService;
   const notifications = { send: jest.fn().mockResolvedValue(undefined) };
@@ -76,6 +78,11 @@ describe('Hotel booking holds (HTL-18)', () => {
       HotelBookingSchema,
     ) as unknown as Model<HotelBookingDocument>;
     await bookingModel.init();
+    paymentModel = connection.model(
+      Payment.name,
+      PaymentSchema,
+    ) as unknown as Model<Payment>;
+    await paymentModel.init();
 
     // The advisory availability check is switched off so these tests prove
     // that the transaction alone prevents double booking.
@@ -112,6 +119,7 @@ describe('Hotel booking holds (HTL-18)', () => {
       lifecycle,
       inventory,
       bookingModel,
+      paymentModel,
       connection,
       reader,
     );
@@ -124,6 +132,7 @@ describe('Hotel booking holds (HTL-18)', () => {
 
   beforeEach(async () => {
     await bookingModel.deleteMany({});
+    await paymentModel.deleteMany({});
     await availability().deleteMany({});
     notifications.send.mockClear();
   });
@@ -237,6 +246,27 @@ describe('Hotel booking holds (HTL-18)', () => {
     );
   });
 
+  it('does not release an expired hold while its Stripe payment still needs cancellation', async () => {
+    const first = await holds.hold(newUser(), dto([R1]), NOW);
+    await paymentModel.create({
+      bookingType: 'hotel',
+      bookingId: first.id,
+      userId: new Types.ObjectId(),
+      stripePaymentIntentId: 'pi_pending',
+      amountMinor: 10000,
+      currency: 'USD',
+      status: 'Pending',
+      holdExpiresAt: first.holdExpiresAt,
+    });
+
+    await expect(
+      holds.hold(newUser(), dto([R1]), minutes(11)),
+    ).resolves.toBeDefined();
+    expect((await bookingModel.findById(first.id))?.status).toBe(
+      HotelBookingStatus.PENDING_PAYMENT,
+    );
+  });
+
   it('keeps a Confirmed reservation blocking and safe from the expiry sweep', async () => {
     const hold = await holds.hold(newUser(), dto([R1]), NOW);
     await lifecycle.confirmBooking(hold.id, undefined, minutes(1));
@@ -265,5 +295,19 @@ describe('Hotel booking holds (HTL-18)', () => {
     expect((await bookingModel.findById(other.id))?.status).toBe(
       HotelBookingStatus.CONFIRMED,
     );
+  });
+
+  it('does not treat an availability window outside the stay as available', async () => {
+    await availability().insertOne({
+      roomId: new Types.ObjectId(R1),
+      startDate: new Date('2026-12-10T00:00:00Z'),
+      endDate: new Date('2026-12-15T00:00:00Z'),
+      status: 'available',
+    });
+
+    await expect(
+      holds.hold(newUser(), dto([R1]), NOW),
+    ).rejects.toThrow(ConflictException);
+    expect(await bookingModel.countDocuments()).toBe(0);
   });
 });
