@@ -15,6 +15,7 @@ import { BlogModule } from './blog/blog.module';
 import { AirlinesModule } from './airlines/airlines.module';
 import { FlightBookingsModule } from './flight-bookings/flight-bookings.module';
 import { HotelsModule } from './hotels/hotels.module';
+import { HotelBookingsModule } from './hotel-bookings/hotel-bookings.module';
 import { PaymentsModule } from './payments/payments.module';
 import { UploadsModule } from './uploads/uploads.module';
 import { ItinerariesModule } from './itineraries/itineraries.module';
@@ -40,6 +41,7 @@ import { ItinerariesModule } from './itineraries/itineraries.module';
     AirlinesModule,
     FlightBookingsModule,
     HotelsModule,
+    HotelBookingsModule,
     PaymentsModule,
     UploadsModule,
     ItinerariesModule,

@@ -710,6 +710,16 @@ confirm it is stable, checked the Swagger UI of the built app against an
 in-memory database, and added a Flight bookings section to the README
 while updating notes that said the booking adapters were still missing.
 ================================================
+Date: 2026-11-18
+Student: Seif Moustapha
+Tool: Claude Code (Claude Sonnet 5.5)
+Related Requirement: HTL-16
+Prompt:
+Implement HTL-16, keep in mind that the system should allow a registered user to book on or more available rooms
+in the same hotel for the same dates in one reservation,assign adults and children(0-17) one room each.No rooms
+guests should exceed its maximum occupancy
+How the output was used:
+Added hotel-bookings folder with its own functionalities,and updated app.module.ts to account for the addition
 
 Date: 2026-11-16
 Student: Hammad
@@ -724,7 +734,6 @@ and the team's ground rules.
 How the output was used:
 Used as the handoff file for Claude Code. It guided the implementation
 plan, the branch and PR split, and the decisions recorded in the specs.
-================================================
 
 Date: 2026-11-16
 Student: Hammad
@@ -742,7 +751,6 @@ adapters), bound BLOG_IMAGE_STORE, replaced Blog's 501 e2e test with real
 upload/delete and a parallel 5-image-limit test, added unit and e2e tests,
 the GEN-08 spec and a README section. Airline and hotel adapters exist but
 their endpoints wait for Yahia's and Seif's agreement.
-================================================
 
 Date: 2026-11-16
 Student: Hammad
@@ -760,7 +768,6 @@ changed the direct-logoUrl check from 501 to 400 and updated Yahia's
 spec, added POST/DELETE /api/hotels/:id/photos with ProviderOwnershipGuard
 and a conditional push, switched Blog's route to ImageFileInterceptor, and
 added an e2e suite for logos and photos including parallel uploads.
-================================================
 
 Date: 2026-11-16
 Student: Hammad
@@ -779,7 +786,6 @@ groups and totals, access rules, services with a version-checked
 read-modify-write, two controllers with Swagger docs, moderation handler),
 unit tests, an e2e suite with parallel-request tests, the ITN spec and a
 README section. Updated two "itineraries answer 501" texts.
-================================================
 
 Date: 2026-11-16
 Student: Hammad
@@ -798,7 +804,6 @@ snapshot schema, service with shared in-flight fetch, fallback and
 retry wait, conversion maths), converted amounts in the itinerary view
 and a GET /itineraries/:id/budget endpoint, unit and e2e tests, the
 ITN-18 spec and a README section.
-================================================
 
 Date: 2026-11-16
 Student: Hammad
@@ -816,7 +821,6 @@ flights), the "N biggest rooms cover the guests" rule on top of the hotel
 search's availability, an e2e suite with real hotels, rooms, a booked
 room and flights, and spec and README notes, including the gaps noted for
 Seif (no room-count parameter, no past check-in check).
-================================================
 
 Date: 2026-11-16
 Student: Hammad
@@ -832,7 +836,6 @@ paginated) as the sheet says "any airport", with `to` as an optional
 filter; ITN-25 rooms default to 1 as in HTL-11; the e2e test sets the
 preferred currency through PATCH /api/users/me (ACC-09); spec and README
 updated.
-================================================
 
 Date: 2026-11-17
 Student: Hammad
@@ -848,7 +851,6 @@ totals with the rate date) as a PDF with pdfkit, with the same visibility
 rules as viewing it; unit and e2e tests; spec decisions D29-D31 and a
 README line. ITN-27 was held because hotel bookings (HTL-17) do not exist
 yet, and BLG-13 needs changes in the Blog module (asked first).
-================================================
 
 Date: 2026-11-17
 Student: Hammad
@@ -865,7 +867,6 @@ booking contract (no teammate files changed); their prices are kept apart
 from the planned costs and never converted (PAY-04); links are private to
 the owner and not cloned; unit and e2e tests; spec decisions D32-D36 and
 README section.
-================================================
 
 Date: 2026-11-17
 Student: Hammad
@@ -881,4 +882,3 @@ it only under the itinerary's visibility rules (owner always; public for
 others; hidden only for admins; deleted shows as null). Additive changes
 in Wael's Blog module, read through Blog's PublicItineraryReader; e2e
 tests; spec decisions D37-D39 and a README line.
-================================================
