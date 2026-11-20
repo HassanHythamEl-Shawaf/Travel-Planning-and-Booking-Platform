@@ -8,7 +8,6 @@ import {
   UseGuards,
   UseInterceptors,
 } from '@nestjs/common';
-import { FileInterceptor } from '@nestjs/platform-express';
 import {
   ApiBadRequestResponse,
   ApiBody,
@@ -31,6 +30,7 @@ import {
 } from '../auth/decorators/current-user.decorator';
 import { AuthGuard } from '../auth/guards/auth.guard';
 import { ParseObjectIdPipe } from '../common/pipes/parse-object-id.pipe';
+import { ImageFileInterceptor } from '../uploads/image-file.interceptor';
 import type { UploadedImageFile } from './blog-image-store';
 import { PostImagesDto } from './dto/author.dto';
 import { IMAGE_UPLOAD_UNAVAILABLE, PostImagesService } from './post-images.service';
@@ -47,7 +47,8 @@ export class PostImagesController {
   constructor(private readonly images: PostImagesService) {}
 
   @Post(':id/images')
-  @UseInterceptors(FileInterceptor('file', { limits: { files: 1 } }))
+  // GEN-08: multer stops reading at 5 MB and the error is a 400, not a 413.
+  @UseInterceptors(ImageFileInterceptor('file'))
   @ApiOperation({
     summary: 'Attach an image to my post (BLG-10, GEN-08)',
     description:
