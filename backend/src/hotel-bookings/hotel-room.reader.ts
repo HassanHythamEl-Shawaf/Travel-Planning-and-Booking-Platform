@@ -35,6 +35,8 @@ export interface HotelRoomReader {
     checkIn: Date,
     checkOut: Date,
   ): Promise<boolean>;
+  /** HTL-17: held -> booked for every room date held under `holdKey`. */
+  confirmRoomDates(holdKey: string): Promise<void>;
 }
 
 export const HOTEL_ROOM_READER = Symbol('HOTEL_ROOM_READER');
@@ -82,5 +84,9 @@ export class HotelsServiceRoomReader implements HotelRoomReader {
     checkOut: Date,
   ): Promise<boolean> {
     return this.hotels.checkAvailability(roomId, checkIn, checkOut);
+  }
+
+  confirmRoomDates(holdKey: string): Promise<void> {
+    return this.hotels.confirmDates(holdKey);
   }
 }

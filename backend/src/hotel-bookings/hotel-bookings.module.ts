@@ -4,16 +4,18 @@ import { MongooseModule } from '@nestjs/mongoose';
 
 import { AuthModule } from '../auth/auth.module';
 import { HotelsModule } from '../hotels/hotels.module';
+import { NotificationsModule } from '../notifications/notifications.module';
 import { UsersModule } from '../users/users.module';
+import { HOTEL_BOOKING_PAYMENTS } from './hotel-booking-payments.contract';
+import { HotelBookingLifecycleService } from './hotel-booking-lifecycle.service';
 import { HotelBookingsController } from './hotel-bookings.controller';
 import { HotelBookingsService } from './hotel-bookings.service';
 import { HOTEL_ROOM_READER, HotelsServiceRoomReader } from './hotel-room.reader';
 import { HotelBooking, HotelBookingSchema } from './schemas/hotel-booking.schema';
 
 /**
- * Hotel booking (Person 6: HTL-16 to HTL-21). Hotels, rooms and availability
- * are reached only through HOTEL_ROOM_READER, bound to Person 5's
- * HotelsService.
+ * Hotel booking . Hotels, rooms and availability
+ * are reached only through HOTEL_ROOM_READER, bound to HotelsService.
  */
 @Module({
   imports: [
@@ -23,6 +25,7 @@ import { HotelBooking, HotelBookingSchema } from './schemas/hotel-booking.schema
     AuthModule,
     // Provides HotelsService (must be in HotelsModule's exports).
     HotelsModule,
+    NotificationsModule,
     // AuthGuard is instantiated in this module, so its dependencies must be
     // visible here (same as FlightBookingsModule).
     UsersModule,
@@ -31,8 +34,14 @@ import { HotelBooking, HotelBookingSchema } from './schemas/hotel-booking.schema
   controllers: [HotelBookingsController],
   providers: [
     HotelBookingsService,
+    HotelBookingLifecycleService,
     { provide: HOTEL_ROOM_READER, useClass: HotelsServiceRoomReader },
+    // Payments depends on this token only.
+    {
+      provide: HOTEL_BOOKING_PAYMENTS,
+      useExisting: HotelBookingLifecycleService,
+    },
   ],
-  exports: [HotelBookingsService, MongooseModule],
+  exports: [HotelBookingsService, HOTEL_BOOKING_PAYMENTS, MongooseModule],
 })
 export class HotelBookingsModule {}
