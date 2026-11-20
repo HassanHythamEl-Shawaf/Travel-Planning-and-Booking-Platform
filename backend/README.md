@@ -216,8 +216,8 @@ other reporters.
   to its author and admins (404 for everyone else) and excluded from search, lists, counts and
   (for reviews) the hotel average rating. The moderation code only sets the flag.
 - Until you register a handler, moderation reads and writes your raw collection with the names in
-  `src/integrations/teammate-contracts.ts` (`CONTENT_COLLECTIONS`). Admin delete of reviews and
-  itineraries answers **501** until you register a handler with `delete`.
+  `src/integrations/teammate-contracts.ts` (`CONTENT_COLLECTIONS`). Admin delete of reviews
+  answers **501** until you register a handler with `delete` (itineraries register one).
 - Register in your module (which imports `ModerationModule`):
   `onModuleInit() { this.moderationRegistry.register('review', { find, setHidden, delete }) }`.
   The interface and a full example are in `src/moderation/moderation.registry.ts`. Use the
@@ -225,7 +225,130 @@ other reporters.
 
 Tests: `npm run test:e2e -- reports` (in-memory replica set, never Atlas).
 
-## Blog (BLG-01 – BLG-12)
+## Image uploads (GEN-08)
+
+Swagger tag **Uploads**. Full rules: `docs/requirements/GEN-08-uploads-spec.md`.
+
+- **Limits** — JPG or PNG only, at most 5 MB each. The type is checked from the file's first
+  bytes, not from the name or the mimetype the client sends. Anything else gets a 400.
+  Per-item maximums (`MAX_IMAGES_PER_ITEM`): 5 per post, activity or hotel, 1 logo per airline.
+- **Storage** — files go to `UPLOAD_DIR` (optional; default `backend/uploads/`, git-ignored)
+  under a random name `<uuid>.jpg|png`, with a record in the `uploads` collection.
+- **Serving** — `GET /api/uploads/:fileName` is public and returns the image with its stored
+  content type. Every upload returns its `url` in this form, relative to the API host.
+
+**For teammates:**
+- Import `UploadsModule`, then bind your token to an adapter, e.g.
+  `{ provide: BLOG_IMAGE_STORE, useExisting: BlogImageUploadAdapter }`, or call
+  `UploadsService.upload(file, { type, id })` / `delete(id)` / `deleteByUrl(url)` directly.
+- Enforce the per-item maximum on your own document with a conditional update (Blog uses
+  `'images.4': { $exists: false }`). If it fails, delete the file you just uploaded and answer 400.
+- Use `@UseInterceptors(ImageFileInterceptor('file'))` on upload routes. It stops reading a file
+  at 5 MB and answers 400 instead of multer's 413.
+- Delete files only after your database change is committed. Deletes are idempotent.
+- Bound: `BLOG_IMAGE_STORE` (Blog), `AIRLINE_LOGO_STORE` (Airlines) and `HOTEL_PHOTO_STORE`
+  (Hotels). Routes using them:
+  - Blog: `POST /api/posts/:id/images`, `DELETE /api/posts/:id/images/:imageId`, post author
+    only, 5 per post.
+  - Airlines: `PUT /api/airlines/:id/logo` (upload or replace) and `DELETE /api/airlines/:id/logo`,
+    assigned airline moderator only. One logo per airline: a new upload replaces the old one and
+    deletes its file. A direct `logoUrl` in create/update is rejected with 400.
+  - Hotels: `POST /api/hotels/:id/photos`, `DELETE /api/hotels/:id/photos/:fileName`, assigned
+    hotel moderator only (`ProviderOwnershipGuard`), 5 per hotel.
+
+Tests: `npm test -- src/uploads` and `npm run test:e2e -- uploads provider-images` (in-memory
+MongoDB, temporary folder).
+
+## Itineraries (ITN-01 – ITN-28)
+
+Swagger tags **Itineraries** and **Itinerary days, activities and budget**. Full rules:
+`docs/requirements/ITN-itineraries-spec.md`.
+
+- **Itineraries** — `POST /api/itineraries` (user accounts; `title` ≤100, `countries` codes,
+  `startDate` `YYYY-MM-DD`; private by default), `GET /api/itineraries/mine` (most recently
+  updated first), `GET|PATCH /api/itineraries/:id`, `PATCH /api/itineraries/:id/visibility`
+  (`{ isPublic }`), `DELETE /api/itineraries/:id` with `{ "confirm": true }`.
+- **Days** — `POST /api/itineraries/:id/days` (`cityId` from the city list, optional `notes` and
+  `position`), `PATCH|DELETE .../days/:dayId` (delete needs `{ "confirm": true }`),
+  `PATCH .../days/:dayId/position`. At most 60 days. Day numbers and dates are never stored:
+  they come from the day's position and the start date, so they can't drift. Consecutive days in
+  the same city are returned as `cityGroups` with day count, dates and budget subtotal.
+- **Activities** — `POST|PATCH|DELETE .../days/:dayId/activities[/:activityId]` (name,
+  description, optional time `HH:mm`, optional cost + currency). Images:
+  `POST .../activities/:activityId/images` (multipart `file`, GEN-08, 5 per activity) and
+  `DELETE .../images/:imageId`.
+- **Budget** — `POST|PATCH|DELETE .../days/:dayId/budget-entries[/:entryId]` (`food`,
+  `accommodation`, `in_city_transport`, `activities`; amount ≥ 0; supported currency) and
+  `POST|PATCH|DELETE /api/itineraries/:id/transport-entries[/:entryId]` (mode, from/to city,
+  amount, currency, `dayId`). Transport entries follow their day when days move and are deleted
+  with it. `budget` in every response totals by category, by day and overall, one amount per
+  currency (activity costs count as `activities`; transport is `intercity_transport`).
+- **Public** — `GET /api/itineraries?q=&country=&cityId=&minDays=&maxDays=&page=` (guests too;
+  `q` matches title, country name/code or city name; newest first; 10 per page) and
+  `POST /api/itineraries/:id/clone` (user accounts): a private, independent copy with its own
+  image files and `clonedFrom` crediting the original author.
+- **Hotels and flights** (owner) — `GET /api/itineraries/:id/hotels?group=&guests=&rooms=`
+  (ITN-25): hotels in a city group's city for its dates (check-out = the day after the group's
+  last day) with at least `rooms` free rooms whose combined occupancy covers `guests`, through
+  `HotelsService.searchHotels`. `GET .../flights/airports` and
+  `GET .../flights?from=&to=&tripType=` (ITN-26): flights to any airport in day 1's city (or only
+  `to`), through `AirlinesService.searchFlights` for each airport, merged, sorted and paginated;
+  dates default to the first and last day. `rooms` defaults to 1.
+- **Linked bookings** (ITN-27, optional bonus, owner) — `POST .../days/:dayId/bookings`
+  (`{ type: 'flight' | 'hotel', bookingId }`, your own Confirmed or Completed booking) and
+  `DELETE .../days/:dayId/bookings/:linkId`. Prices are read live and feed
+  `budget.byDay[].bookings`, `budget.bookings` and `budget.totalWithBookings`, kept apart from
+  the planned costs and never converted (PAY-04). Only the owner sees them; clones don't copy
+  them. Bookings are read through `integrations/teammate-contracts.ts`; hotel reservations
+  appear once Person 6's module stores them under those names.
+- **PDF export** (ITN-28, optional bonus) — `GET /api/itineraries/:id/pdf?currency=`: the same
+  content as `GET /api/itineraries/:id` as a printable A4 PDF (`itinerary-<id>.pdf`), with the
+  same visibility rules and converted totals. Non-Western-European characters show as "?"
+  (built-in fonts).
+
+Who sees what: the owner always; a private itinerary nobody else (404, admins too); a public one
+everyone, read-only (other users get 403 on writes); hidden (GEN-10) only the owner and admins;
+public itineraries of a deactivated owner only admins (ACC-12). Search applies the same rules.
+Every write that changes days or entries is a read-modify-write that only saves if nobody saved
+in between (a `version` field), and retries otherwise; after 12 tries it answers 409.
+
+**For teammates:**
+- Model `Itinerary`, collection `itineraries`, fields as in `ITINERARY_FIELDS` (Blog's author
+  page reads them). Older raw documents without days or a start date are tolerated.
+- Moderation: an `itinerary` handler is registered (hide, unhide, delete; delete removes the
+  activity image files after the commit). An owner's delete closes open reports as
+  `content_deleted` with the note `Deleted by owner`.
+- `ItinerariesModule` exports `ItinerariesService` (`loadViewable`, `findOne`).
+
+Tests: `npm test -- src/itineraries` and `npm run test:e2e -- itineraries` (in-memory replica
+set, includes parallel day edits, the 60-day limit and 5 images per activity under parallel
+requests).
+
+## Exchange rates (ITN-18)
+
+Full rules: `docs/requirements/ITN-18-fx-rates-spec.md`.
+
+- **Source** — FXRatesAPI `GET /latest`, server-side only. Set `FXRATES_API_KEY` in `.env`; it
+  is sent as a Bearer header and never logged or returned.
+- **Once a day** — the first request of the (UTC) day fetches the rates and stores them in
+  `fx_rate_snapshots` (one per day); everything else reads that snapshot. No cron job.
+- **API down** — the latest stored snapshot is used and responses say `usingCachedRates: true`
+  with its `rateDate`. Nothing stored at all → 503. A failed fetch is retried after 10 minutes.
+- **Itinerary amounts** — `GET /api/itineraries/:id` and every itinerary write response add
+  `converted` to each budget total and `convertedAmount` / `convertedCost` to each entry, in
+  `?currency=`, else the user's `preferredCurrency` (ACC-09), else USD. `budget.conversion` shows
+  `{ currency, rateDate, usingCachedRates }`. If no rates are available the itinerary still loads
+  with `conversion: null`. `GET /api/itineraries/:id/budget?currency=` returns only the converted
+  budget (503 if it can't convert). Unsupported currency → 400. Booking prices are never converted
+  (PAY-04).
+
+**For teammates:** `FxRatesModule` exports `FxRatesService` (`converter(viewer, currency?)` gives
+`convert(amount, from)` and the rate date). In tests, override the `FX_RATES_CLIENT` token
+(see `test/itineraries.e2e-spec.ts`) so nothing calls the real API.
+
+Tests: `npm test -- src/fx-rates` and `npm run test:e2e -- itineraries` (fake provider).
+
+## Blog (BLG-01 – BLG-13)
 
 Swagger tag **Blog**. Full rules: `docs/requirements/BLG-blog-spec.md`.
 
@@ -249,11 +372,16 @@ Swagger tag **Blog**. Full rules: `docs/requirements/BLG-blog-spec.md`.
   same transaction as the like or comment (hidden comments are not counted).
 - **Images** — `POST /api/posts/:id/images` (multipart `file`) and
   `DELETE /api/posts/:id/images/:imageId`. They go through the shared upload module (JPG/PNG,
-  5 MB, max 5 per post; the first image is the cover). Until that module is bound to
-  `BLOG_IMAGE_STORE` in `BlogModule`, both answer **501**.
+  5 MB, max 5 per post; the first image is the cover). `BlogModule` binds
+  `BLOG_IMAGE_STORE` to the upload module's `BlogImageUploadAdapter`.
 - **Author page** — `GET /api/authors/:id` returns name, join date, published posts (paginated)
   and up to 10 public itineraries (read from `itineraries` via
   `ITINERARY_FIELDS` in `teammate-contracts.ts`).
+- **Attached itinerary** (BLG-13, optional bonus, added by Person 8) — `POST` / `PATCH
+  /api/posts[/:id]` accept `itineraryId` (one of your own itineraries; `null` detaches). Post
+  details return `itinerary: { id, title, countries, isPublic }`, or `null` when the reader may
+  not see it (private, hidden or deleted). Rules: `docs/requirements/ITN-itineraries-spec.md`
+  D37–D39.
 
 Public GETs use `OptionalAuthGuard` (`src/blog/optional-auth.guard.ts`). It applies the same
 checks as `AuthGuard`, but a missing or invalid session makes the request a guest request,
@@ -276,10 +404,11 @@ Airline profiles are exposed through Swagger under the **Airlines** tag:
 
 The `isActive` flag is owned by the profile for the separate administrator
 deactivate/reactivate endpoints. Existing confirmed bookings are unaffected by
-that flag. Airline logos are intentionally not accepted as direct URLs; the
-profile has a `logoUrl` field and the module exposes an
-`AIRLINE_LOGO_STORE` boundary for Person 8's shared JPG/PNG upload integration.
-Until that integration is merged, sending `logoUrl` returns `501`.
+that flag. Airline logos are intentionally not accepted as direct URLs (sending
+`logoUrl` returns `400`). The assigned airline moderator uploads the logo with
+`PUT /api/airlines/:id/logo` (multipart `file`, JPG/PNG, 5 MB) and removes it
+with `DELETE /api/airlines/:id/logo`, through Person 8's shared upload module
+bound to `AIRLINE_LOGO_STORE` (see "Image uploads (GEN-08)").
 
 Targeted validation:
 

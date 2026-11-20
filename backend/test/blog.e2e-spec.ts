@@ -4,6 +4,10 @@
  * is overridden before the app boots and the test asserts the connection is
  * local.
  */
+import { mkdtempSync, readdirSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+
 import { INestApplication, ValidationPipe } from '@nestjs/common';
 import { getConnectionToken } from '@nestjs/mongoose';
 import { Test } from '@nestjs/testing';
@@ -15,6 +19,7 @@ import request from 'supertest';
 import type TestAgent from 'supertest/lib/agent';
 
 import { HttpExceptionFilter } from '../src/common/filters/http-exception.filter';
+import { JPEG_BYTES, jpegOfSize } from './fixtures/images';
 
 jest.setTimeout(180_000);
 
@@ -32,6 +37,7 @@ describe('Blog (e2e)', () => {
   let aliceId: Types.ObjectId;
   let bobId: Types.ObjectId;
 
+  let uploadDir: string;
   let postId: string;
   let otherPostId: string;
   let commentId: string;
@@ -72,6 +78,9 @@ describe('Blog (e2e)', () => {
     process.env.MONGODB_URI = replSet.getUri('blog-e2e');
     process.env.JWT_ACCESS_SECRET = 'e2e-access-secret';
     process.env.JWT_REFRESH_SECRET = 'e2e-refresh-secret';
+    // Uploaded images go to a temporary folder (GEN-08).
+    uploadDir = mkdtempSync(join(tmpdir(), 'blog-e2e-uploads-'));
+    process.env.UPLOAD_DIR = uploadDir;
 
     const { AppModule } = await import('../src/app.module');
     const moduleRef = await Test.createTestingModule({
@@ -133,6 +142,8 @@ describe('Blog (e2e)', () => {
   afterAll(async () => {
     await app?.close();
     await replSet?.stop();
+    delete process.env.UPLOAD_DIR;
+    rmSync(uploadDir, { recursive: true, force: true });
   });
 
   describe('posts (BLG-01 – BLG-04)', () => {
@@ -474,13 +485,67 @@ describe('Blog (e2e)', () => {
       await admin.patch(`/api/admin/content/post/${postId}/unhide`).expect(200);
     });
 
-    it('answers 501 for images until the upload module is bound (D15)', async () => {
-      await alice
+    // Was "answers 501 until the upload module is bound (D15)". The shared
+    // upload module (GEN-08, Person 8) is now bound, so this checks the real
+    // behaviour.
+    it('attaches and removes images through the upload module (BLG-10, GEN-08)', async () => {
+      const added = await alice
         .post(`/api/posts/${postId}/images`)
-        .attach('file', Buffer.from([0xff, 0xd8, 0xff]), 'nile.jpg')
-        .expect(501);
-      await alice.delete(`/api/posts/${postId}/images/abc`).expect(501);
+        .attach('file', JPEG_BYTES, 'nile.jpg')
+        .expect(201);
+      expect(added.body.images).toHaveLength(1);
+      const [image] = added.body.images;
+      expect(image.url).toMatch(/^\/api\/uploads\/[0-9a-f-]{36}\.jpg$/);
+      const served = await guest().get(image.url).expect(200);
+      expect(served.headers['content-type']).toBe('image/jpeg');
+
+      const notImage = await alice
+        .post(`/api/posts/${postId}/images`)
+        .attach('file', Buffer.from('not an image'), 'nile.jpg')
+        .expect(400);
+      expect(notImage.body.message).toBe('Only JPG or PNG images are allowed');
+      const tooBig = await alice
+        .post(`/api/posts/${postId}/images`)
+        .attach('file', jpegOfSize(5 * 1024 * 1024 + 1), 'nile.jpg')
+        .expect(400);
+      expect(tooBig.body.message).toBe('Images can be at most 5 MB');
       await guest().post(`/api/posts/${postId}/images`).expect(401);
+      await bob
+        .post(`/api/posts/${postId}/images`)
+        .attach('file', JPEG_BYTES, 'nile.jpg')
+        .expect(403);
+
+      const removed = await alice
+        .delete(`/api/posts/${postId}/images/${image.imageId}`)
+        .expect(200);
+      expect(removed.body.images).toEqual([]);
+      await guest().get(image.url).expect(404);
+      expect(await connection.collection('uploads').countDocuments()).toBe(0);
+      expect(readdirSync(uploadDir)).toEqual([]);
+    });
+
+    it('keeps 5 images per post under parallel uploads and deletes the extra files (BLG-10, GEN-08)', async () => {
+      const results = await Promise.all(
+        Array.from({ length: 8 }, () =>
+          alice
+            .post(`/api/posts/${postId}/images`)
+            .attach('file', JPEG_BYTES, 'nile.jpg'),
+        ),
+      );
+      const statuses = results.map((r) => r.status).sort();
+      expect(statuses).toEqual([201, 201, 201, 201, 201, 400, 400, 400]);
+
+      const post = await storedPost();
+      expect(post!.images).toHaveLength(5);
+      expect(
+        await connection.collection('uploads').countDocuments({ ownerId: postId }),
+      ).toBe(5);
+      expect(readdirSync(uploadDir)).toHaveLength(5);
+
+      for (const { imageId } of post!.images as { imageId: string }[]) {
+        await alice.delete(`/api/posts/${postId}/images/${imageId}`).expect(200);
+      }
+      expect(readdirSync(uploadDir)).toEqual([]);
     });
 
     it('shows an author page with published posts and public itineraries (BLG-12)', async () => {
