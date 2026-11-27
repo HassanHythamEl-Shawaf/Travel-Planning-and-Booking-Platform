@@ -995,3 +995,20 @@ profile and account-deactivation flows. Documented the API/UI contracts and
 frontend setup. Validated with frontend lint/build, browser route smoke checks,
 and targeted backend auth/account tests.
 ================================================
+
+Date: 2026-11-27
+Student: Hassan
+Tool: GitHub Copilot (VS Code)
+Related Requirement: ACC-06, ACC-11, GEN-02, GEN-03, GEN-05, GEN-17
+Prompt:
+Audit the merged Person 1 Milestone 2 frontend work against the official
+requirements and fix directly related gaps without inspecting backend
+environment credentials.
+How the output was used:
+Routed server-rendered API 401, 403 and 404 responses to the matching
+login, access-denied and not-found pages, preserved the requested route during
+server-side session-expiry redirects, improved validation-to-field mapping,
+aligned the booking badge with the shared booking states and page size,
+centralized core type and spacing tokens, and added confirmation before
+removing uploaded images.
+================================================

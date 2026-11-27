@@ -33,12 +33,12 @@ function signalSessionExpired(): void {
   window.dispatchEvent(new Event("session-expired"));
 }
 
-async function readResponse<T>(response: Response): Promise<T> {
+async function readResponse<T>(response: Response, requestPath: string): Promise<T> {
   const text = await response.text();
   const payload = parseApiPayload(text, response.status);
 
   if (!response.ok) {
-    const error = apiErrorFromResponse(response.status, payload);
+    const error = apiErrorFromResponse(response.status, payload, requestPath);
     throw error;
   }
 
@@ -71,7 +71,7 @@ export async function apiRequest<T>(
     window.dispatchEvent(new Event("session-forbidden"));
   }
 
-  return readResponse<T>(response);
+  return readResponse<T>(response, path);
 }
 
 export function isApiError(error: unknown): error is ApiError {

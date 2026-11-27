@@ -4,6 +4,7 @@ import { useRef, useState } from "react";
 import Image from "next/image";
 
 import { Button } from "@/components/ui/button";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { API_BASE_URL } from "@/lib/api/config";
 
 export interface UploadedImage {
@@ -28,13 +29,21 @@ export function ImageUploader({
   const inputRef = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string>();
+  const [imageToRemove, setImageToRemove] = useState<UploadedImage>();
   const remaining = Math.max(0, maxImages - images.length);
 
   async function upload(file?: File) {
     if (!file) return;
     setError(undefined);
 
-    const signature = new Uint8Array(await file.slice(0, 8).arrayBuffer());
+    let signature: Uint8Array;
+    try {
+      signature = new Uint8Array(await file.slice(0, 8).arrayBuffer());
+    } catch {
+      setError("The image could not be checked. Please try another file.");
+      return;
+    }
+
     const isJpeg = signature[0] === 0xff && signature[1] === 0xd8 && signature[2] === 0xff;
     const isPng =
       signature[0] === 0x89 &&
@@ -69,15 +78,15 @@ export function ImageUploader({
       );
     } finally {
       setBusy(false);
-      if (inputRef.current) inputRef.current.value = "";
     }
   }
 
-  async function remove(image: UploadedImage) {
+  async function remove() {
+    if (!imageToRemove) return;
     setError(undefined);
     setBusy(true);
     try {
-      await onRemove(image);
+      await onRemove(imageToRemove);
     } catch (removeError) {
       setError(
         removeError instanceof Error
@@ -86,6 +95,7 @@ export function ImageUploader({
       );
     } finally {
       setBusy(false);
+      setImageToRemove(undefined);
     }
   }
 
@@ -105,7 +115,11 @@ export function ImageUploader({
           accept="image/jpeg,image/png"
           aria-label="Choose a JPG or PNG image"
           disabled={disabled || busy || remaining === 0}
-          onChange={(event) => void upload(event.currentTarget.files?.[0])}
+          onChange={(event) => {
+            const file = event.currentTarget.files?.[0];
+            event.currentTarget.value = "";
+            void upload(file);
+          }}
         />
         <Button
           type="button"
@@ -138,7 +152,7 @@ export function ImageUploader({
                 variant="ghost"
                 size="small"
                 disabled={disabled || busy}
-                onClick={() => void remove(image)}
+                onClick={() => setImageToRemove(image)}
               >
                 Remove
               </Button>
@@ -148,6 +162,16 @@ export function ImageUploader({
       ) : (
         <p className="field-hint">No images added yet.</p>
       )}
+      <ConfirmDialog
+        open={imageToRemove !== undefined}
+        title="Remove this image?"
+        message="This image will be removed from this item."
+        confirmLabel="Remove image"
+        cancelLabel="Keep image"
+        busy={busy}
+        onCancel={() => setImageToRemove(undefined)}
+        onConfirm={() => void remove()}
+      />
     </section>
   );
 }

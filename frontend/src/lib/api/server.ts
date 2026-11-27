@@ -1,6 +1,7 @@
 import "server-only";
 
-import { cookies } from "next/headers";
+import { cookies, headers as requestHeaders } from "next/headers";
+import { notFound, redirect } from "next/navigation";
 
 import { apiErrorFromResponse, parseApiPayload } from "@/lib/api/errors";
 import { apiUrl } from "@/lib/api/config";
@@ -28,7 +29,19 @@ export async function serverApiRequest<T>(
   const payload = parseApiPayload(text, response.status);
 
   if (!response.ok) {
-    throw apiErrorFromResponse(response.status, payload);
+    const error = apiErrorFromResponse(response.status, payload, path);
+    if (error.status === 401) {
+      const currentHeaders = await requestHeaders();
+      const returnTo = currentHeaders.get("x-wayfarer-path") ?? "/";
+      const query = new URLSearchParams({
+        reason: "session-expired",
+        returnTo,
+      });
+      redirect(`/login?${query.toString()}`);
+    }
+    if (error.status === 403) redirect("/forbidden");
+    if (error.status === 404) notFound();
+    throw error;
   }
 
   return payload as T;

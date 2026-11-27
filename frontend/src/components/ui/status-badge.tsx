@@ -3,9 +3,7 @@ export type BookingStatus =
   | "Confirmed"
   | "Completed"
   | "Expired"
-  | "Cancelled"
-  | "Failed"
-  | "Refunded";
+  | "Cancelled";
 
 const STATUS_CLASS: Record<BookingStatus, string> = {
   "Pending Payment": "status-pending",
@@ -13,8 +11,6 @@ const STATUS_CLASS: Record<BookingStatus, string> = {
   Completed: "status-completed",
   Expired: "status-expired",
   Cancelled: "status-cancelled",
-  Failed: "status-failed",
-  Refunded: "status-refunded",
 };
 
 export function StatusBadge({ status }: { status: BookingStatus }) {

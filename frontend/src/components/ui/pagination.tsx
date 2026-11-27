@@ -2,6 +2,8 @@
 
 import { Button } from "@/components/ui/button";
 
+export const PAGE_SIZE = 10;
+
 interface PaginationProps {
   page: number;
   totalPages: number;

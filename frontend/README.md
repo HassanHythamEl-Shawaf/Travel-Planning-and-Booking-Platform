@@ -29,22 +29,27 @@ Milestone 1 NestJS API as its source of truth.
   token once before retrying.
 - `serverApiRequest<T>(path, init?)` is for Server Components. It forwards the
   incoming session cookie and disables response caching for user-specific data.
+  API `401` responses return to login with the requested path, `403` responses
+  route to `/forbidden`, and `404` responses render the app's not-found page.
 - The current user comes from `GET /auth/me`; credentials and tokens are never
   written to localStorage or sessionStorage. The `proxy.ts` route guard checks
   sessions, refreshes expired access cookies, enforces role landing pages and
-  sends users with temporary passwords to `/account/change-password`.
+  sends users with temporary passwords to `/account/change-password`. It
+  forwards the requested path to server components so an expired session can
+  return to the page the user originally requested after login.
 - `AppShell` owns the authenticated header and role navigation. Its
   `data-slot="notification-bell"` element is the integration point for the
   notification component.
 - Shared UI components are in `src/components/ui/`: `Button`, `TextField`,
   `SelectField`, `TextAreaField`, `DataTable`, `ConfirmDialog`, toast helpers,
   loading/error/empty states, `Pagination`, `StatusBadge`, and `ImageUploader`.
-  Pagination consumers use a page size of 10.
+  Paginated API consumers use the exported `PAGE_SIZE` value of 10.
 - `ImageUploader` accepts existing images, `maxImages`, and upload/remove
   callbacks. The owner page supplies the backend endpoint; the component
-  enforces the user-facing JPG/PNG and 5 MB checks, while the backend remains
-  authoritative.
-- Design tokens and responsive rules are in `src/app/globals.css`.
+  enforces the user-facing JPG/PNG and 5 MB checks, confirms before removing
+  an image, and leaves final validation to the backend.
+- Color, spacing, and typography tokens plus responsive rules are in
+  `src/app/globals.css`.
 
 ## Checks
 
