@@ -190,6 +190,15 @@ function applyRefreshedCookies(
   return response;
 }
 
+function continueRequest(request: NextRequest): NextResponse {
+  const headers = new Headers(request.headers);
+  headers.set(
+    "x-wayfarer-path",
+    `${request.nextUrl.pathname}${request.nextUrl.search}`,
+  );
+  return NextResponse.next({ request: { headers } });
+}
+
 export async function proxy(request: NextRequest): Promise<NextResponse> {
   const { pathname } = request.nextUrl;
   const isLoginPage = pathname === "/login" || pathname === "/register";
@@ -200,7 +209,7 @@ export async function proxy(request: NextRequest): Promise<NextResponse> {
     pathname.startsWith("/account/") ||
     requiredRole(pathname) !== undefined;
 
-  if (!isLoginPage && !isProtectedPage) return NextResponse.next();
+  if (!isLoginPage && !isProtectedPage) return continueRequest(request);
 
   if (!request.cookies.has("access_token") && !request.cookies.has("refresh_token")) {
     return isProtectedPage ? loginRedirect(request) : NextResponse.next();
@@ -240,14 +249,14 @@ export async function proxy(request: NextRequest): Promise<NextResponse> {
 
   if (refreshedCookies.length > 0) {
     return applyRefreshedCookies(
-      NextResponse.next({ request }),
+      continueRequest(request),
       refreshedCookies,
     );
   }
 
-  return NextResponse.next();
+  return continueRequest(request);
 }
 
 export const config = {
-  matcher: ["/login", "/register", "/account/:path*", "/dashboard/:path*", "/admin/:path*", "/moderator/:path*"],
+  matcher: ["/((?!_next/static|_next/image|favicon.ico|icon.svg|.*\\.(?:png|jpg|jpeg|gif|webp|svg|ico)$).*)"],
 };

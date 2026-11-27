@@ -42,18 +42,56 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
 }
 
-function fieldForMessage(message: string): FormFieldName | undefined {
-  const normalized = message.toLowerCase();
-  return FIELD_NAMES.find(
-    (field) =>
-      normalized.startsWith(`${field.toLowerCase()} `) ||
-      normalized.includes(` ${field.toLowerCase()} `),
-  );
+function fieldForMessage(
+  message: string,
+  requestPath?: string,
+): FormFieldName | undefined {
+  const normalized = ` ${message
+    .replace(/([a-z])([A-Z])/g, "$1 $2")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")} `;
+  const path = requestPath?.toLowerCase() ?? "";
+  const aliases: Partial<Record<FormFieldName, string[]>> = {
+    currentPassword: ["current password"],
+    newPassword: ["new password"],
+    preferredCurrency: ["preferred currency"],
+    termsAccepted: ["terms accepted", "terms and conditions", "consent"],
+    privacyPolicyAccepted: ["privacy policy accepted", "privacy policy"],
+  };
+
+  for (const field of ["currentPassword", "newPassword"] as const) {
+    const fieldWords = field.replace(/([a-z])([A-Z])/g, "$1 $2").toLowerCase();
+    const terms = [fieldWords, ...(aliases[field] ?? [])];
+    if (terms.some((term) => normalized.includes(` ${term} `))) return field;
+  }
+
+  if (/\bpassword\b/i.test(message)) {
+    if (path.includes("/auth/change-password")) return "newPassword";
+    if (path.includes("/auth/register")) return "password";
+  }
+
+  if (
+    path.includes("/users/me") &&
+    normalized.includes(" currency ")
+  ) {
+    return "preferredCurrency";
+  }
+
+  for (const field of FIELD_NAMES.filter(
+    (candidate) => candidate !== "currentPassword" && candidate !== "newPassword",
+  )) {
+    const fieldWords = field.replace(/([a-z])([A-Z])/g, "$1 $2").toLowerCase();
+    const terms = [fieldWords, ...(aliases[field] ?? [])];
+    if (terms.some((term) => normalized.includes(` ${term} `))) return field;
+  }
+
+  return undefined;
 }
 
 export function apiErrorFromResponse(
   status: number,
   payload: unknown,
+  requestPath?: string,
 ): ApiError {
   const payloadRecord = isRecord(payload) ? payload : undefined;
   const rawMessage = payloadRecord?.message;
@@ -66,7 +104,7 @@ export function apiErrorFromResponse(
   const fieldErrors: FieldErrors = {};
 
   for (const message of messages) {
-    const field = fieldForMessage(message);
+    const field = fieldForMessage(message, requestPath);
     if (field) {
       fieldErrors[field] = [...(fieldErrors[field] ?? []), message];
     }
