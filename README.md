@@ -35,3 +35,11 @@ npm test -- --runInBand
 npm run build
 npm run lint
 ```
+
+## Milestone 2 frontend
+
+The Next.js frontend lives in [`frontend/`](./frontend/). See the
+[frontend setup and shared contracts](./frontend/README.md) for environment
+variables, local startup, session handling and reusable component contracts.
+Copy `.env.example` to `frontend/.env.local`; never commit the local
+environment file.
