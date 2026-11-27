@@ -977,3 +977,21 @@ HTTP integration pass also wired payment module dependencies, isolated E2E
 tests from Atlas, updated review-moderation expectations, and documented
 root setup instructions.
 ================================================
+
+Date: 2026-11-27
+Student: Hassan
+Tool: GitHub Copilot (VS Code)
+Related Requirement: ACC-01, ACC-04, ACC-05, ACC-06, ACC-08, ACC-09, ACC-10, ACC-11, ACC-12, ACC-19, GEN-02, GEN-03, GEN-04, GEN-05, GEN-08, GEN-14, GEN-15, GEN-16, GEN-17
+Prompt:
+Implement Person 1's Milestone 2 frontend foundation, auth and account pages,
+shared UI kit and public home using the finished backend and the supplied
+official requirements. Follow the feature-branch Git workflow.
+How the output was used:
+Scaffolded the Next.js App Router TypeScript frontend; added cookie-forwarding
+server and browser API clients, current-user session handling and role-aware
+route protection; built the responsive app shell, reusable UI components,
+image uploader, public landing page, and registration, login, password-change,
+profile and account-deactivation flows. Documented the API/UI contracts and
+frontend setup. Validated with frontend lint/build, browser route smoke checks,
+and targeted backend auth/account tests.
+================================================
