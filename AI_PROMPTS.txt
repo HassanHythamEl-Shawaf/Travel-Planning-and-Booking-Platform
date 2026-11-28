@@ -1053,3 +1053,13 @@ Provide the missing moderator read contract for the assigned airline.
 How the output was used:
 Added an ownership-guarded Swagger endpoint for the airline profile, saved policies and paginated flights with editable cabin capacities.
 ================================================
+
+Date: 2026-11-28
+Student: Yahia
+Tool: OpenAI Codex
+Related Requirement: FLT-01, FLT-08, FLT-09, GEN-08
+Prompt (task summary):
+Build the shared airline profile form and assigned moderator policy editors.
+How the output was used:
+Added reusable admin creation with an onSaved callback, moderator profile and logo management, extra-bag pricing and cancellation tiers.
+================================================
