@@ -4,7 +4,7 @@ import { useState } from "react";
 import { apiRequest } from "@/lib/api/client";
 import type { Airline } from "@/lib/airlines/workspace";
 import { ImageUploader } from "@/components/ui/image-uploader";
-import { TextField } from "@/components/ui/text-field";
+import { EditorTextField as TextField } from "./editor-fields";
 import { EditorForm } from "./editor-form";
 
 export function AirlineProfileForm({ airline, onSaved }: {
