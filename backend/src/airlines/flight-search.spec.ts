@@ -70,6 +70,9 @@ describe('AirlinesService flight search', () => {
 
     expect(result.items).toHaveLength(1);
     expect(result.items[0].cabins[0].seatsAvailable).toBe(1);
+    expect(flightModel.find).toHaveBeenCalledWith(expect.objectContaining({
+      airlineId: { $in: [airlineId, String(airlineId)] },
+    }));
     expect(result.message).toBe('Flights found');
   });
 

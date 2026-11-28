@@ -147,7 +147,7 @@ export class AirlinesService {
 
   async workspace(id: string, pageValue?: string): Promise<AirlineWorkspaceDto> {
     const { page, skip, limit } = getPagination(pageValue);
-    const filter = { airlineId: new Types.ObjectId(id) };
+    const filter = { airlineId: { $in: [new Types.ObjectId(id), id] } };
     const [airline, flights, total] = await Promise.all([
       this.airlineModel.findById(id).exec(),
       this.flightModel.find(filter).sort({ departureAt: -1, _id: -1 }).skip(skip).limit(limit).exec(),
@@ -174,8 +174,13 @@ export class AirlinesService {
       );
     }
 
-    const result = await this.referenceData.listAirports();
-    return result.items.map((airport) => ({
+    const first = await this.referenceData.listAirports();
+    const airports = [...first.items];
+    for (let page = 2; page <= first.totalPages; page++) {
+      const next = await this.referenceData.listAirports({ page });
+      airports.push(...next.items);
+    }
+    return airports.map((airport) => ({
       iataCode: airport._id,
       name: airport.name,
       city: airport.cityId,
@@ -559,7 +564,8 @@ export class AirlinesService {
   ): Promise<FlightSearchResultDto[]> {
     const flights = await this.flightModel
       .find({
-        airlineId: { $in: airlineIds },
+        // Legacy inventory contains both BSON ObjectIds and their hex strings.
+        airlineId: { $in: airlineIds.flatMap(id => [id, String(id)]) },
         departureAirportCode,
         arrivalAirportCode,
         departureLocalDate: departureDate.slice(0, 10),
