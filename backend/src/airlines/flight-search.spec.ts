@@ -72,6 +72,7 @@ describe('AirlinesService flight search', () => {
     expect(result.items[0].cabins[0].seatsAvailable).toBe(1);
     expect(flightModel.find).toHaveBeenCalledWith(expect.objectContaining({
       airlineId: { $in: [airlineId, String(airlineId)] },
+      departureAt: { $gt: expect.any(Date) },
     }));
     expect(result.message).toBe('Flights found');
   });
@@ -96,8 +97,13 @@ describe('AirlinesService flight search', () => {
         maxWeightPerBagKg: 23,
       }],
     });
+    const expensive = flight('CA102');
+    expensive.cabins[0].price = 500;
+    expensive.cabins.push({ ...expensive.cabins[0], category: 'First', price: 100, seatCount: 1 });
+    const soldOut = flight('CA103');
+    soldOut.cabins[0].seatCount = 1;
     const flightModel = {
-      find: jest.fn().mockReturnValue(chain([flight('CA101')])),
+      find: jest.fn().mockReturnValue(chain([expensive, soldOut, flight('CA101')])),
     };
     const airlineModel = {
       find: jest.fn().mockReturnValue(chain([{ _id: airlineId }])),
@@ -122,11 +128,13 @@ describe('AirlinesService flight search', () => {
       adults: 1,
       children: 1,
       infants: 1,
-      cabinClass: 'Economy',
+      sort: 'price',
     });
 
-    expect(result.items).toHaveLength(1);
-    expect(result.returnItems).toHaveLength(1);
+    for (const leg of [result.items, result.returnItems!]) {
+      expect(leg.map(item => item.flightNumber)).toEqual(['CA101', 'CA102']);
+      expect(leg[1].cabins.map(cabin => cabin.price)).toEqual([500]);
+    }
     expect(result.items[0].cabins[0].infantPrice).toBe(25);
   });
 
