@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useId, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { AirportSelect, type Airport } from "@/components/flights/airport-select";
@@ -24,15 +24,17 @@ function localInput(instant: string, timeZone: string) {
 }
 
 function ScheduleFields({ flight }: { flight?: ManagedFlight }) {
+  const id = useId();
   return <>
-    <TextField name="departureLocalTime" label="Departure (departure airport local time)" type="datetime-local" required
+    <TextField id={id + "-departure"} name="departureLocalTime" label="Departure (departure airport local time)" type="datetime-local" required
       defaultValue={flight && localInput(flight.departureAt, flight.departureTimeZone)} />
-    <TextField name="arrivalLocalTime" label="Arrival (arrival airport local time)" type="datetime-local" required
+    <TextField id={id + "-arrival"} name="arrivalLocalTime" label="Arrival (arrival airport local time)" type="datetime-local" required
       defaultValue={flight && localInput(flight.arrivalAt, flight.arrivalTimeZone)} />
   </>;
 }
 
 function CabinEditor({ flight, cabin }: { flight: ManagedFlight; cabin?: Cabin }) {
+  const id = useId();
   const unused = categories.filter(name => !flight.cabins.some(c => c.category === name));
   if (!cabin && !unused.length) return null;
   return <details><summary>{cabin ? cabin.category + " cabin" : "Add cabin"}</summary>
@@ -46,11 +48,11 @@ function CabinEditor({ flight, cabin }: { flight: ManagedFlight; cabin?: Cabin }
         method: cabin ? "PATCH" : "POST", body: JSON.stringify(payload),
       });
     }}>
-      {!cabin && <SelectField name="category" label="Cabin category">{unused.map(name => <option key={name}>{name}</option>)}</SelectField>}
-      <TextField name="seats" label="Total seats" type="number" min="1" required defaultValue={cabin?.seatCount} />
-      <TextField name="price" label="Fare (USD)" type="number" min=".01" step=".01" required defaultValue={cabin?.price} />
-      <TextField name="bags" label="Included bags" type="number" min="0" required defaultValue={cabin?.freeBaggageAllowance} />
-      <TextField name="weight" label="Weight per bag (kg)" type="number" min="0" step="any" required defaultValue={cabin?.maxWeightPerBagKg} />
+      {!cabin && <SelectField id={id + "-category"} name="category" label="Cabin category">{unused.map(name => <option key={name}>{name}</option>)}</SelectField>}
+      <TextField id={id + "-seats"} name="seats" label="Total seats" type="number" min="1" required defaultValue={cabin?.seatCount} />
+      <TextField id={id + "-price"} name="price" label="Fare (USD)" type="number" min=".01" step=".01" required defaultValue={cabin?.price} />
+      <TextField id={id + "-bags"} name="bags" label="Included bags" type="number" min="0" required defaultValue={cabin?.freeBaggageAllowance} />
+      <TextField id={id + "-weight"} name="weight" label="Weight per bag (kg)" type="number" min="0" step="any" required defaultValue={cabin?.maxWeightPerBagKg} />
     </EditorForm>
   </details>;
 }

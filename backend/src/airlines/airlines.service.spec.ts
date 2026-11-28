@@ -261,6 +261,13 @@ describe('AirlinesService', () => {
     ]);
   });
 
+  it('includes airports beyond the first reference-data page', async () => {
+    referenceData.listAirports.mockResolvedValueOnce({ items: [], totalPages: 2 })
+      .mockResolvedValueOnce({ items: [{ _id: 'DXB', name: 'Dubai', cityId: 'dubai', countryCode: 'AE', timeZone: 'Asia/Dubai' }] });
+    expect(await service.listAirports()).toEqual([expect.objectContaining({ iataCode: 'DXB' })]);
+    expect(referenceData.listAirports).toHaveBeenLastCalledWith({ page: 2 });
+  });
+
   it('converts airport-local date-times to UTC and stores both zones', async () => {
     const result = await service.createFlight('moderator-id', {
       airlineId: id.toString(),
