@@ -51,6 +51,21 @@ Milestone 1 NestJS API as its source of truth.
 - Color, spacing, and typography tokens plus responsive rules are in
   `src/app/globals.css`.
 
+## Flight selection for the passenger form (FLT-12, FLT-17, FLT-19)
+
+The public details page at `/flights/[id]` links to `/flights/book` with
+`outboundId`, `outboundCabin`, `adults`, `children`, and `infants`. A round trip
+also includes `returnId` and `returnCabin`. Cabin values are API categories
+(for example, `Premium Economy`). On a round trip the traveler chooses an
+outbound cabin before choosing a return cabin.
+
+Person 4 can mount the passenger form in `src/app/flights/book/page.tsx`.
+The entry page reloads both flights and checks the selected cabins. Its
+`segments[0]` matches the booking DTO's `outbound` and the optional
+`segments[1]` matches `returnFlight`, each shaped as `{ flightId, cabinCategory }`.
+Use the three counts to initialize the passenger fields. The backend verifies
+availability and pricing again when the traveler proceeds to payment.
+
 ## Checks
 
 Run `npm run lint` and `npm run build` from `frontend/`.

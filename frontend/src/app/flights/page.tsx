@@ -37,6 +37,9 @@ async function FlightLeg({ criteria, returning, query }: {
       {results.items.map(flight => (
         <article className="panel form-stack" key={flight.id}>
           <h3>{flight.flightNumber} · {flight.departureAirportCode} → {flight.arrivalAirportCode}</h3>
+          <Link className="text-link" href={`/flights/${flight.id}?${new URLSearchParams([...query, ["leg", returning ? "return" : "outbound"]])}`}>
+            View details for {flight.flightNumber}
+          </Link>
           <p>Departs {formatInZone(flight.departureAt, flight.departureTimeZone)}<br />
             Arrives {formatInZone(flight.arrivalAt, flight.arrivalTimeZone)} · {flight.durationMinutes} min</p>
           <ul>{flight.cabins.map(cabin => <li key={cabin.id}>{cabin.category} · Fare {cabin.price} · Infant fare {cabin.infantPrice} · {cabin.seatsAvailable} seats available</li>)}</ul>
@@ -63,6 +66,10 @@ export default async function FlightsPage({ searchParams }: { searchParams: Prom
   criteria.adults ??= "1";
   const errors = searched ? validateCriteria(criteria) : {};
   const query = new URLSearchParams(criteria);
+  if (criteria.tripType === "round-trip" && typeof raw.outboundId === "string" && typeof raw.outboundCabin === "string") {
+    query.set("outboundId", raw.outboundId);
+    query.set("outboundCabin", raw.outboundCabin);
+  }
   for (const key of ["page", "returnPage"]) {
     const value = raw[key];
     if (typeof value === "string" && /^[1-9]\d*$/.test(value) && Number.isSafeInteger(Number(value))) query.set(key, value);
@@ -74,6 +81,7 @@ export default async function FlightsPage({ searchParams }: { searchParams: Prom
       {airports.length ? <FlightSearchPanel key={query.toString()} initialValues={criteria} initialErrors={errors} airports={airports} />
         : <EmptyState title="No airports available" message="Flight search will be available when airports have been added." />}
       {airports.length > 0 && searched && Object.keys(errors).length === 0 && <>
+        {query.has("outboundId") && <p role="status">Outbound cabin selected ({query.get("outboundCabin")}). Choose your return flight.</p>}
         <FlightLeg criteria={criteria} query={query} />
         {criteria.tripType === "round-trip" && <FlightLeg criteria={criteria} query={query} returning />}
       </>}
