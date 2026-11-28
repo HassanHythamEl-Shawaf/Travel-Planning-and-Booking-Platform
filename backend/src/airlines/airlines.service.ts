@@ -29,6 +29,7 @@ import {
   UpdateAirlineDto,
 } from './dto/airline.dto';
 import { AirportResponseDto } from './dto/airport.dto';
+import { AirlineWorkspaceDto } from './dto/airline-workspace.dto';
 import {
   BaggagePolicyResponseDto,
   UpdateBaggagePolicyDto,
@@ -142,6 +143,28 @@ export class AirlinesService {
 
       throw error;
     }
+  }
+
+  async workspace(id: string, pageValue?: string): Promise<AirlineWorkspaceDto> {
+    const { page, skip, limit } = getPagination(pageValue);
+    const filter = { airlineId: new Types.ObjectId(id) };
+    const [airline, flights, total] = await Promise.all([
+      this.airlineModel.findById(id).exec(),
+      this.flightModel.find(filter).sort({ departureAt: -1, _id: -1 }).skip(skip).limit(limit).exec(),
+      this.flightModel.countDocuments(filter).exec(),
+    ]);
+    if (!airline) throw new NotFoundException('Airline not found');
+    return {
+      airline: this.toResponse(airline),
+      baggagePolicy: airline.baggagePolicy ?? null,
+      cancellationPolicy: airline.cancellationPolicy ?? [],
+      flights: flights.map(flight => ({
+        ...this.toFlightResponse(flight),
+        cabins: flight.cabins.map(cabin => this.toCabinResponse(cabin)),
+      })),
+      page,
+      totalPages: Math.ceil(total / limit),
+    };
   }
 
   async listAirports(): Promise<AirportResponseDto[]> {
