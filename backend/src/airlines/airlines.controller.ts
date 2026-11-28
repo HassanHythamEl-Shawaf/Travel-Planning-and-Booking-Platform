@@ -27,6 +27,7 @@ import {
   ApiOkResponse,
   ApiOperation,
   ApiParam,
+  ApiQuery,
   ApiTags,
   ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
@@ -49,6 +50,7 @@ import {
   UpdateAirlineDto,
 } from './dto/airline.dto';
 import { AirlinesService } from './airlines.service';
+import { AirlineWorkspaceDto } from './dto/airline-workspace.dto';
 import { AirportResponseDto } from './dto/airport.dto';
 import {
   BaggagePolicyResponseDto,
@@ -84,6 +86,19 @@ const ID_PARAM = {
 @Controller('airlines')
 export class AirlinesController {
   constructor(private readonly airlines: AirlinesService) {}
+
+  @Get(':id/workspace')
+  @UseGuards(AuthGuard, RolesGuard, ProviderOwnershipGuard)
+  @Roles(UserRole.MODERATOR)
+  @ProviderOwnership('airline')
+  @ApiCookieAuth('access_token')
+  @ApiOperation({ summary: 'Read the assigned airline, policies and paginated flight inventory' })
+  @ApiQuery({ name: 'page', required: false, type: Number })
+  @ApiOkResponse({ type: AirlineWorkspaceDto })
+  @ApiForbiddenResponse({ description: 'Assigned airline moderator required' })
+  workspace(@Param('id', ParseObjectIdPipe) id: string, @Query('page') page?: string) {
+    return this.airlines.workspace(id, page);
+  }
 
   @Get('airports')
   @ApiOperation({
