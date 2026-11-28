@@ -3,10 +3,10 @@
 import { useId, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { AirportSelect, type Airport } from "@/components/flights/airport-select";
+import type { Airport } from "@/components/flights/airport-select";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
-import { SelectField, TextField } from "@/components/ui/text-field";
+import { EditorAirportSelect as AirportSelect, EditorFieldError, EditorSelectField as SelectField, EditorTextField as TextField } from "./editor-fields";
 import { EmptyState } from "@/components/ui/states";
 import { apiRequest } from "@/lib/api/client";
 import { formatInZone } from "@/lib/flights/format-in-zone";
@@ -98,7 +98,9 @@ export function FlightManagement({ workspace, airports }: { workspace: AirlineWo
   return <section id="flights" className="form-stack"><h2>Flights</h2>
     <details className="panel"><summary>Create flight</summary>
       <EditorForm label="Create flight" save={async data => {
-        if (data.get("departureAirportCode") === data.get("arrivalAirportCode")) throw new Error("Choose different departure and arrival airports.");
+        if (data.get("departureAirportCode") === data.get("arrivalAirportCode")) {
+          throw new EditorFieldError("arrivalAirportCode", "Choose different departure and arrival airports.");
+        }
         await apiRequest("/flights", {method: "POST", body: JSON.stringify({ ...Object.fromEntries(data), airlineId: workspace.airline.id })});
       }}>
         <TextField name="flightNumber" label="Flight number" pattern="[A-Za-z0-9\-]{2,10}" required minLength={2} maxLength={10} />

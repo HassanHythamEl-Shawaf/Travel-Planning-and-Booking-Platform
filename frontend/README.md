@@ -66,6 +66,22 @@ The entry page reloads both flights and checks the selected cabins. Its
 Use the three counts to initialize the passenger fields. The backend verifies
 availability and pricing again when the traveler proceeds to payment.
 
+## Airline moderator bookings handoff for Person 4 (FLT-29)
+
+The airline dashboard lives at `/moderator`. Person 4 owns the proposed bookings
+route `/moderator/flights/[flightId]/bookings` inside the existing workspace layout.
+When the page is ready, replace the `moderator-bookings-menu` slot with a
+“Bookings by flight” link to `/moderator#flights`. Replace the `flight-bookings`
+slot in each flight card with a “View bookings” link to that flight's route.
+Use the flight's database ID, available as `flight.id` in the card.
+
+The page should use the signed-in moderator session for
+`GET /api/flights/:id/bookings` and the CSV action at
+`GET /api/flights/:id/passengers/export`. Both endpoints enforce assigned-airline
+ownership. Use the shared loading, empty and error states and preserve a return
+link to `/moderator#flights`. The passenger booking entry at `/flights/book`
+serves travelers and has a separate contract above.
+
 ## Checks
 
 Run `npm run lint` and `npm run build` from `frontend/`.

@@ -1093,3 +1093,13 @@ Exclude departures at or before search time and rank only cabins with seats for 
 How the output was used:
 Added a strict UTC departure cutoff and cabin-level capacity filtering before sorting and pagination on both legs. Added regression assertions for the query boundary and an unavailable low fare.
 ================================================
+
+Date: 2026-11-28
+Student: Yahia
+Tool: OpenAI Codex
+Related Requirement: GEN-02, GEN-16, FLT-03, FLT-09, FLT-29 (handoff)
+Prompt (task summary):
+Associate moderator validation failures with their inputs and define the bookings dashboard handoff for Person 4.
+How the output was used:
+Used the shared inline field UI and focus management for API and cross-field validation. Documented the proposed moderator bookings route, both dashboard slots and the API endpoints. Browser checks with real Nest and MongoDB verified expired and mixed-capacity searches, focus on the duplicate tier, identical airport and past departure, and the existing flight lifecycle across three widths. Frontend lint and both production builds passed.
+================================================

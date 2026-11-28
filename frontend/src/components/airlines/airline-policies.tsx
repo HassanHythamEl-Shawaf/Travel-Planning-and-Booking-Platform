@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { TextField } from "@/components/ui/text-field";
+import { EditorFieldError, EditorTextField as TextField } from "./editor-fields";
 import { Button } from "@/components/ui/button";
 import { apiRequest } from "@/lib/api/client";
 import type { AirlineWorkspace } from "@/lib/airlines/workspace";
@@ -27,7 +27,13 @@ export function AirlinePolicies({ workspace }: { workspace: AirlineWorkspace }) 
     <section className="panel form-stack"><h2>Cancellation refunds</h2>
       <EditorForm label="Save cancellation tiers" save={async data => {
         const tiers = rows.map(({ key }) => ({ daysBeforeDeparture: Number(data.get("days" + key)), refundPercentage: Number(data.get("refund" + key)) }));
-        if (new Set(tiers.map(tier => tier.daysBeforeDeparture)).size !== tiers.length) throw new Error("Use a different departure threshold for each tier.");
+        const seen = new Set<number>();
+        for (const [index, tier] of tiers.entries()) {
+          if (seen.has(tier.daysBeforeDeparture)) {
+            throw new EditorFieldError("days" + rows[index].key, "Use a different departure threshold for each tier.");
+          }
+          seen.add(tier.daysBeforeDeparture);
+        }
         await apiRequest(path + "/cancellation-policy", {method: "PUT", body: JSON.stringify({ tiers })});
       }}>
         {rows.map(({ key, tier }, index) => <div className="panel form-stack" key={key}>
