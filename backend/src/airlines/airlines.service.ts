@@ -569,6 +569,7 @@ export class AirlinesService {
         departureAirportCode,
         arrivalAirportCode,
         departureLocalDate: departureDate.slice(0, 10),
+        departureAt: { $gt: new Date() },
         status: FlightStatus.SCHEDULED,
       })
       .sort({ departureAt: 1 })
@@ -580,14 +581,13 @@ export class AirlinesService {
         ...flight,
         cabins: flight.cabins.filter(
           (cabin) =>
+            cabin.seatsAvailable >= requiredSeats &&
             (!cabinClass || cabin.category === cabinClass) &&
             (minPrice === undefined || cabin.price >= minPrice) &&
             (maxPrice === undefined || cabin.price <= maxPrice),
         ),
       }))
-      .filter((flight) =>
-        flight.cabins.some((cabin) => cabin.seatsAvailable >= requiredSeats),
-      )
+      .filter((flight) => flight.cabins.length > 0)
       .sort((left, right) => {
         if (sort === 'price') {
           return (

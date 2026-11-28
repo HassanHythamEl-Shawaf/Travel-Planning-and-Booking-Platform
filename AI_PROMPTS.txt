@@ -1083,3 +1083,13 @@ Trace live dashboard and search integration failures, preserve historical invent
 How the output was used:
 Matched both airline ID representations in inventory and public search, returned all airport pages, added regression coverage and gave repeated schedule and cabin inputs distinct labels. All 41 airline tests passed. A browser test using the real frontend, backend and an isolated MongoDB verified profile, policies, flight and cabin creation, rescheduling, search, flight details, booking handoff, cancellation and three viewport widths.
 ================================================
+
+Date: 2026-11-28
+Student: Yahia
+Tool: OpenAI Codex
+Related Requirement: FLT-11, FLT-12, FLT-15, FLT-30
+Prompt (task summary):
+Exclude departures at or before search time and rank only cabins with seats for the party.
+How the output was used:
+Added a strict UTC departure cutoff and cabin-level capacity filtering before sorting and pagination on both legs. Added regression assertions for the query boundary and an unavailable low fare.
+================================================
