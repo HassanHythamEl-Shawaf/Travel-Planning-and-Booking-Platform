@@ -1012,3 +1012,18 @@ aligned the booking badge with the shared booking states and page size,
 centralized core type and spacing tokens, and added confirmation before
 removing uploaded images.
 ================================================
+
+Date: 2026-11-28
+Student: Yahia
+Tool: OpenAI Codex
+Related Requirement: FLT-02, FLT-11, FLT-12, FLT-15, GEN-06
+Prompt (task summary):
+Build the reusable airport selector, airport-local time formatter and
+server-rendered flight search from the frontend foundation and Swagger API.
+Support itinerary-prefilled searches, passenger types, filters and sorting.
+How the output was used:
+Added the public flights page and shared search components. The form keeps
+criteria in the URL. Each direction uses the public search endpoint with its
+own page number because the combined response counts only outbound results.
+Passed frontend lint and production build. Browser checks with a temporary API fixture covered round-trip search, independent return pagination, price validation, the one-way empty state, and layout overflow at 390, 768 and 1280 pixels. Live backend integration remains to be verified.
+================================================
